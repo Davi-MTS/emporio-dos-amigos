@@ -1,0 +1,34 @@
+# Build
+/build/
+/out/
+*.o
+*.obj
+*.exe
+*.dll
+
+# Qt
+*.user
+*.qmlc
+*.jsc
+CMakeLists.txt.user*
+.qmake.stash
+
+# SQLite (banco local não vai pro versionamento — contém dados da loja)
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Backup local e relatório gerado
+/backups/
+/Backups/
+relatorio.html
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Segredos e config local (Claude Code)
+CLAUDE.local.md

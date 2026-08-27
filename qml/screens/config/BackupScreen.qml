@@ -1,0 +1,266 @@
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import Distribuidora
+
+// Backup e restauração (só Administrador). Backup manual + automático (ao fechar
+// caixa), com retenção de 5 cópias, e restauração agendada para o próximo início.
+Rectangle {
+    id: tela
+    color: Theme.background
+
+    property var status: ({})
+
+    ListModel { id: backupsModel }
+
+    Component.onCompleted: carregar()
+    function carregar() {
+        status = App.statusBackup();
+        backupsModel.clear();
+        var l = App.backupsDisponiveis();
+        for (var i = 0; i < l.length; i++)
+            backupsModel.append(l[i]);
+    }
+    function fmtData(iso) {
+        if (!iso || iso.length === 0) return "—";
+        return Qt.formatDateTime(new Date(iso), "dd/MM/yyyy HH:mm");
+    }
+    function fmtTam(b) {
+        if (b >= 1048576) return (b / 1048576).toFixed(1) + " MB";
+        if (b >= 1024) return Math.round(b / 1024) + " KB";
+        return b + " B";
+    }
+
+    ColumnLayout {
+        anchors.fill: parent
+        anchors.margins: Theme.spacingLg
+        spacing: Theme.spacingMd
+
+        // ---- Status + ações ----
+        Rectangle {
+            Layout.fillWidth: true
+            radius: Theme.radius
+            color: Theme.surface
+            border.color: Theme.border
+            implicitHeight: statusCol.implicitHeight + 2 * Theme.spacingLg
+
+            ColumnLayout {
+                id: statusCol
+                anchors.fill: parent
+                anchors.margins: Theme.spacingLg
+                spacing: Theme.spacingMd
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.spacingMd
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 2
+                        Text {
+                            text: qsTr("Backup do sistema")
+                            color: Theme.text
+                            font.family: Theme.fontDisplay
+                            font.pixelSize: Theme.fontXl
+                            font.weight: Font.DemiBold
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            text: (tela.status.ultimoCriadoEm && tela.status.ultimoCriadoEm.length > 0)
+                                  ? qsTr("Último backup: ") + tela.fmtData(tela.status.ultimoCriadoEm)
+                                    + "  ·  " + (tela.status.ultimoResumo || "")
+                                  : qsTr("Nenhum backup ainda.")
+                            color: (tela.status.ultimoCriadoEm && tela.status.ultimoCriadoEm.length > 0)
+                                   ? Theme.success : Theme.warning
+                            font.pixelSize: Theme.fontSm
+                            font.weight: Font.DemiBold
+                        }
+                    }
+                    AppButton {
+                        kind: "accent"
+                        text: qsTr("Fazer backup agora")
+                        onClicked: {
+                            var r = App.fazerBackup();
+                            if (r.ok) { aviso.mostrar(qsTr("Backup criado — ") + r.resumo, false); tela.carregar(); }
+                            else aviso.mostrar(r.erro, true);
+                        }
+                    }
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    elide: Text.ElideMiddle
+                    text: qsTr("Pasta: ") + (tela.status.pasta || "")
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.fontXs
+                }
+                Text {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    text: qsTr("Um backup é feito automaticamente ao fechar o caixa. São mantidas as 5 cópias mais recentes.")
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.fontXs
+                }
+                Label {
+                    id: aviso
+                    property bool erro: false
+                    function mostrar(t, e) { erro = e; text = t; visible = true; }
+                    visible: false
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    color: erro ? Theme.danger : Theme.success
+                    font.pixelSize: Theme.fontSm
+                    font.weight: Font.DemiBold
+                }
+            }
+        }
+
+        Text {
+            text: qsTr("Cópias disponíveis")
+            color: Theme.textMuted
+            font.pixelSize: Theme.fontSm
+            font.weight: Font.DemiBold
+            font.capitalization: Font.AllUppercase
+            font.letterSpacing: 0.6
+        }
+
+        // ---- Lista de backups ----
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            radius: Theme.radius
+            color: Theme.surface
+            border.color: Theme.border
+            clip: true
+
+            ListView {
+                id: lista
+                anchors.fill: parent
+                clip: true
+                model: backupsModel
+                ScrollBar.vertical: ScrollBar {}
+                delegate: Rectangle {
+                    id: row
+                    required property int index
+                    required property string caminho
+                    required property string criadoEm
+                    required property var tamanho
+                    required property string resumo
+                    width: ListView.view.width
+                    height: 58
+                    color: "transparent"
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: Theme.spacingMd
+                        anchors.rightMargin: Theme.spacingMd
+                        spacing: Theme.spacingMd
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 0
+                            Text {
+                                text: tela.fmtData(row.criadoEm)
+                                color: Theme.text
+                                font.pixelSize: Theme.fontMd
+                                font.weight: Font.DemiBold
+                            }
+                            Text {
+                                Layout.fillWidth: true
+                                elide: Text.ElideRight
+                                text: row.resumo + "  ·  " + tela.fmtTam(row.tamanho)
+                                color: Theme.textMuted
+                                font.pixelSize: Theme.fontXs
+                            }
+                        }
+                        AppButton {
+                            kind: "default"
+                            text: qsTr("Restaurar")
+                            onClicked: restaurarDialog.abrir(row.caminho, tela.fmtData(row.criadoEm), row.resumo)
+                        }
+                    }
+                    Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.border }
+                }
+                Label {
+                    anchors.centerIn: parent
+                    visible: lista.count === 0
+                    text: qsTr("Nenhum backup ainda. Clique em “Fazer backup agora”.")
+                    color: Theme.textMuted
+                }
+            }
+        }
+    }
+
+    // Confirmar restauração
+    AppDialog {
+        id: restaurarDialog
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: 500
+        padding: Theme.spacingLg
+        property string caminho: ""
+        property string quando: ""
+        property string resumo: ""
+        function abrir(c, q, r) { caminho = c; quando = q; resumo = r; open(); }
+        title: qsTr("Restaurar backup")
+        contentItem: ColumnLayout {
+            spacing: Theme.spacingMd
+            Text {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: qsTr("Isto vai substituir TODOS os dados atuais pela cópia de ") + restaurarDialog.quando + "."
+                color: Theme.text
+                font.pixelSize: Theme.fontMd
+                font.weight: Font.DemiBold
+            }
+            Text {
+                Layout.fillWidth: true
+                text: restaurarDialog.resumo
+                color: Theme.textMuted
+                font.pixelSize: Theme.fontSm
+            }
+            Text {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: qsTr("Uma cópia de segurança do estado atual é criada antes, por garantia. Para concluir, o aplicativo precisa ser fechado e aberto de novo.")
+                color: Theme.textMuted
+                font.pixelSize: Theme.fontXs
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                AppButton {
+                    kind: "accent"
+                    text: qsTr("Restaurar")
+                    onClicked: {
+                        var r = App.agendarRestauracao(restaurarDialog.caminho);
+                        restaurarDialog.close();
+                        if (r.ok) prontoDialog.open();
+                        else aviso.mostrar(r.erro, true);
+                    }
+                }
+                AppButton { kind: "default"; text: qsTr("Cancelar"); onClicked: restaurarDialog.close() }
+                Item { Layout.fillWidth: true }
+            }
+        }
+    }
+
+    // Restauração agendada
+    AppDialog {
+        id: prontoDialog
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: 460
+        padding: Theme.spacingLg
+        title: qsTr("Restauração agendada")
+        standardButtons: Dialog.Ok
+        contentItem: ColumnLayout {
+            Text {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: qsTr("Feche e abra o sistema novamente para concluir. Ao reabrir, os dados estarão como no backup escolhido.")
+                color: Theme.text
+                font.pixelSize: Theme.fontMd
+            }
+        }
+    }
+}
