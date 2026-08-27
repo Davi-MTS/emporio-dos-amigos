@@ -70,10 +70,18 @@ Rectangle {
         // Período
         RowLayout {
             spacing: Theme.spacingSm
-            AppButton { kind: tela.dias === 0 ? "accent" : "default"; text: qsTr("Hoje"); onClicked: { tela.dias = 0; tela.carregar(); } }
-            AppButton { kind: tela.dias === 7 ? "accent" : "default"; text: qsTr("7 dias"); onClicked: { tela.dias = 7; tela.carregar(); } }
-            AppButton { kind: tela.dias === 30 ? "accent" : "default"; text: qsTr("30 dias"); onClicked: { tela.dias = 30; tela.carregar(); } }
+            SegmentedControl {
+                id: periodo
+                Layout.preferredWidth: 300
+                Layout.preferredHeight: 42
+                options: [qsTr("Hoje"), qsTr("7 dias"), qsTr("30 dias")]
+                onCurrentIndexChanged: {
+                    tela.dias = (currentIndex === 0) ? 0 : (currentIndex === 1 ? 7 : 30);
+                    tela.carregar();
+                }
+            }
             Item { Layout.fillWidth: true }
+            AppButton { kind: "ghost"; text: qsTr("↻ Atualizar"); onClicked: tela.carregar() }
         }
 
         // Cartões

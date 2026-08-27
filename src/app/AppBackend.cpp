@@ -876,7 +876,8 @@ bool AppBackend::registrarEntrada(int produtoId, int embalagemId, int qtdEmb,
             custoUnitBaseMilli = *cents * 1000 / fator;
     }
 
-    if (!m_estoqueRepo.registrarEntradaMilli(produtoId, qtdBase, custoUnitBaseMilli, 0, observacao)) {
+    if (!m_estoqueRepo.registrarEntradaMilli(produtoId, qtdBase, custoUnitBaseMilli,
+                                             m_usuarioId, observacao)) {
         m_erro = m_estoqueRepo.ultimoErro();
         return false;
     }
@@ -888,7 +889,7 @@ bool AppBackend::registrarEntrada(int produtoId, int embalagemId, int qtdEmb,
 
 bool AppBackend::registrarInventario(int produtoId, int novaQtdBase, const QString &motivo)
 {
-    if (!m_estoqueRepo.registrarInventario(produtoId, novaQtdBase, motivo, 0)) {
+    if (!m_estoqueRepo.registrarInventario(produtoId, novaQtdBase, motivo, m_usuarioId)) {
         m_erro = m_estoqueRepo.ultimoErro();
         return false;
     }
@@ -913,7 +914,7 @@ bool AppBackend::registrarRetirada(int produtoId, int embalagemId, int qtdEmb,
     }
     const qint64 qtdBase = static_cast<qint64>(qtdEmb) * fator;
 
-    if (!m_estoqueRepo.registrarSaida(produtoId, qtdBase, motivo, 0)) {
+    if (!m_estoqueRepo.registrarSaida(produtoId, qtdBase, motivo, m_usuarioId)) {
         m_erro = m_estoqueRepo.ultimoErro();
         return false;
     }

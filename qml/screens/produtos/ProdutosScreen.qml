@@ -67,6 +67,7 @@ Rectangle {
         localField.text = produtoAtual.localizacao || "";
         categoriaCombo.currentIndex = categoriaCombo.indexOfValue(produtoAtual.categoriaId || 0);
         compostoCheck.checked = produtoAtual.composto || false;
+        abasProduto.currentIndex = 0;   // sempre abre em "Dados"
     }
     function _carregarEmbalagens() {
         embModel.clear();
@@ -305,6 +306,22 @@ Rectangle {
                         Layout.rightMargin: Theme.spacingLg
                         spacing: Theme.spacingMd
 
+                        // O editor é dividido em seções para não virar um
+                        // formulário gigante empilhado.
+                        SegmentedControl {
+                            id: abasProduto
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 40
+                            Layout.bottomMargin: Theme.spacingXs
+                            options: [qsTr("Dados"), qsTr("Embalagens"), qsTr("Composição")]
+                        }
+
+                        // ========================= SEÇÃO: DADOS =========================
+                        ColumnLayout {
+                        visible: abasProduto.currentIndex === 0
+                        Layout.fillWidth: true
+                        spacing: Theme.spacingMd
+
                         FormField {
                             label: qsTr("Nome *")
                             Layout.fillWidth: true
@@ -393,14 +410,14 @@ Rectangle {
                             }
                         }
 
-                        // ----------------------- Embalagens -----------------------
-                        Text {
-                            text: qsTr("Embalagens e conversão")
-                            color: Theme.text
-                            font.pixelSize: Theme.fontMd
-                            font.weight: Font.DemiBold
-                            Layout.topMargin: Theme.spacingSm
-                        }
+                        } // fim SEÇÃO: DADOS
+
+                        // ====================== SEÇÃO: EMBALAGENS ======================
+                        ColumnLayout {
+                        visible: abasProduto.currentIndex === 1
+                        Layout.fillWidth: true
+                        spacing: Theme.spacingMd
+
                         Text {
                             text: qsTr("O estoque é sempre em unidade base. Fator = quantas unidades base a embalagem tem.")
                             color: Theme.textMuted
@@ -472,12 +489,27 @@ Rectangle {
                             })
                         }
 
-                        // ---------------- Produto composto (copão, drink, shot, dose) ----------------
-                        Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Theme.border; Layout.topMargin: Theme.spacingSm }
+                        } // fim SEÇÃO: EMBALAGENS
+
+                        // ====================== SEÇÃO: COMPOSIÇÃO ======================
+                        // Produto composto (copão, drink, shot, dose).
+                        ColumnLayout {
+                        visible: abasProduto.currentIndex === 2
+                        Layout.fillWidth: true
+                        spacing: Theme.spacingMd
+
                         ToggleButton {
                             id: compostoCheck
                             text: qsTr("Produto composto (copão, drink, shot…)")
-                            Layout.topMargin: Theme.spacingXs
+                        }
+                        Text {
+                            visible: !compostoCheck.checked
+                            text: qsTr("Ative se este produto for montado na hora a partir de outros (ex.: copão). "
+                                       + "Produtos normais não precisam de composição.")
+                            color: Theme.textMuted
+                            font.pixelSize: Theme.fontSm
+                            wrapMode: Text.WordWrap
+                            Layout.fillWidth: true
                         }
                         Text {
                             visible: compostoCheck.checked
@@ -538,6 +570,8 @@ Rectangle {
                             text: qsTr("＋ Adicionar categoria")
                             onClicked: compModel.append({ categoriaId: 0, unidade: "unidade", quantidade: 1 })
                         }
+
+                        } // fim SEÇÃO: COMPOSIÇÃO
 
                         Label {
                             id: erroLabel
