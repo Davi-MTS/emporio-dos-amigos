@@ -54,6 +54,18 @@ void TstRelatorioMobile::geraHtmlComDados()
     QVERIFY(html.contains(QStringLiteral("ProdutoTesteXYZ")));
     QVERIFY(html.contains(QStringLiteral("id=\"dados\"")));  // JSON embutido
     QVERIFY(html.contains(QStringLiteral("periodos")));
+
+    // Relatório COMPLETO: todas as áreas do negócio presentes no JSON.
+    for (const char *chave : {"estoque", "estoqueValor", "fiado", "aPagar",
+                              "compras", "parados", "caixa"}) {
+        QVERIFY2(html.contains(QStringLiteral("\"%1\"").arg(QLatin1String(chave))),
+                 qUtf8Printable(QStringLiteral("faltou a seção '%1' no relatório")
+                                    .arg(QLatin1String(chave))));
+    }
+    // E as seções renderizadas na página.
+    QVERIFY(html.contains(QStringLiteral("Último fechamento de caixa")));
+    QVERIFY(html.contains(QStringLiteral("A pagar")));
+    QVERIFY(html.contains(QStringLiteral("Últimas compras")));
 }
 
 QTEST_MAIN(TstRelatorioMobile)

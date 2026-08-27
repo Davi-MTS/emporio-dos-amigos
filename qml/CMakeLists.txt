@@ -46,7 +46,6 @@ qt_add_qml_module(distribuidora
         screens/financeiro/FinanceiroScreen.qml
         screens/relatorios/RelatoriosScreen.qml
         screens/config/BackupScreen.qml
-        screens/config/RelatorioMobileScreen.qml
 )
 
 # Fontes embutidas (:/fonts/...), carregadas em main.cpp.

@@ -331,9 +331,15 @@ sem servidor. `src/services/relatoriomobile/RelatorioMobileService`:
   no celular (privado, só leitura).
 - Conteúdo: resumo Hoje/7/30 (faturamento, lucro, nº vendas, ticket), formas de
   pagamento, mais vendidos, estoque (baixos em destaque) e fiado a receber.
-- Atualiza **ao fechar o caixa** (`AppBackend::fecharCaixa`) + botão "Atualizar agora".
-- UI: `qml/screens/config/RelatorioMobileScreen.qml` (rota `relmobile`, sidebar só
-  Admin). `AppBackend::gerarRelatorioCelular/statusRelatorioCelular`.
+- **SEM aba própria** (decisão do dono): é 100% automático, sempre **junto com o
+  backup** — no `fecharCaixa` e também no botão "Fazer backup agora". A tela de
+  Backup só mostra uma linha com "atualizado em / pasta".
+- **Relatório completo**: além do resumo por período (Hoje/7/30 com faturamento,
+  lucro, nº vendas, ticket), traz formas de pagamento, mais vendidos, **último
+  fechamento de caixa** (esperado × contado × diferença + composição), **estoque**
+  com valor imobilizado e itens em falta, **fiado a receber**, **contas a pagar**
+  (vencidas destacadas), **últimas compras** e **produtos parados**.
+- `AppBackend::gerarRelatorioCelular/statusRelatorioCelular` (sem UI dedicada).
 - Descartado Vercel/nuvem pública (exporia finanças); Cloudflare Pages+Access fica
   como evolução futura para "URL com login".
 - Coberto por `tst_relatorio_mobile`. **16 executáveis de teste no CTest.**

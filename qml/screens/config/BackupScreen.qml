@@ -10,12 +10,14 @@ Rectangle {
     color: Theme.background
 
     property var status: ({})
+    property var relatorio: ({})
 
     ListModel { id: backupsModel }
 
     Component.onCompleted: carregar()
     function carregar() {
         status = App.statusBackup();
+        relatorio = App.statusRelatorioCelular();
         backupsModel.clear();
         var l = App.backupsDisponiveis();
         for (var i = 0; i < l.length; i++)
@@ -97,7 +99,17 @@ Rectangle {
                 Text {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
-                    text: qsTr("Um backup é feito automaticamente ao fechar o caixa. São mantidas as 5 cópias mais recentes.")
+                    text: qsTr("Ao fechar o caixa (e neste botão) são gerados automaticamente: o backup — mantendo as 5 cópias mais recentes — e o relatório do celular.")
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.fontXs
+                }
+                Text {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    elide: Text.ElideMiddle
+                    visible: tela.relatorio.existe === true
+                    text: qsTr("Relatório do celular: atualizado em ")
+                          + tela.fmtData(tela.relatorio.atualizadoEm) + "\n" + (tela.relatorio.pasta || "")
                     color: Theme.textMuted
                     font.pixelSize: Theme.fontXs
                 }

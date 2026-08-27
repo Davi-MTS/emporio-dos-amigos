@@ -10,8 +10,13 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 
+#include <QSqlQuery>
+
+#include "domain/caixa/CaixaRepository.h"
 #include "domain/clientes/ClienteRepository.h"
+#include "domain/compras/CompraRepository.h"
 #include "domain/estoque/EstoqueRepository.h"
+#include "domain/financeiro/FinanceiroRepository.h"
 #include "domain/relatorios/RelatorioRepository.h"
 #include "utils/Money.h"
 
@@ -96,7 +101,17 @@ QString RelatorioMobileService::montarHtml() const
     }
     dados[QStringLiteral("periodos")] = periodos;
 
-    // Estoque (baixos primeiro).
+    // Produtos parados (30 dias) — o que não gira.
+    QJsonArray paradosArr;
+    for (const ProdutoParado &pp : rel.produtosParados(30)) {
+        QJsonObject o;
+        o[QStringLiteral("nome")] = pp.nome;
+        o[QStringLiteral("estoque")] = static_cast<double>(pp.estoque);
+        paradosArr.append(o);
+    }
+    dados[QStringLiteral("parados")] = paradosArr;
+
+    // Estoque (baixos primeiro) + valor imobilizado.
     EstoqueRepository est(m_db);
     QVector<ItemEstoque> itens = est.listar();
     std::sort(itens.begin(), itens.end(), [](const ItemEstoque &a, const ItemEstoque &b) {
@@ -106,6 +121,8 @@ QString RelatorioMobileService::montarHtml() const
         return a.nome.localeAwareCompare(b.nome) < 0;
     });
     QJsonArray estArr;
+    qint64 valorEstoque = 0;
+    int emFalta = 0;
     for (const ItemEstoque &it : itens) {
         QJsonObject o;
         o[QStringLiteral("nome")] = it.nome;
@@ -114,8 +131,87 @@ QString RelatorioMobileService::montarHtml() const
         o[QStringLiteral("custoMedio")] = Money::format(it.custoMedio);
         o[QStringLiteral("baixo")] = (it.quantidade <= it.minimo);
         estArr.append(o);
+        valorEstoque += it.quantidade * it.custoMedio;
+        if (it.quantidade <= it.minimo)
+            ++emFalta;
     }
     dados[QStringLiteral("estoque")] = estArr;
+    dados[QStringLiteral("estoqueValor")] = Money::format(valorEstoque);
+    dados[QStringLiteral("estoqueEmFalta")] = emFalta;
+    dados[QStringLiteral("estoqueItens")] = itens.size();
+
+    // Último fechamento de caixa (este relatório nasce justamente no fechamento).
+    {
+        QJsonObject cx;
+        int sid = 0;
+        QSqlQuery q(m_db);
+        if (q.exec(QStringLiteral(
+                "SELECT id, valor_esperado, valor_informado, diferenca, fechada_em "
+                "FROM sessoes_caixa WHERE status='fechada' ORDER BY id DESC LIMIT 1"))
+            && q.next()) {
+            sid = q.value(0).toInt();
+            cx[QStringLiteral("esperado")] = Money::format(q.value(1).toLongLong());
+            cx[QStringLiteral("contado")] = Money::format(q.value(2).toLongLong());
+            const qint64 dif = q.value(3).toLongLong();
+            cx[QStringLiteral("diferenca")] = Money::format(dif);
+            cx[QStringLiteral("difValor")] = static_cast<double>(dif);
+            cx[QStringLiteral("fechadaEm")] = q.value(4).toString();
+        }
+        if (sid > 0) {
+            CaixaRepository caixa(m_db);
+            const ResumoCaixa rc = caixa.resumo(sid);
+            cx[QStringLiteral("vendido")] = Money::format(rc.totalVendas());
+            cx[QStringLiteral("numVendas")] = rc.numVendas;
+            cx[QStringLiteral("abertura")] = Money::format(rc.abertura);
+            cx[QStringLiteral("dinheiro")] = Money::format(rc.vendasDinheiro);
+            cx[QStringLiteral("sangrias")] = Money::format(rc.sangrias);
+            cx[QStringLiteral("suprimentos")] = Money::format(rc.suprimentos);
+            cx[QStringLiteral("recebimentos")] = Money::format(rc.recebimentos);
+            cx[QStringLiteral("temDados")] = true;
+        } else {
+            cx[QStringLiteral("temDados")] = false;
+        }
+        dados[QStringLiteral("caixa")] = cx;
+    }
+
+    // Contas a pagar em aberto.
+    FinanceiroRepository fin(m_db);
+    {
+        QJsonArray arr;
+        qint64 total = 0;
+        for (const ContaPagar &cp : fin.contasPagar(/*apenasAbertas=*/true)) {
+            QJsonObject o;
+            o[QStringLiteral("descricao")] = cp.descricao;
+            o[QStringLiteral("fornecedor")] = cp.fornecedorNome;
+            o[QStringLiteral("valor")] = Money::format(cp.valor);
+            o[QStringLiteral("vencimento")] = cp.vencimento;
+            o[QStringLiteral("vencida")] = cp.vencida;
+            arr.append(o);
+            total += cp.valor;
+        }
+        QJsonObject ap;
+        ap[QStringLiteral("total")] = Money::format(total);
+        ap[QStringLiteral("contas")] = arr;
+        dados[QStringLiteral("aPagar")] = ap;
+    }
+
+    // Últimas compras registradas.
+    {
+        QJsonArray arr;
+        int n = 0;
+        for (const CompraResumo &cr : CompraRepository(m_db).listar()) {
+            if (n++ >= 10)
+                break;
+            QJsonObject o;
+            o[QStringLiteral("fornecedor")] = cr.fornecedorNome;
+            o[QStringLiteral("data")] = cr.data;
+            o[QStringLiteral("total")] = Money::format(cr.total);
+            o[QStringLiteral("itens")] = cr.numItens;
+            o[QStringLiteral("nota")] = cr.numeroNota;
+            arr.append(o);
+        }
+        dados[QStringLiteral("compras")] = arr;
+    }
 
     // Fiado a receber (por cliente com saldo).
     ClienteRepository cli(m_db);
@@ -200,11 +296,23 @@ QString RelatorioMobileService::montarHtml() const
     <h2>Mais vendidos</h2>
     <div class="card" id="maisVendidos"></div>
 
-    <h2>Estoque</h2>
+    <h2 id="hCaixa">Último fechamento de caixa</h2>
+    <div class="card" id="caixa"></div>
+
+    <h2 id="hEstoque">Estoque</h2>
     <div class="card" id="estoque"></div>
 
     <h2 id="hFiado">A receber (fiado)</h2>
     <div class="card" id="fiado"></div>
+
+    <h2 id="hPagar">A pagar</h2>
+    <div class="card" id="pagar"></div>
+
+    <h2>Últimas compras</h2>
+    <div class="card" id="compras"></div>
+
+    <h2>Parados (30 dias sem vender)</h2>
+    <div class="card" id="parados"></div>
 
     <div class="foot">Empório dos Amigos · relatório somente leitura</div>
   </div>
@@ -231,13 +339,52 @@ QString RelatorioMobileService::montarHtml() const
       rows($('maisVendidos'), p.maisVendidos, m => `<div class="row"><div class="n">${m.nome}</div><div class="val">${m.qtd}</div></div>`);
     }
 
-    // Estoque e fiado não dependem do período.
+    // --- Seções que não dependem do período ---
+
+    // Último fechamento de caixa.
+    (function(){
+      const cx = D.caixa||{};
+      if (!cx.temDados) { $('caixa').innerHTML = '<div class="empty">Nenhum caixa fechado ainda.</div>'; return; }
+      $('hCaixa').textContent = 'Último fechamento de caixa · ' + fmtData(cx.fechadaEm);
+      const dif = cx.difValor||0;
+      const corDif = dif === 0 ? 'var(--green)' : (dif < 0 ? 'var(--red)' : 'var(--orange)');
+      const rotuloDif = dif === 0 ? 'confere' : (dif < 0 ? 'falta' : 'sobra');
+      $('caixa').innerHTML =
+        `<div class="row"><div class="n">Vendido no turno (${cx.numVendas||0})</div><div class="val">${cx.vendido||'—'}</div></div>`
+      + `<div class="row"><div class="n">Abertura</div><div class="val">${cx.abertura||'—'}</div></div>`
+      + `<div class="row"><div class="n">Vendas em dinheiro</div><div class="val">${cx.dinheiro||'—'}</div></div>`
+      + `<div class="row"><div class="n">Suprimentos</div><div class="val">${cx.suprimentos||'—'}</div></div>`
+      + `<div class="row"><div class="n">Recebimentos de fiado</div><div class="val">${cx.recebimentos||'—'}</div></div>`
+      + `<div class="row"><div class="n">Sangrias</div><div class="val">${cx.sangrias||'—'}</div></div>`
+      + `<div class="row"><div class="n">Esperado na gaveta</div><div class="val">${cx.esperado||'—'}</div></div>`
+      + `<div class="row"><div class="n">Contado</div><div class="val">${cx.contado||'—'}</div></div>`
+      + `<div class="row"><div class="n" style="color:${corDif}">Diferença (${rotuloDif})</div><div class="val" style="color:${corDif}">${cx.diferenca||'—'}</div></div>`;
+    })();
+
+    // Estoque (com valor imobilizado e quantos estão baixos).
+    $('hEstoque').textContent = 'Estoque · ' + (D.estoqueValor||'R$ 0,00')
+      + (D.estoqueEmFalta ? ('  ·  ' + D.estoqueEmFalta + ' em falta') : '');
     rows($('estoque'), D.estoque, e => `<div class="row"><div><div class="n">${e.nome}</div><div class="s">custo ${e.custoMedio}</div></div><div style="display:flex;align-items:center;gap:8px">${e.baixo?'<span class="pill">baixo</span>':''}<span class="val">${e.quantidade} ${e.unidade||''}</span></div></div>`);
+
+    // Fiado a receber.
     (function(){
       const fi = D.fiado||{clientes:[]};
       $('hFiado').textContent = 'A receber (fiado) · ' + (fi.total||'R$ 0,00');
       rows($('fiado'), fi.clientes, c => `<div class="row"><div class="n">${c.nome}</div><div class="val">${c.saldo}</div></div>`);
     })();
+
+    // Contas a pagar.
+    (function(){
+      const ap = D.aPagar||{contas:[]};
+      $('hPagar').textContent = 'A pagar · ' + (ap.total||'R$ 0,00');
+      rows($('pagar'), ap.contas, c => `<div class="row"><div><div class="n">${c.descricao}</div><div class="s" ${c.vencida?'style="color:var(--red)"':''}>${c.fornecedor}${c.vencimento?(' · vence '+c.vencimento):''}${c.vencida?' · VENCIDA':''}</div></div><div class="val">${c.valor}</div></div>`);
+    })();
+
+    // Últimas compras.
+    rows($('compras'), D.compras, c => `<div class="row"><div><div class="n">${c.fornecedor}</div><div class="s">${fmtData(c.data)}${c.nota?(' · NF '+c.nota):''} · ${c.itens} item(ns)</div></div><div class="val">${c.total}</div></div>`);
+
+    // Produtos parados.
+    rows($('parados'), D.parados, p => `<div class="row"><div class="n">${p.nome}</div><div class="val">${p.estoque}</div></div>`);
 
     document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
       document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));

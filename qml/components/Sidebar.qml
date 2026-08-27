@@ -24,8 +24,7 @@ Rectangle {
         { rota: "financeiro", titulo: "Financeiro",  perm: "ve_financeiro" },
         { rota: "relatorios", titulo: "Relatórios" },
         { rota: "usuarios",   titulo: "Usuários",       perm: "gerencia_usuarios" },
-        { rota: "backup",     titulo: "Backup",         perm: "gerencia_usuarios" },
-        { rota: "relmobile",  titulo: "Ver no celular", perm: "gerencia_usuarios" }
+        { rota: "backup",     titulo: "Backup",         perm: "gerencia_usuarios" }
     ]
 
     function _selecionar(item) {

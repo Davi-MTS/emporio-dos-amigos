@@ -49,8 +49,7 @@ ApplicationWindow {
         "financeiro": { t: qsTr("Financeiro"),           s: qsTr("Contas a pagar e receber") },
         "relatorios": { t: qsTr("Relatórios"),           s: qsTr("Indicadores e desempenho") },
         "usuarios":   { t: qsTr("Usuários"),             s: qsTr("Perfis e permissões") },
-        "backup":     { t: qsTr("Backup"),               s: qsTr("Cópias de segurança e restauração") },
-        "relmobile":  { t: qsTr("Ver no celular"),        s: qsTr("Relatório para o celular (OneDrive)") }
+        "backup":     { t: qsTr("Backup"),               s: qsTr("Cópias de segurança e restauração") }
     })
     readonly property var _cab: cabecalhos[rotaAtual] ? cabecalhos[rotaAtual] : cabecalhos["dashboard"]
 
@@ -196,8 +195,6 @@ ApplicationWindow {
                         conteudo.replace(relatoriosComp);
                     else if (rota === "backup")
                         conteudo.replace(backupComp);
-                    else if (rota === "relmobile")
-                        conteudo.replace(relMobileComp);
                     else
                         conteudo.replace(placeholderComp, { titulo: titulo });
                 }
@@ -251,10 +248,6 @@ ApplicationWindow {
     Component {
         id: backupComp
         BackupScreen {}
-    }
-    Component {
-        id: relMobileComp
-        RelatorioMobileScreen {}
     }
     Component {
         id: placeholderComp

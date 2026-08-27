@@ -1143,6 +1143,8 @@ QVariantMap AppBackend::fazerBackup()
         return out;
     }
     m_backupService.rotacionar(5);
+    // Backup e relatório do celular andam juntos (mesma "foto" dos dados).
+    m_relatorioMobile.gerar(nullptr);
     out[QStringLiteral("ok")] = true;
     out[QStringLiteral("caminho")] = info.caminho;
     out[QStringLiteral("resumo")] = info.resumo;
