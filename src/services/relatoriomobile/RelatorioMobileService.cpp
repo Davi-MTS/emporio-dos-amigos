@@ -9,6 +9,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QStringList>
 
 #include <QSqlQuery>
 
@@ -62,7 +63,7 @@ bool RelatorioMobileService::gerar(QString *out)
     return true;
 }
 
-QString RelatorioMobileService::montarHtml() const
+QJsonObject RelatorioMobileService::coletarDados() const
 {
     // ---- Coleta de dados (reaproveita os repositórios) ----
     QJsonObject dados;
@@ -231,6 +232,12 @@ QString RelatorioMobileService::montarHtml() const
     fiado[QStringLiteral("clientes")] = fiadoArr;
     dados[QStringLiteral("fiado")] = fiado;
 
+    return dados;
+}
+
+QString RelatorioMobileService::montarHtml() const
+{
+    const QJsonObject dados = coletarDados();
     QString json = QString::fromUtf8(
         QJsonDocument(dados).toJson(QJsonDocument::Compact));
     // Escapa '<' (só aparece dentro de strings do JSON) para impedir qualquer
@@ -399,4 +406,66 @@ QString RelatorioMobileService::montarHtml() const
     QString html = kTemplate;
     html.replace(QStringLiteral("%DADOS%"), json);
     return html;
+}
+
+QString RelatorioMobileService::resumoTexto() const
+{
+    const QJsonObject d = coletarDados();
+    const QJsonObject hoje = d.value(QStringLiteral("periodos")).toObject()
+                                 .value(QStringLiteral("0")).toObject();
+    const QJsonObject cx = d.value(QStringLiteral("caixa")).toObject();
+
+    QStringList l;
+    l << QStringLiteral("<b>🍺 Empório dos Amigos</b>");
+    l << QDateTime::currentDateTime().toString(QStringLiteral("dd/MM/yyyy HH:mm"));
+    l << QString();
+
+    l << QStringLiteral("<b>Hoje</b>");
+    l << QStringLiteral("Faturamento: <b>%1</b>").arg(hoje.value(QStringLiteral("faturamento")).toString());
+    l << QStringLiteral("Lucro: %1").arg(hoje.value(QStringLiteral("lucro")).toString());
+    l << QStringLiteral("Vendas: %1  ·  Ticket: %2")
+             .arg(hoje.value(QStringLiteral("numVendas")).toInt())
+             .arg(hoje.value(QStringLiteral("ticket")).toString());
+
+    const QJsonArray formas = hoje.value(QStringLiteral("formas")).toArray();
+    if (!formas.isEmpty()) {
+        QStringList fs;
+        for (const QJsonValue &v : formas) {
+            const QJsonObject f = v.toObject();
+            QString nome = f.value(QStringLiteral("forma")).toString();
+            if (!nome.isEmpty())
+                nome[0] = nome[0].toUpper();
+            fs << QStringLiteral("%1 %2").arg(nome, f.value(QStringLiteral("valor")).toString());
+        }
+        l << QStringLiteral("Formas: %1").arg(fs.join(QStringLiteral(" · ")));
+    }
+
+    if (cx.value(QStringLiteral("temDados")).toBool()) {
+        l << QString();
+        l << QStringLiteral("<b>Fechamento do caixa</b>");
+        l << QStringLiteral("Vendido: %1 (%2 vendas)")
+                 .arg(cx.value(QStringLiteral("vendido")).toString())
+                 .arg(cx.value(QStringLiteral("numVendas")).toInt());
+        l << QStringLiteral("Esperado: %1  ·  Contado: %2")
+                 .arg(cx.value(QStringLiteral("esperado")).toString(),
+                      cx.value(QStringLiteral("contado")).toString());
+        const qint64 dif = static_cast<qint64>(cx.value(QStringLiteral("difValor")).toDouble());
+        const QString marca = dif == 0 ? QStringLiteral("✅ confere")
+                            : (dif < 0 ? QStringLiteral("🔴 falta") : QStringLiteral("🟠 sobra"));
+        l << QStringLiteral("Diferença: <b>%1</b> %2")
+                 .arg(cx.value(QStringLiteral("diferenca")).toString(), marca);
+    }
+
+    l << QString();
+    l << QStringLiteral("<b>Situação</b>");
+    l << QStringLiteral("Estoque: %1").arg(d.value(QStringLiteral("estoqueValor")).toString());
+    const int falta = d.value(QStringLiteral("estoqueEmFalta")).toInt();
+    if (falta > 0)
+        l << QStringLiteral("⚠️ %1 produto(s) em falta").arg(falta);
+    l << QStringLiteral("A receber (fiado): %1")
+             .arg(d.value(QStringLiteral("fiado")).toObject().value(QStringLiteral("total")).toString());
+    l << QStringLiteral("A pagar: %1")
+             .arg(d.value(QStringLiteral("aPagar")).toObject().value(QStringLiteral("total")).toString());
+
+    return l.join(QStringLiteral("\n"));
 }

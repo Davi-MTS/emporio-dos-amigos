@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QJsonObject>
 #include <QSqlDatabase>
 #include <QString>
 
@@ -23,11 +24,16 @@ public:
     // Monta o HTML e grava no arquivo. Preenche *out com o caminho. false em erro.
     bool gerar(QString *out = nullptr);
 
+    // Resumo curto e formatado para enviar como mensagem (Telegram).
+    QString resumoTexto() const;
+
     QString ultimoErro() const { return m_erro; }
 
     static QString pastaPadrao();
 
 private:
+    // Coleta única dos dados do negócio; alimenta tanto o HTML quanto o resumo.
+    QJsonObject coletarDados() const;
     QString montarHtml() const;
 
     QSqlDatabase m_db;

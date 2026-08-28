@@ -12,6 +12,7 @@
 #include "domain/vendas/VendaRepository.h"
 #include "services/backup/BackupService.h"
 #include "services/relatoriomobile/RelatorioMobileService.h"
+#include "services/telegram/TelegramService.h"
 #include "models/ClientesListModel.h"
 #include "models/ComprasListModel.h"
 #include "models/ContasPagarModel.h"
@@ -189,6 +190,13 @@ public:
     // Situação: { pasta, caminho, existe, atualizadoEm }.
     Q_INVOKABLE QVariantMap statusRelatorioCelular();
 
+    // --- Telegram (resumo no celular dos donos; só Admin na UI) ---
+    // { token, chatId, ativo, configurado }.
+    Q_INVOKABLE QVariantMap configTelegram();
+    Q_INVOKABLE void salvarConfigTelegram(const QString &token, const QString &chatId, bool ativo);
+    // Dispara um envio de teste; o retorno vem pelo sinal telegramResultado.
+    Q_INVOKABLE void testarTelegram();
+
     // --- Utilidades de dinheiro (centavos <-> texto pt-BR) ---
     Q_INVOKABLE QString formatarDinheiro(qlonglong centavos) const;      // "R$ 12,50"
     Q_INVOKABLE QString formatarValor(qlonglong centavos) const;         // "12,50"
@@ -199,6 +207,8 @@ public:
 signals:
     void caixaAbertoChanged();
     void sessaoUsuarioChanged();
+    // Resposta do envio ao Telegram (assíncrono).
+    void telegramResultado(bool ok, const QString &mensagem);
 
 private:
     void _definirUsuarioAtual(const Usuario &u);
@@ -216,6 +226,7 @@ private:
     RelatorioRepository m_relatorioRepo;
     BackupService m_backupService;
     RelatorioMobileService m_relatorioMobile;
+    TelegramService m_telegram;
     ProdutosListModel *m_produtosModel;
     EstoqueListModel *m_estoqueModel;
     UsuariosListModel *m_usuariosModel;

@@ -18,6 +18,10 @@ Rectangle {
     function carregar() {
         status = App.statusBackup();
         relatorio = App.statusRelatorioCelular();
+        var tg = App.configTelegram();
+        tgToken.text = tg.token || "";
+        tgChat.text = tg.chatId || "";
+        tgAtivo.checked = tg.ativo === true;
         backupsModel.clear();
         var l = App.backupsDisponiveis();
         for (var i = 0; i < l.length; i++)
@@ -123,6 +127,108 @@ Rectangle {
                     color: erro ? Theme.danger : Theme.success
                     font.pixelSize: Theme.fontSm
                     font.weight: Font.DemiBold
+                }
+            }
+        }
+
+        // ---- Aviso no celular (Telegram) ----
+        Rectangle {
+            Layout.fillWidth: true
+            radius: Theme.radius
+            color: Theme.surface
+            border.color: Theme.border
+            implicitHeight: tgCol.implicitHeight + 2 * Theme.spacingLg
+
+            Connections {
+                target: App
+                function onTelegramResultado(ok, mensagem) {
+                    tgAviso.erro = !ok;
+                    tgAviso.text = ok ? qsTr("Enviado! Confira o celular.") : mensagem;
+                    tgAviso.visible = true;
+                }
+            }
+
+            ColumnLayout {
+                id: tgCol
+                anchors.fill: parent
+                anchors.margins: Theme.spacingLg
+                spacing: Theme.spacingMd
+
+                Text {
+                    text: qsTr("Aviso no celular (Telegram)")
+                    color: Theme.text
+                    font.family: Theme.fontDisplay
+                    font.pixelSize: Theme.fontLg
+                    font.weight: Font.DemiBold
+                }
+                Text {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    text: qsTr("Ao fechar o caixa, o resumo do dia é enviado como mensagem para o celular dos donos — chega como notificação, de qualquer lugar.")
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.fontXs
+                }
+
+                FormField {
+                    label: qsTr("Token do bot")
+                    Layout.fillWidth: true
+                    AppTextField {
+                        id: tgToken
+                        width: parent.width
+                        placeholderText: qsTr("cole aqui o token que o @BotFather enviou")
+                    }
+                }
+                FormField {
+                    label: qsTr("Chat / grupo (ID)")
+                    Layout.fillWidth: true
+                    AppTextField {
+                        id: tgChat
+                        width: parent.width
+                        placeholderText: qsTr("ex.: 123456789  (ou -100... para grupo)")
+                    }
+                }
+
+                ToggleButton {
+                    id: tgAtivo
+                    text: qsTr("Enviar automaticamente ao fechar o caixa")
+                }
+
+                Label {
+                    id: tgAviso
+                    property bool erro: false
+                    visible: false
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    color: erro ? Theme.danger : Theme.success
+                    font.pixelSize: Theme.fontSm
+                    font.weight: Font.DemiBold
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.spacingSm
+                    AppButton {
+                        kind: "accent"
+                        text: qsTr("Salvar")
+                        onClicked: {
+                            App.salvarConfigTelegram(tgToken.text, tgChat.text, tgAtivo.checked);
+                            tgAviso.erro = false;
+                            tgAviso.text = qsTr("Configuração salva.");
+                            tgAviso.visible = true;
+                        }
+                    }
+                    AppButton {
+                        kind: "default"
+                        text: qsTr("Enviar teste agora")
+                        onClicked: {
+                            App.salvarConfigTelegram(tgToken.text, tgChat.text, tgAtivo.checked);
+                            tgAviso.erro = false;
+                            tgAviso.text = qsTr("Enviando…");
+                            tgAviso.visible = true;
+                            App.testarTelegram();
+                        }
+                    }
+                    Item { Layout.fillWidth: true }
                 }
             }
         }

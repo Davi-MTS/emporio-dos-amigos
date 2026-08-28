@@ -1,0 +1,43 @@
+#pragma once
+
+#include <QObject>
+#include <QString>
+
+class QNetworkAccessManager;
+
+// Envio do resumo do negócio para o celular dos donos via bot do Telegram.
+//
+// Por que Telegram: chega como NOTIFICAÇÃO (não depende de alguém lembrar de
+// abrir uma pasta), funciona de qualquer lugar, é gratuito e não exige servidor
+// próprio — só uma chamada HTTPS para a API do Telegram.
+//
+// O token do bot e o chat de destino ficam em QSettings (máquina local), NUNCA
+// no repositório: são credenciais do dono.
+class TelegramService : public QObject
+{
+    Q_OBJECT
+
+public:
+    explicit TelegramService(QObject *parent = nullptr);
+
+    bool configurado() const;
+    QString token() const;
+    QString chatId() const;
+    bool ativo() const;                 // envio automático ligado?
+
+    void salvarConfig(const QString &token, const QString &chatId, bool ativo);
+
+    // Envia texto (HTML simples do Telegram: <b>, <i>, <code>). Assíncrono:
+    // nunca trava a UI nem faz o fechamento de caixa falhar.
+    void enviarMensagem(const QString &texto);
+
+    // Envia um arquivo (o relatório HTML completo) como documento.
+    void enviarArquivo(const QString &caminho, const QString &legenda);
+
+signals:
+    // ok=false traz a mensagem de erro para a interface mostrar.
+    void resultado(bool ok, const QString &mensagem);
+
+private:
+    QNetworkAccessManager *m_net;
+};

@@ -26,6 +26,7 @@ AppBackend::AppBackend(QSqlDatabase db, QObject *parent)
     , m_relatorioRepo(m_db)
     , m_backupService(m_db)
     , m_relatorioMobile(m_db)
+    , m_telegram(this)
     , m_produtosModel(new ProdutosListModel(this))
     , m_estoqueModel(new EstoqueListModel(this))
     , m_usuariosModel(new UsuariosListModel(this))
@@ -35,6 +36,8 @@ AppBackend::AppBackend(QSqlDatabase db, QObject *parent)
     , m_contasPagarModel(new ContasPagarModel(this))
     , m_contasReceberModel(new ContasReceberModel(this))
 {
+    connect(&m_telegram, &TelegramService::resultado,
+            this, &AppBackend::telegramResultado);
     m_sessaoId = m_caixaRepo.sessaoAbertaId();
     recarregarProdutos();
     recarregarEstoque();
@@ -1126,6 +1129,12 @@ QVariantMap AppBackend::fecharCaixa(const QString &dinheiroContadoTexto)
             m_backupService.rotacionar(5);
         // Atualiza o relatório do celular (OneDrive) com os números do dia.
         m_relatorioMobile.gerar(nullptr);
+        // E manda o resumo para o celular dos donos (chega como notificação).
+        if (m_telegram.configurado() && m_telegram.ativo()) {
+            m_telegram.enviarMensagem(m_relatorioMobile.resumoTexto());
+            m_telegram.enviarArquivo(m_relatorioMobile.caminhoArquivo(),
+                                     QStringLiteral("Relatório completo"));
+        }
     } else {
         m_erro = r.erro;
     }
@@ -1222,6 +1231,32 @@ QVariantMap AppBackend::statusRelatorioCelular()
     out[QStringLiteral("atualizadoEm")] =
         fi.exists() ? fi.lastModified().toString(Qt::ISODate) : QString();
     return out;
+}
+
+// ------------------------------------------------------------------ Telegram
+
+QVariantMap AppBackend::configTelegram()
+{
+    QVariantMap m;
+    m[QStringLiteral("token")] = m_telegram.token();
+    m[QStringLiteral("chatId")] = m_telegram.chatId();
+    m[QStringLiteral("ativo")] = m_telegram.ativo();
+    m[QStringLiteral("configurado")] = m_telegram.configurado();
+    return m;
+}
+
+void AppBackend::salvarConfigTelegram(const QString &token, const QString &chatId, bool ativo)
+{
+    m_telegram.salvarConfig(token, chatId, ativo);
+}
+
+void AppBackend::testarTelegram()
+{
+    if (!m_telegram.configurado()) {
+        emit telegramResultado(false, QStringLiteral("Informe o token e o chat antes de testar."));
+        return;
+    }
+    m_telegram.enviarMensagem(m_relatorioMobile.resumoTexto());
 }
 
 QString AppBackend::formatarDinheiro(qlonglong centavos) const

@@ -251,6 +251,23 @@ Perfis: Administrador (tudo) e Funcionário (restrito).
      de objetos em ListModel — serializar para JSON.**
   Cobertos por `tst_venda_repository::excedenteEmPixNaoViraTroco` e asserts novos
   em `tst_caixa_repository`.
+### Aviso no celular via Telegram (feito)
+
+Substitui a dependência de "ir olhar o OneDrive": ao fechar o caixa o resumo do
+dia é ENVIADO como notificação para o celular dos donos.
+- `src/services/telegram/TelegramService`: `sendMessage` (HTML) e `sendDocument`
+  (anexa o relatorio.html) via `QNetworkAccessManager` — assíncrono, nunca trava
+  a UI nem faz o fechamento falhar. Sem servidor próprio e sem custo.
+- **Token e chat_id ficam em `QSettings` (máquina local), NUNCA no repositório** —
+  são credenciais do dono; ele cola na tela de Backup.
+- `RelatorioMobileService::resumoTexto()` monta a mensagem; `coletarDados()` foi
+  extraído para alimentar tanto o HTML quanto o resumo (fonte única).
+- `AppBackend`: `configTelegram/salvarConfigTelegram/testarTelegram` + sinal
+  `telegramResultado`; envio automático dentro de `fecharCaixa`.
+- UI: painel "Aviso no celular (Telegram)" na tela de Backup (só Admin), com
+  botão de teste.
+- OneDrive segue ativo como reforço (relatório HTML completo).
+
 - **Importador automático de NF-e (XML): PENDENTE** — o dono só tem DANFE em papel/PDF
   hoje. Combinado: construir o leitor de XML (parse fornecedor+itens via `QXmlStreamReader`,
   casar por código de barras, revisar e reaproveitar `registrarCompra`) **quando houver um
