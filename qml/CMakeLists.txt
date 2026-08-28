@@ -66,6 +66,14 @@ qt_add_resources(distribuidora "imagens"
         ${CMAKE_SOURCE_DIR}/resources/images/logo.png
 )
 
+# Sem janela de console no Windows quando for build de produção (Release).
+# Como CUI, o app abria um cmd preto junto — no PC da loja isso confunde e, se o
+# operador fechar aquela janela, o sistema morre no meio de uma venda.
+# Em Debug o console CONTINUA, porque é onde saem os avisos de QML e migrations.
+set_target_properties(distribuidora PROPERTIES
+    WIN32_EXECUTABLE $<CONFIG:Release>
+)
+
 target_link_libraries(distribuidora
     PRIVATE
         Distribuidora::Core
