@@ -48,6 +48,7 @@ ApplicationWindow {
         "clientes":   { t: qsTr("Clientes"),             s: qsTr("Cadastro e fiado") },
         "financeiro": { t: qsTr("Financeiro"),           s: qsTr("Contas a pagar e receber") },
         "relatorios": { t: qsTr("Relatórios"),           s: qsTr("Indicadores e desempenho") },
+        "vendas":     { t: qsTr("Vendas"),               s: qsTr("Histórico e cancelamento") },
         "usuarios":   { t: qsTr("Usuários"),             s: qsTr("Perfis e permissões") },
         "backup":     { t: qsTr("Backup"),               s: qsTr("Cópias de segurança e restauração") }
     })
@@ -193,6 +194,8 @@ ApplicationWindow {
                         conteudo.replace(financeiroComp);
                     else if (rota === "relatorios")
                         conteudo.replace(relatoriosComp);
+                    else if (rota === "vendas")
+                        conteudo.replace(vendasComp);
                     else if (rota === "backup")
                         conteudo.replace(backupComp);
                     else
@@ -244,6 +247,10 @@ ApplicationWindow {
     Component {
         id: relatoriosComp
         RelatoriosScreen {}
+    }
+    Component {
+        id: vendasComp
+        VendasScreen {}
     }
     Component {
         id: backupComp

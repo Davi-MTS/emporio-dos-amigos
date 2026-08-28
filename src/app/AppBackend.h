@@ -21,6 +21,7 @@
 #include "models/FornecedoresListModel.h"
 #include "models/ProdutosListModel.h"
 #include "models/UsuariosListModel.h"
+#include "models/VendasListModel.h"
 
 #include <QObject>
 #include <QSqlDatabase>
@@ -43,6 +44,7 @@ class AppBackend : public QObject
     Q_PROPERTY(ClientesListModel *clientes READ clientes CONSTANT)
     Q_PROPERTY(ContasPagarModel *contasPagar READ contasPagar CONSTANT)
     Q_PROPERTY(ContasReceberModel *contasReceber READ contasReceber CONSTANT)
+    Q_PROPERTY(VendasListModel *vendas READ vendas CONSTANT)
     Q_PROPERTY(bool caixaAberto READ caixaAberto NOTIFY caixaAbertoChanged)
     Q_PROPERTY(bool logado READ logado NOTIFY sessaoUsuarioChanged)
     Q_PROPERTY(bool precisaCriarAdmin READ precisaCriarAdmin NOTIFY sessaoUsuarioChanged)
@@ -59,6 +61,7 @@ public:
     ClientesListModel *clientes() const { return m_clientesModel; }
     ContasPagarModel *contasPagar() const { return m_contasPagarModel; }
     ContasReceberModel *contasReceber() const { return m_contasReceberModel; }
+    VendasListModel *vendas() const { return m_vendasModel; }
     bool caixaAberto() const { return m_sessaoId > 0; }
     bool logado() const { return m_usuarioId > 0; }
     bool precisaCriarAdmin();
@@ -108,6 +111,14 @@ public:
     Q_INVOKABLE QVariantMap finalizarVenda(const QVariantMap &dados);
 
     // Resumo da sessão aberta (por forma, esperado etc.). { aberto:false } se fechado.
+    // --- Histórico de vendas ---
+    Q_INVOKABLE void recarregarVendas(int dias);
+    // Itens de uma venda: [{produto, embalagem, qtd, precoUnit, desconto}].
+    Q_INVOKABLE QVariantList itensDaVenda(int vendaId);
+    // Cancela a venda (devolve estoque, cancela fiado, estorna dinheiro).
+    // Exige permissão pode_cancelar_venda. { ok, erro }.
+    Q_INVOKABLE QVariantMap cancelarVenda(int vendaId, const QString &motivo);
+
     Q_INVOKABLE QVariantMap caixaResumo();
     Q_INVOKABLE bool registrarSangria(const QString &valorTexto, const QString &motivo);
     Q_INVOKABLE bool registrarSuprimento(const QString &valorTexto, const QString &motivo);
@@ -238,6 +249,7 @@ private:
     ClientesListModel *m_clientesModel;
     ContasPagarModel *m_contasPagarModel;
     ContasReceberModel *m_contasReceberModel;
+    VendasListModel *m_vendasModel;
     QVariantMap m_usuarioAtual;
     int m_usuarioId = 0;
     int m_sessaoId = 0;

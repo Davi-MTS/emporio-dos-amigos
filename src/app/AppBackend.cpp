@@ -35,6 +35,7 @@ AppBackend::AppBackend(QSqlDatabase db, QObject *parent)
     , m_clientesModel(new ClientesListModel(this))
     , m_contasPagarModel(new ContasPagarModel(this))
     , m_contasReceberModel(new ContasReceberModel(this))
+    , m_vendasModel(new VendasListModel(this))
 {
     connect(&m_telegram, &TelegramService::resultado,
             this, &AppBackend::telegramResultado);
@@ -1051,6 +1052,51 @@ QVariantMap AppBackend::finalizarVenda(const QVariantMap &dados)
         recarregarProdutos();
     } else {
         m_erro = r.erro;
+    }
+    return out;
+}
+
+void AppBackend::recarregarVendas(int dias)
+{
+    m_vendasModel->setVendas(m_vendaRepo.listar(dias));
+}
+
+QVariantList AppBackend::itensDaVenda(int vendaId)
+{
+    QVariantList lista;
+    for (const ItemVendido &it : m_vendaRepo.itens(vendaId)) {
+        QVariantMap m;
+        m[QStringLiteral("produto")] = it.produto;
+        m[QStringLiteral("embalagem")] = it.embalagem;
+        m[QStringLiteral("qtd")] = static_cast<qlonglong>(it.qtdBase);
+        m[QStringLiteral("precoUnit")] = static_cast<qlonglong>(it.precoUnit);
+        m[QStringLiteral("desconto")] = static_cast<qlonglong>(it.desconto);
+        lista.push_back(m);
+    }
+    return lista;
+}
+
+QVariantMap AppBackend::cancelarVenda(int vendaId, const QString &motivo)
+{
+    QVariantMap out;
+    if (!temPermissao(QStringLiteral("pode_cancelar_venda"))) {
+        out[QStringLiteral("ok")] = false;
+        out[QStringLiteral("erro")] = QStringLiteral("Você não tem permissão para cancelar vendas.");
+        return out;
+    }
+    if (motivo.trimmed().isEmpty()) {
+        out[QStringLiteral("ok")] = false;
+        out[QStringLiteral("erro")] = QStringLiteral("Informe o motivo do cancelamento.");
+        return out;
+    }
+    const bool ok = m_vendaRepo.cancelarVenda(vendaId, motivo.trimmed(), m_usuarioId, m_sessaoId);
+    out[QStringLiteral("ok")] = ok;
+    out[QStringLiteral("erro")] = ok ? QString() : m_vendaRepo.ultimoErro();
+    if (ok) {
+        recarregarEstoque();
+        recarregarProdutos();
+        recarregarClientes();
+        recarregarFinanceiro();
     }
     return out;
 }

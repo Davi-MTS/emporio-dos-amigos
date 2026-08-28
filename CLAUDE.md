@@ -268,6 +268,34 @@ dia é ENVIADO como notificação para o celular dos donos.
   botão de teste.
 - OneDrive segue ativo como reforço (relatório HTML completo).
 
+### Histórico de vendas e cancelamento (feito)
+
+- Migration `0010`: `contas_receber.status` aceita `'cancelada'`; `vendas` ganha
+  `cancelada_em` e `motivo_cancelamento`.
+- `VendaRepository::cancelarVenda(vendaId, motivo, usuarioId, sessaoAbertaId)`:
+  devolve ao estoque **lendo as movimentações da venda** (pega o produto real,
+  inclusive insumos de composto) com tipo `devolucao`; cancela a conta de fiado;
+  marca a venda como `cancelada` — **nunca apaga** (auditoria).
+  **Dinheiro:** na MESMA sessão o esperado cai sozinho (o resumo só conta vendas
+  `concluida`); em sessão JÁ FECHADA registra **sangria** (`dinheiro - troco`),
+  senão a gaveta de hoje não bate.
+- `VendaRepository::listar(dias)` / `itens(vendaId)` + `VendasListModel`.
+- `AppBackend`: `recarregarVendas/itensDaVenda/cancelarVenda` — cancelamento
+  exige permissão **`pode_cancelar_venda`** (já existia no seed) e motivo.
+- UI: `qml/screens/vendas/VendasScreen.qml` (rota `vendas`, em OPERAÇÃO) com
+  período, detalhe da venda e cancelamento; canceladas ficam riscadas.
+- Coberto por `tst_venda_repository::cancelamentoDevolveEstoqueEFiado` e
+  `::cancelamentoSaiDoCaixaEDoHistorico`.
+
+### Empacotamento para a loja (feito)
+
+`deploy/empacotar.ps1` gera pasta autossuficiente + zip (~26 MB): compila em
+Release, roda `windeployqt --qmldir qml`, copia o runtime do MinGW e escreve um
+LEIA-ME. **Verificado rodando com PATH limpo (sem Qt instalado).**
+Nota PS 5.1: stderr de .exe vira erro — o script usa `Exec{}` conferindo
+`$LASTEXITCODE` em vez de `ErrorActionPreference=Stop`.
+Inno Setup não está instalado; o pacote é "copiar a pasta e criar atalho".
+
 - **Importador automático de NF-e (XML): PENDENTE** — o dono só tem DANFE em papel/PDF
   hoje. Combinado: construir o leitor de XML (parse fornecedor+itens via `QXmlStreamReader`,
   casar por código de barras, revisar e reaproveitar `registrarCompra`) **quando houver um

@@ -16,7 +16,8 @@ Rectangle {
         { rota: "dashboard", titulo: "Dashboard" },
         { rota: "pdv",       titulo: "PDV" },
         { rota: "produtos",  titulo: "Produtos" },
-        { rota: "estoque",   titulo: "Estoque" }
+        { rota: "estoque",   titulo: "Estoque" },
+        { rota: "vendas",    titulo: "Vendas" }
     ]
     readonly property var retaguarda: [
         { rota: "compras",    titulo: "Compras",     perm: "ve_financeiro" },

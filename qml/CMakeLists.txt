@@ -45,6 +45,7 @@ qt_add_qml_module(distribuidora
         screens/clientes/ClientesScreen.qml
         screens/financeiro/FinanceiroScreen.qml
         screens/relatorios/RelatoriosScreen.qml
+        screens/vendas/VendasScreen.qml
         screens/config/BackupScreen.qml
 )
 

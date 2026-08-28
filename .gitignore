@@ -20,6 +20,10 @@ CMakeLists.txt.user*
 *.sqlite
 *.sqlite3
 
+# Pacote gerado pelo deploy/empacotar.ps1 (artefato, não fonte)
+/deploy/pacote/
+/deploy/*.zip
+
 # Backup local e relatório gerado
 /backups/
 /Backups/

@@ -264,3 +264,218 @@ ResultadoVenda VendaRepository::registrarVenda(int sessaoId, int clienteId,
     res.vendaId = vendaId;
     return res;
 }
+
+bool VendaRepository::cancelarVenda(int vendaId, const QString &motivo, int usuarioId,
+                                    int sessaoAbertaId)
+{
+    // Confere se a venda existe e ainda pode ser cancelada.
+    int sessaoDaVenda = 0;
+    {
+        QSqlQuery q(m_db);
+        q.prepare(QStringLiteral("SELECT status, sessao_id FROM vendas WHERE id = :id"));
+        q.bindValue(QStringLiteral(":id"), vendaId);
+        if (!q.exec() || !q.next()) {
+            m_erro = QStringLiteral("Venda não encontrada.");
+            return false;
+        }
+        if (q.value(0).toString() != QStringLiteral("concluida")) {
+            m_erro = QStringLiteral("Esta venda já foi cancelada.");
+            return false;
+        }
+        sessaoDaVenda = q.value(1).toInt();
+    }
+
+    if (!m_db.transaction()) {
+        m_erro = m_db.lastError().text();
+        return false;
+    }
+
+    // 1) Devolve ao estoque exatamente o que saiu (inclui insumos de composto).
+    //    Lê das movimentações, que registram o produto real baixado.
+    struct Devolucao { int produtoId; qint64 qtd; };
+    QVector<Devolucao> devolucoes;
+    {
+        QSqlQuery q(m_db);
+        q.prepare(QStringLiteral(
+            "SELECT produto_id, quantidade FROM movimentacoes_estoque "
+            "WHERE tipo = 'saida_venda' AND origem = :origem"));
+        q.bindValue(QStringLiteral(":origem"), QStringLiteral("venda:%1").arg(vendaId));
+        if (!q.exec()) {
+            m_erro = q.lastError().text();
+            m_db.rollback();
+            return false;
+        }
+        while (q.next())
+            devolucoes.push_back({q.value(0).toInt(), -q.value(1).toLongLong()}); // saída era negativa
+    }
+
+    for (const Devolucao &d : devolucoes) {
+        QSqlQuery qe(m_db);
+        qe.prepare(QStringLiteral(
+            "UPDATE estoque SET quantidade_atual = quantidade_atual + :qtd WHERE produto_id = :pid"));
+        qe.bindValue(QStringLiteral(":qtd"), d.qtd);
+        qe.bindValue(QStringLiteral(":pid"), d.produtoId);
+        if (!qe.exec()) {
+            m_erro = qe.lastError().text();
+            m_db.rollback();
+            return false;
+        }
+
+        QSqlQuery qm(m_db);
+        qm.prepare(QStringLiteral(
+            "INSERT INTO movimentacoes_estoque "
+            "(produto_id, tipo, quantidade, origem, usuario_id, observacao, data) "
+            "VALUES (:pid, 'devolucao', :qtd, :origem, :uid, :obs, datetime('now','localtime'))"));
+        qm.bindValue(QStringLiteral(":pid"), d.produtoId);
+        qm.bindValue(QStringLiteral(":qtd"), d.qtd);   // entrada = positivo
+        qm.bindValue(QStringLiteral(":origem"), QStringLiteral("cancelamento:%1").arg(vendaId));
+        qm.bindValue(QStringLiteral(":uid"), usuarioId > 0 ? QVariant(usuarioId) : QVariant());
+        qm.bindValue(QStringLiteral(":obs"), motivo);
+        if (!qm.exec()) {
+            m_erro = qm.lastError().text();
+            m_db.rollback();
+            return false;
+        }
+    }
+
+    // 2) Cancela a conta de fiado gerada — o cliente não deve por venda desfeita.
+    {
+        QSqlQuery q(m_db);
+        q.prepare(QStringLiteral(
+            "UPDATE contas_receber SET status = 'cancelada' "
+            "WHERE venda_id = :vid AND status = 'aberta'"));
+        q.bindValue(QStringLiteral(":vid"), vendaId);
+        if (!q.exec()) {
+            m_erro = q.lastError().text();
+            m_db.rollback();
+            return false;
+        }
+    }
+
+    // 3) Dinheiro devolvido ao cliente.
+    //    Mesma sessão: o resumo do caixa só conta vendas 'concluida', então o
+    //    esperado já cai sozinho. Sessão diferente (turno antigo): registra
+    //    sangria, senão o dinheiro sai da gaveta sem aparecer no fechamento.
+    if (sessaoAbertaId > 0 && sessaoDaVenda != sessaoAbertaId) {
+        qint64 dinheiro = 0;
+        {
+            QSqlQuery q(m_db);
+            q.prepare(QStringLiteral(
+                "SELECT COALESCE(SUM(valor),0) FROM pagamentos "
+                "WHERE venda_id = :vid AND forma = 'dinheiro'"));
+            q.bindValue(QStringLiteral(":vid"), vendaId);
+            if (q.exec() && q.next())
+                dinheiro = q.value(0).toLongLong();
+        }
+        qint64 troco = 0;
+        {
+            QSqlQuery q(m_db);
+            q.prepare(QStringLiteral("SELECT troco FROM vendas WHERE id = :vid"));
+            q.bindValue(QStringLiteral(":vid"), vendaId);
+            if (q.exec() && q.next())
+                troco = q.value(0).toLongLong();
+        }
+        const qint64 devolver = dinheiro - troco;   // o que de fato ficou na gaveta
+        if (devolver > 0) {
+            QSqlQuery q(m_db);
+            q.prepare(QStringLiteral(
+                "INSERT INTO mov_caixa (sessao_id, tipo, valor, motivo, usuario_id, data) "
+                "VALUES (:sid, 'sangria', :valor, :motivo, :uid, datetime('now','localtime'))"));
+            q.bindValue(QStringLiteral(":sid"), sessaoAbertaId);
+            q.bindValue(QStringLiteral(":valor"), devolver);
+            q.bindValue(QStringLiteral(":motivo"),
+                        QStringLiteral("Estorno da venda #%1").arg(vendaId));
+            q.bindValue(QStringLiteral(":uid"), usuarioId > 0 ? QVariant(usuarioId) : QVariant());
+            if (!q.exec()) {
+                m_erro = q.lastError().text();
+                m_db.rollback();
+                return false;
+            }
+        }
+    }
+
+    // 4) Marca a venda (nunca apaga: o histórico precisa mostrar o cancelamento).
+    {
+        QSqlQuery q(m_db);
+        q.prepare(QStringLiteral(
+            "UPDATE vendas SET status = 'cancelada', cancelada_em = datetime('now','localtime'), "
+            "motivo_cancelamento = :motivo WHERE id = :id"));
+        q.bindValue(QStringLiteral(":motivo"), motivo);
+        q.bindValue(QStringLiteral(":id"), vendaId);
+        if (!q.exec()) {
+            m_erro = q.lastError().text();
+            m_db.rollback();
+            return false;
+        }
+    }
+
+    if (!m_db.commit()) {
+        m_erro = m_db.lastError().text();
+        m_db.rollback();
+        return false;
+    }
+    m_erro.clear();
+    return true;
+}
+
+QVector<VendaResumo> VendaRepository::listar(int dias)
+{
+    QVector<VendaResumo> lista;
+    const QString filtro = dias <= 0
+        ? QStringLiteral("date(v.data) = date('now','localtime')")
+        : QStringLiteral("v.data >= date('now','localtime','-%1 days')").arg(dias - 1);
+
+    QSqlQuery q(m_db);
+    if (!q.exec(QStringLiteral(
+            "SELECT v.id, v.data, COALESCE(c.nome, 'Consumidor final'), v.status, "
+            "       v.total, v.troco, COALESCE(v.motivo_cancelamento, ''), "
+            "       (SELECT COUNT(*) FROM venda_itens vi WHERE vi.venda_id = v.id), "
+            "       (SELECT GROUP_CONCAT(p.forma, ', ') FROM pagamentos p WHERE p.venda_id = v.id) "
+            "FROM vendas v LEFT JOIN clientes c ON c.id = v.cliente_id "
+            "WHERE %1 ORDER BY v.id DESC").arg(filtro))) {
+        m_erro = q.lastError().text();
+        return lista;
+    }
+    while (q.next()) {
+        VendaResumo r;
+        r.id = q.value(0).toInt();
+        r.data = q.value(1).toString();
+        r.clienteNome = q.value(2).toString();
+        r.status = q.value(3).toString();
+        r.total = q.value(4).toLongLong();
+        r.troco = q.value(5).toLongLong();
+        r.motivoCancelamento = q.value(6).toString();
+        r.numItens = q.value(7).toInt();
+        r.formas = q.value(8).toString();
+        lista.push_back(r);
+    }
+    return lista;
+}
+
+QVector<ItemVendido> VendaRepository::itens(int vendaId)
+{
+    QVector<ItemVendido> lista;
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral(
+        "SELECT p.nome, COALESCE(pe.nome_embalagem, p.unidade_base), "
+        "       vi.qtd_unidade_base, vi.preco_unit, vi.desconto "
+        "FROM venda_itens vi "
+        "JOIN produtos p ON p.id = vi.produto_id "
+        "LEFT JOIN produto_embalagens pe ON pe.id = vi.embalagem_id "
+        "WHERE vi.venda_id = :vid ORDER BY vi.id"));
+    q.bindValue(QStringLiteral(":vid"), vendaId);
+    if (!q.exec()) {
+        m_erro = q.lastError().text();
+        return lista;
+    }
+    while (q.next()) {
+        ItemVendido it;
+        it.produto = q.value(0).toString();
+        it.embalagem = q.value(1).toString();
+        it.qtdBase = q.value(2).toLongLong();
+        it.precoUnit = q.value(3).toLongLong();
+        it.desconto = q.value(4).toLongLong();
+        lista.push_back(it);
+    }
+    return lista;
+}

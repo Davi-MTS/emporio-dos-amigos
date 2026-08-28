@@ -68,6 +68,8 @@ target_sources(DistribuidoraCore
         models/ClientesListModel.cpp
         models/ContasPagarModel.h
         models/ContasPagarModel.cpp
+        models/VendasListModel.h
+        models/VendasListModel.cpp
         models/ContasReceberModel.h
         models/ContasReceberModel.cpp
         app/AppBackend.h
@@ -102,5 +104,6 @@ qt_add_resources(DistribuidoraCore "db_scripts"
         ${CMAKE_SOURCE_DIR}/db/migrations/0007_custo_milesimos.sql
         ${CMAKE_SOURCE_DIR}/db/migrations/0008_compra_nota.sql
         ${CMAKE_SOURCE_DIR}/db/migrations/0009_datas_locais.sql
+        ${CMAKE_SOURCE_DIR}/db/migrations/0010_cancelar_venda.sql
         ${CMAKE_SOURCE_DIR}/db/seed/0001_dados_iniciais.sql
 )

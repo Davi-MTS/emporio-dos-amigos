@@ -44,6 +44,30 @@ struct ResultadoVenda
     QString erro;
 };
 
+// Linha do histórico de vendas.
+struct VendaResumo
+{
+    int id = 0;
+    QString data;
+    QString clienteNome;
+    QString status;            // concluida | cancelada | troca
+    QString formas;            // "Dinheiro, Pix"
+    qint64 total = 0;
+    qint64 troco = 0;
+    int numItens = 0;
+    QString motivoCancelamento;
+};
+
+// Um item de uma venda (para conferir o que foi vendido).
+struct ItemVendido
+{
+    QString produto;
+    QString embalagem;
+    qint64 qtdBase = 0;
+    qint64 precoUnit = 0;
+    qint64 desconto = 0;
+};
+
 // Registra vendas: grava a venda, os itens e pagamentos, baixa o estoque em
 // unidade base e registra as movimentações. Tudo em transação.
 class VendaRepository
@@ -56,6 +80,23 @@ public:
                                   const QVector<PagamentoVenda> &pagamentos,
                                   int usuarioId);
 
+    // Cancela uma venda concluída: devolve os itens ao estoque (movimentação
+    // 'devolucao'), cancela a conta de fiado gerada e marca a venda como
+    // 'cancelada'. NUNCA apaga registros — o histórico continua auditável.
+    // Se a venda for de um turno JÁ FECHADO e houver caixa aberto agora, o
+    // dinheiro devolvido sai como sangria; senão o fechamento de hoje não bate.
+    // Tudo numa transação. false com o motivo em ultimoErro().
+    bool cancelarVenda(int vendaId, const QString &motivo, int usuarioId,
+                       int sessaoAbertaId = 0);
+
+    // Histórico (mais recentes primeiro). dias <= 0 = só hoje.
+    QVector<VendaResumo> listar(int dias);
+    // Itens de uma venda, para conferência.
+    QVector<ItemVendido> itens(int vendaId);
+
+    QString ultimoErro() const { return m_erro; }
+
 private:
     QSqlDatabase m_db;
+    QString m_erro;
 };
