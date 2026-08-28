@@ -289,7 +289,25 @@ QString RelatorioMobileService::montarHtml() const
   .caixa-ok{ text-align:center; padding:14px; font-weight:800; }
   .bar{ height:6px; border-radius:4px; background:#241d16; overflow:hidden; margin-top:6px; }
   .bar > i{ display:block; height:100%; background:var(--orange); }
-  .busca{ width:100%; padding:11px 14px; border-radius:12px; border:1px solid var(--line); background:var(--card); color:var(--txt); font-size:15px; margin-bottom:8px; }
+  /* Seções recolhíveis: com muitos produtos o relatório vira rolagem infinita. */
+  details{ margin:14px 0 0; }
+  details > summary{ list-style:none; cursor:pointer; display:flex; align-items:center; gap:8px;
+                     padding:12px 14px; background:var(--card); border:1px solid var(--line);
+                     border-radius:14px; font-size:13px; text-transform:uppercase;
+                     letter-spacing:.6px; color:var(--muted); font-weight:700; }
+  details > summary::-webkit-details-marker{ display:none; }
+  details > summary .tt{ flex:1; min-width:0; }
+  details > summary .chev{ transition:transform .18s; color:var(--orange); font-size:16px; }
+  details[open] > summary{ border-radius:14px 14px 0 0; border-bottom:0; }
+  details[open] > summary .chev{ transform:rotate(90deg); }
+  details > .corpo{ border:1px solid var(--line); border-top:0; border-radius:0 0 14px 14px; overflow:hidden; }
+  details > .corpo > .card{ border:0; border-radius:0; }
+  .filtros{ display:flex; gap:8px; padding:10px 12px 4px; }
+  .chip{ padding:6px 12px; border-radius:999px; border:1px solid var(--line); background:var(--card2);
+         color:var(--muted); font-size:12px; font-weight:700; cursor:pointer; }
+  .chip.on{ background:var(--orange); color:#150f08; border-color:var(--orange); }
+  .maisitens{ text-align:center; padding:12px; color:var(--orange); font-weight:700; cursor:pointer; font-size:13px; }
+  .busca{ width:calc(100% - 24px); margin:8px 12px; padding:11px 14px; border-radius:12px; border:1px solid var(--line); background:var(--card2); color:var(--txt); font-size:15px; }
   .busca::placeholder{ color:var(--muted); }
   .lucro{ color:var(--green); }
   .card{ background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
@@ -323,30 +341,52 @@ QString RelatorioMobileService::montarHtml() const
 
     <div id="alertas"></div>
 
-    <h2>Formas de pagamento</h2>
-    <div class="card" id="formas"></div>
+    <details open>
+      <summary><span class="chev">›</span><span class="tt">Formas de pagamento</span></summary>
+      <div class="corpo"><div class="card" id="formas"></div></div>
+    </details>
 
-    <h2>Mais vendidos</h2>
-    <div class="card" id="maisVendidos"></div>
+    <details open>
+      <summary><span class="chev">›</span><span class="tt">Mais vendidos</span></summary>
+      <div class="corpo"><div class="card" id="maisVendidos"></div></div>
+    </details>
 
-    <h2 id="hCaixa">Último fechamento de caixa</h2>
-    <div class="card" id="caixa"></div>
+    <details open>
+      <summary><span class="chev">›</span><span class="tt" id="hCaixa">Último fechamento de caixa</span></summary>
+      <div class="corpo"><div class="card" id="caixa"></div></div>
+    </details>
 
-    <h2 id="hEstoque">Estoque</h2>
-    <input class="busca" id="buscaEstoque" placeholder="Buscar produto no estoque…">
-    <div class="card" id="estoque"></div>
+    <details>
+      <summary><span class="chev">›</span><span class="tt" id="hEstoque">Estoque</span></summary>
+      <div class="corpo">
+        <div class="filtros">
+          <span class="chip on" id="chipFalta">Só os que faltam</span>
+          <span class="chip" id="chipTodos">Todos</span>
+        </div>
+        <input class="busca" id="buscaEstoque" placeholder="Buscar produto…">
+        <div class="card" id="estoque"></div>
+      </div>
+    </details>
 
-    <h2 id="hFiado">A receber (fiado)</h2>
-    <div class="card" id="fiado"></div>
+    <details>
+      <summary><span class="chev">›</span><span class="tt" id="hFiado">A receber (fiado)</span></summary>
+      <div class="corpo"><div class="card" id="fiado"></div></div>
+    </details>
 
-    <h2 id="hPagar">A pagar</h2>
-    <div class="card" id="pagar"></div>
+    <details>
+      <summary><span class="chev">›</span><span class="tt" id="hPagar">A pagar</span></summary>
+      <div class="corpo"><div class="card" id="pagar"></div></div>
+    </details>
 
-    <h2>Últimas compras</h2>
-    <div class="card" id="compras"></div>
+    <details>
+      <summary><span class="chev">›</span><span class="tt" id="hCompras">Últimas compras</span></summary>
+      <div class="corpo"><div class="card" id="compras"></div></div>
+    </details>
 
-    <h2>Parados (30 dias sem vender)</h2>
-    <div class="card" id="parados"></div>
+    <details>
+      <summary><span class="chev">›</span><span class="tt" id="hParados">Parados (30 dias sem vender)</span></summary>
+      <div class="corpo"><div class="card" id="parados"></div></div>
+    </details>
 
     <div class="foot">Empório dos Amigos · relatório somente leitura</div>
   </div>
@@ -426,29 +466,72 @@ QString RelatorioMobileService::montarHtml() const
     $('hEstoque').textContent = 'Estoque · ' + (D.estoqueValor||'R$ 0,00')
       + (D.estoqueEmFalta ? ('  ·  ' + D.estoqueEmFalta + ' em falta') : '');
     const linhaEstoque = e => `<div class="row"><div><div class="n">${e.nome}</div><div class="s">custo ${e.custoMedio}</div></div><div style="display:flex;align-items:center;gap:8px">${e.baixo?'<span class="pill">baixo</span>':''}<span class="val">${e.quantidade} ${e.unidade||''}</span></div></div>`;
-    rows($('estoque'), D.estoque, linhaEstoque);
-    // Busca instantânea — numa lista grande, achar um produto no celular é o que importa.
-    $('buscaEstoque').addEventListener('input', function(){
-      const t = this.value.trim().toLowerCase();
-      const f = (D.estoque||[]).filter(e => e.nome.toLowerCase().indexOf(t) >= 0);
-      rows($('estoque'), f, linhaEstoque);
+
+    // Com muitos produtos, mostrar tudo de uma vez vira rolagem infinita no
+    // celular. Padrão: só o que falta (é o acionável). O resto entra por
+    // demanda, em blocos, e a busca varre a lista inteira.
+    const LOTE = 25;
+    let soFalta = true, limite = LOTE, termo = '';
+    function estoqueFiltrado(){
+      const t = termo.trim().toLowerCase();
+      return (D.estoque||[]).filter(e =>
+        (!soFalta || e.baixo) && (!t || e.nome.toLowerCase().indexOf(t) >= 0));
+    }
+    function pintarEstoque(){
+      const f = estoqueFiltrado();
+      const vis = f.slice(0, limite);
+      if (!f.length) {
+        $('estoque').innerHTML = '<div class="empty">'
+          + (soFalta ? 'Nenhum produto no estoque mínimo. 👍' : 'Nada encontrado.') + '</div>';
+        return;
+      }
+      $('estoque').innerHTML = vis.map(linhaEstoque).join('')
+        + (f.length > vis.length
+            ? `<div class="maisitens" id="verMais">Mostrar mais ${Math.min(LOTE, f.length - vis.length)} de ${f.length - vis.length}</div>`
+            : '');
+      const b = $('verMais');
+      if (b) b.addEventListener('click', () => { limite += LOTE; pintarEstoque(); });
+    }
+    $('chipFalta').addEventListener('click', () => {
+      soFalta = true; limite = LOTE;
+      $('chipFalta').classList.add('on'); $('chipTodos').classList.remove('on');
+      pintarEstoque();
     });
+    $('chipTodos').addEventListener('click', () => {
+      soFalta = false; limite = LOTE;
+      $('chipTodos').classList.add('on'); $('chipFalta').classList.remove('on');
+      pintarEstoque();
+    });
+    $('buscaEstoque').addEventListener('input', function(){
+      termo = this.value; limite = LOTE;
+      // Buscar implica procurar em tudo, não só no que falta.
+      if (termo.trim()) {
+        soFalta = false;
+        $('chipTodos').classList.add('on'); $('chipFalta').classList.remove('on');
+      }
+      pintarEstoque();
+    });
+    pintarEstoque();
 
     // Fiado a receber.
     (function(){
       const fi = D.fiado||{clientes:[]};
-      $('hFiado').textContent = 'A receber (fiado) · ' + (fi.total||'R$ 0,00');
+      const nFi = (fi.clientes||[]).length;
+      $('hFiado').textContent = 'A receber (fiado) · ' + (fi.total||'R$ 0,00') + (nFi ? ' (' + nFi + ')' : '');
       rows($('fiado'), fi.clientes, c => `<div class="row"><div class="n">${c.nome}</div><div class="val">${c.saldo}</div></div>`);
     })();
 
     // Contas a pagar.
     (function(){
       const ap = D.aPagar||{contas:[]};
-      $('hPagar').textContent = 'A pagar · ' + (ap.total||'R$ 0,00');
+      const nAp = (ap.contas||[]).length;
+      $('hPagar').textContent = 'A pagar · ' + (ap.total||'R$ 0,00') + (nAp ? ' (' + nAp + ')' : '');
       rows($('pagar'), ap.contas, c => `<div class="row"><div><div class="n">${c.descricao}</div><div class="s" ${c.vencida?'style="color:var(--red)"':''}>${c.fornecedor}${c.vencimento?(' · vence '+c.vencimento):''}${c.vencida?' · VENCIDA':''}</div></div><div class="val">${c.valor}</div></div>`);
     })();
 
     // Últimas compras.
+    if ((D.compras||[]).length) $('hCompras').textContent = 'Últimas compras · ' + D.compras.length;
+    if ((D.parados||[]).length) $('hParados').textContent = 'Parados (30 dias) · ' + D.parados.length;
     rows($('compras'), D.compras, c => `<div class="row"><div><div class="n">${c.fornecedor}</div><div class="s">${fmtData(c.data)}${c.nota?(' · NF '+c.nota):''} · ${c.itens} item(ns)</div></div><div class="val">${c.total}</div></div>`);
 
     // Produtos parados.
