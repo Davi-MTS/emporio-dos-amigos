@@ -10,6 +10,12 @@ Dialog {
     modal: true
     padding: Theme.spacingLg
 
+    // Nunca ultrapassar a janela: um diálogo mais alto que a tela sai pelas
+    // bordas e os botões de confirmar ficam inalcançáveis. Diálogos com muito
+    // conteúdo usam ScrollView por dentro para o excedente continuar acessível.
+    readonly property real alturaMaxima: (parent ? parent.height : 900) - 2 * Theme.spacingLg
+    height: Math.min(implicitHeight, alturaMaxima)
+
     background: Rectangle {
         radius: Theme.radius
         color: Theme.surface

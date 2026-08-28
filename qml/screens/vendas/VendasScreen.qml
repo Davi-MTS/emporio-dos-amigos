@@ -205,7 +205,12 @@ Rectangle {
             open();
         }
         title: qsTr("Venda #") + detalheDialog.vendaId
-        contentItem: ColumnLayout {
+        contentItem: ScrollView {
+            id: rolVenda
+            contentWidth: availableWidth
+            clip: true
+            ColumnLayout {
+            width: rolVenda.availableWidth
             spacing: Theme.spacingMd
 
             Rectangle {
@@ -302,6 +307,7 @@ Rectangle {
                 }
                 AppButton { kind: "default"; text: qsTr("Fechar"); onClicked: detalheDialog.close() }
                 Item { Layout.fillWidth: true }
+            }
             }
         }
     }

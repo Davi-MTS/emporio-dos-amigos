@@ -44,9 +44,18 @@ Rectangle {
         return b + " B";
     }
 
-    ColumnLayout {
+    // A tela tem muito conteúdo (backup, Telegram, registro e a lista de cópias):
+    // sem rolagem, o que passa da altura da janela ficava inacessível.
+    ScrollView {
+        id: rolagem
         anchors.fill: parent
         anchors.margins: Theme.spacingLg
+        contentWidth: availableWidth
+        clip: true
+        ScrollBar.vertical.policy: ScrollBar.AsNeeded
+
+    ColumnLayout {
+        width: rolagem.availableWidth
         spacing: Theme.spacingMd
 
         // ---- Status + ações ----
@@ -372,7 +381,8 @@ Rectangle {
         // ---- Lista de backups ----
         Rectangle {
             Layout.fillWidth: true
-            Layout.fillHeight: true
+            // Altura própria: dentro de um ScrollView não existe "resto da tela".
+            Layout.preferredHeight: Math.max(160, Math.min(lista.count, 6) * 58 + 16)
             radius: Theme.radius
             color: Theme.surface
             border.color: Theme.border
@@ -432,6 +442,7 @@ Rectangle {
                 }
             }
         }
+    }
     }
 
     // Confirmar restauração

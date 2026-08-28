@@ -863,7 +863,12 @@ Rectangle {
             return true;
         }
         title: qsTr("Montar ") + (item ? item.nome : "")
-        contentItem: ColumnLayout {
+        contentItem: ScrollView {
+            id: rolComposto
+            contentWidth: availableWidth
+            clip: true
+            ColumnLayout {
+            width: rolComposto.availableWidth
             spacing: Theme.spacingMd
             Text {
                 text: qsTr("Monte o pedido escolhendo o produto de cada categoria.")
@@ -1032,6 +1037,7 @@ Rectangle {
                 AppButton { kind: "default"; text: qsTr("Cancelar"); onClicked: compostoDialog.close() }
                 Item { Layout.fillWidth: true }
             }
+            }
         }
     }
 
@@ -1104,7 +1110,12 @@ Rectangle {
             diferenca = (v < 0 ? 0 : v) - (resumo.dinheiroEsperado || 0);
         }
         title: qsTr("Fechar caixa")
-        contentItem: ColumnLayout {
+        contentItem: ScrollView {
+            id: rolFechar
+            contentWidth: availableWidth
+            clip: true
+            ColumnLayout {
+            width: rolFechar.availableWidth
             spacing: Theme.spacingXs
 
             // --- Bloco informativo: o que foi vendido no turno ---
@@ -1192,6 +1203,7 @@ Rectangle {
                 }
                 AppButton { kind: "default"; text: qsTr("Cancelar"); onClicked: fecharDialog.close() }
                 Item { Layout.fillWidth: true }
+            }
             }
         }
     }

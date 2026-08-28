@@ -178,7 +178,12 @@ Rectangle {
 
         title: atual.nome !== undefined ? atual.nome : qsTr("Movimentar estoque")
 
-        contentItem: ColumnLayout {
+        contentItem: ScrollView {
+            id: rolMov
+            contentWidth: availableWidth
+            clip: true
+            ColumnLayout {
+            width: rolMov.availableWidth
             spacing: Theme.spacingMd
 
             // Situação atual
@@ -380,6 +385,7 @@ Rectangle {
                     onClicked: movDialog.close()
                 }
                 Item { Layout.fillWidth: true }
+            }
             }
         }
     }
