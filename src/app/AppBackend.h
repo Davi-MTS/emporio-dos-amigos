@@ -196,6 +196,8 @@ public:
     Q_INVOKABLE void salvarConfigTelegram(const QString &token, const QString &chatId, bool ativo);
     // Dispara um envio de teste; o retorno vem pelo sinal telegramResultado.
     Q_INVOKABLE void testarTelegram();
+    // Descobre o chat/grupo automaticamente (resposta em telegramChatDescoberto).
+    Q_INVOKABLE void descobrirChatTelegram(const QString &token);
 
     // --- Utilidades de dinheiro (centavos <-> texto pt-BR) ---
     Q_INVOKABLE QString formatarDinheiro(qlonglong centavos) const;      // "R$ 12,50"
@@ -209,6 +211,7 @@ signals:
     void sessaoUsuarioChanged();
     // Resposta do envio ao Telegram (assíncrono).
     void telegramResultado(bool ok, const QString &mensagem);
+    void telegramChatDescoberto(const QString &chatId, const QString &nome);
 
 private:
     void _definirUsuarioAtual(const Usuario &u);

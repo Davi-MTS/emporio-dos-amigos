@@ -3,6 +3,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QHttpMultiPart>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkAccessManager>
@@ -125,4 +126,53 @@ void TelegramService::enviarArquivo(const QString &caminho, const QString &legen
     QNetworkReply *reply = m_net->post(req, multi);
     multi->setParent(reply);
     connect(reply, &QNetworkReply::finished, reply, &QNetworkReply::deleteLater);
+}
+
+void TelegramService::descobrirChat(const QString &tokenInformado)
+{
+    const QString tk = tokenInformado.trimmed().isEmpty() ? token() : tokenInformado.trimmed();
+    if (tk.isEmpty()) {
+        emit resultado(false, QStringLiteral("Informe o token do bot primeiro."));
+        return;
+    }
+
+    QNetworkRequest req{QUrl(apiUrl(tk, QStringLiteral("getUpdates")))};
+    QNetworkReply *reply = m_net->get(req);
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        reply->deleteLater();
+        const QJsonObject raiz = QJsonDocument::fromJson(reply->readAll()).object();
+        if (reply->error() != QNetworkReply::NoError || !raiz.value(QStringLiteral("ok")).toBool()) {
+            const QString desc = raiz.value(QStringLiteral("description")).toString();
+            emit resultado(false, desc.isEmpty()
+                                      ? QStringLiteral("Não consegui falar com o Telegram. Confira o token.")
+                                      : desc);
+            return;
+        }
+
+        // Percorre de trás para frente: queremos a conversa mais recente.
+        const QJsonArray updates = raiz.value(QStringLiteral("result")).toArray();
+        for (int i = updates.size() - 1; i >= 0; --i) {
+            const QJsonObject up = updates.at(i).toObject();
+            for (const QString &campo : {QStringLiteral("message"),
+                                         QStringLiteral("channel_post"),
+                                         QStringLiteral("my_chat_member")}) {
+                const QJsonObject chat = up.value(campo).toObject()
+                                             .value(QStringLiteral("chat")).toObject();
+                if (chat.isEmpty())
+                    continue;
+                const QString id = QString::number(
+                    static_cast<qint64>(chat.value(QStringLiteral("id")).toDouble()));
+                QString nome = chat.value(QStringLiteral("title")).toString();
+                if (nome.isEmpty())
+                    nome = chat.value(QStringLiteral("first_name")).toString();
+                if (nome.isEmpty())
+                    nome = chat.value(QStringLiteral("username")).toString();
+                emit chatDescoberto(id, nome);
+                return;
+            }
+        }
+        emit resultado(false, QStringLiteral(
+            "Nenhuma conversa encontrada. Mande uma mensagem qualquer no grupo "
+            "(ou para o bot) e clique de novo."));
+    });
 }

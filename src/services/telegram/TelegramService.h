@@ -34,7 +34,15 @@ public:
     // Envia um arquivo (o relatório HTML completo) como documento.
     void enviarArquivo(const QString &caminho, const QString &legenda);
 
+    // Descobre o chat/grupo sozinho: lê as últimas mensagens recebidas pelo bot
+    // (getUpdates) e devolve o id do chat mais recente. Evita depender de bots
+    // de terceiros — o @userinfobot, por exemplo, nem entra em grupos.
+    // Recebe o token por parâmetro para funcionar antes de salvar a config.
+    void descobrirChat(const QString &token);
+
 signals:
+    // Chat encontrado pelo descobrirChat (nome = título do grupo ou da pessoa).
+    void chatDescoberto(const QString &chatId, const QString &nome);
     // ok=false traz a mensagem de erro para a interface mostrar.
     void resultado(bool ok, const QString &mensagem);
 

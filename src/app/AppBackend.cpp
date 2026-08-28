@@ -38,6 +38,8 @@ AppBackend::AppBackend(QSqlDatabase db, QObject *parent)
 {
     connect(&m_telegram, &TelegramService::resultado,
             this, &AppBackend::telegramResultado);
+    connect(&m_telegram, &TelegramService::chatDescoberto,
+            this, &AppBackend::telegramChatDescoberto);
     m_sessaoId = m_caixaRepo.sessaoAbertaId();
     recarregarProdutos();
     recarregarEstoque();
@@ -1257,6 +1259,11 @@ void AppBackend::testarTelegram()
         return;
     }
     m_telegram.enviarMensagem(m_relatorioMobile.resumoTexto());
+}
+
+void AppBackend::descobrirChatTelegram(const QString &token)
+{
+    m_telegram.descobrirChat(token);
 }
 
 QString AppBackend::formatarDinheiro(qlonglong centavos) const

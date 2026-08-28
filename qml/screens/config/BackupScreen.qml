@@ -141,6 +141,13 @@ Rectangle {
 
             Connections {
                 target: App
+                function onTelegramChatDescoberto(chatId, nome) {
+                    tgChat.text = chatId;
+                    tgAviso.erro = false;
+                    tgAviso.text = qsTr("Encontrei: ") + (nome && nome.length ? nome : chatId)
+                                 + qsTr(" — agora clique em Salvar.");
+                    tgAviso.visible = true;
+                }
                 function onTelegramResultado(ok, mensagem) {
                     tgAviso.erro = !ok;
                     tgAviso.text = ok ? qsTr("Enviado! Confira o celular.") : mensagem;
@@ -178,14 +185,36 @@ Rectangle {
                         placeholderText: qsTr("cole aqui o token que o @BotFather enviou")
                     }
                 }
-                FormField {
-                    label: qsTr("Chat / grupo (ID)")
+                RowLayout {
                     Layout.fillWidth: true
-                    AppTextField {
-                        id: tgChat
-                        width: parent.width
-                        placeholderText: qsTr("ex.: 123456789  (ou -100... para grupo)")
+                    spacing: Theme.spacingSm
+                    FormField {
+                        label: qsTr("Chat / grupo")
+                        Layout.fillWidth: true
+                        AppTextField {
+                            id: tgChat
+                            width: parent.width
+                            placeholderText: qsTr("clique em Descobrir →")
+                        }
                     }
+                    AppButton {
+                        kind: "default"
+                        text: qsTr("Descobrir")
+                        Layout.alignment: Qt.AlignBottom
+                        onClicked: {
+                            tgAviso.erro = false;
+                            tgAviso.text = qsTr("Procurando a conversa…");
+                            tgAviso.visible = true;
+                            App.descobrirChatTelegram(tgToken.text);
+                        }
+                    }
+                }
+                Text {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    text: qsTr("Para descobrir: adicione o seu bot ao grupo (ou converse com ele), mande qualquer mensagem lá e clique em “Descobrir”.")
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.fontXs
                 }
 
                 ToggleButton {
