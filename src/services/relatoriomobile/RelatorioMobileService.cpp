@@ -22,6 +22,19 @@
 #include "domain/relatorios/RelatorioRepository.h"
 #include "utils/Money.h"
 
+namespace {
+// Ícone por forma de pagamento, para a mensagem ficar escaneável no celular.
+QString _iconeForma(const QString &forma)
+{
+    if (forma == QLatin1String("dinheiro")) return QStringLiteral("💵");
+    if (forma == QLatin1String("pix"))      return QStringLiteral("⚡");
+    if (forma == QLatin1String("debito"))   return QStringLiteral("💳");
+    if (forma == QLatin1String("credito"))  return QStringLiteral("💳");
+    if (forma == QLatin1String("fiado"))    return QStringLiteral("📒");
+    return QStringLiteral("•");
+}
+} // namespace
+
 RelatorioMobileService::RelatorioMobileService(QSqlDatabase db, const QString &destinoDir)
     : m_db(std::move(db))
     , m_dir(destinoDir.isEmpty() ? pastaPadrao() : destinoDir)
@@ -267,7 +280,18 @@ QString RelatorioMobileService::montarHtml() const
   .kpi .l{ color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.5px; font-weight:700; }
   .kpi .v{ font-size:21px; font-weight:800; margin-top:4px; }
   .kpi.big .v{ color:var(--orange); }
-  h2{ font-size:13px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin:22px 4px 8px; }
+  h2{ font-size:13px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin:22px 4px 8px; display:flex; align-items:center; gap:8px; }
+  h2 .badge{ background:#241a10; color:var(--orange); border:1px solid #3a2a18; border-radius:999px; padding:1px 8px; font-size:11px; letter-spacing:0; text-transform:none; font-weight:700; }
+  .alerta{ display:flex; gap:10px; align-items:flex-start; background:#1b1205; border:1px solid #4a3212; border-radius:14px; padding:12px 14px; margin:4px 0 2px; }
+  .alerta.erro{ background:#1d0f0f; border-color:#5a2222; }
+  .alerta .t{ font-weight:700; }
+  .alerta .s{ color:var(--muted); font-size:12px; margin-top:2px; }
+  .caixa-ok{ text-align:center; padding:14px; font-weight:800; }
+  .bar{ height:6px; border-radius:4px; background:#241d16; overflow:hidden; margin-top:6px; }
+  .bar > i{ display:block; height:100%; background:var(--orange); }
+  .busca{ width:100%; padding:11px 14px; border-radius:12px; border:1px solid var(--line); background:var(--card); color:var(--txt); font-size:15px; margin-bottom:8px; }
+  .busca::placeholder{ color:var(--muted); }
+  .lucro{ color:var(--green); }
   .card{ background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
   .row{ display:flex; align-items:center; justify-content:space-between; padding:11px 14px; border-bottom:1px solid var(--line); gap:10px; }
   .row:last-child{ border-bottom:0; }
@@ -297,6 +321,8 @@ QString RelatorioMobileService::montarHtml() const
       <div class="kpi"><div class="l">Ticket médio</div><div class="v" id="kTicket">—</div></div>
     </div>
 
+    <div id="alertas"></div>
+
     <h2>Formas de pagamento</h2>
     <div class="card" id="formas"></div>
 
@@ -307,6 +333,7 @@ QString RelatorioMobileService::montarHtml() const
     <div class="card" id="caixa"></div>
 
     <h2 id="hEstoque">Estoque</h2>
+    <input class="busca" id="buscaEstoque" placeholder="Buscar produto no estoque…">
     <div class="card" id="estoque"></div>
 
     <h2 id="hFiado">A receber (fiado)</h2>
@@ -331,7 +358,7 @@ QString RelatorioMobileService::montarHtml() const
     const $ = (id) => document.getElementById(id);
     const cap = (s) => s ? s.charAt(0).toUpperCase()+s.slice(1) : s;
     function fmtData(iso){ try{ const d=new Date(iso); return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }catch(e){ return iso; } }
-    function rows(el, arr, mk){ if(!arr||!arr.length){ el.innerHTML='<div class="empty">Nada por aqui.</div>'; return; } el.innerHTML = arr.map(mk).join(''); }
+    function rows(el, arr, mk){ if(!arr||!arr.length){ el.innerHTML='<div class="empty">Nada por aqui.</div>'; return; } el.innerHTML = arr.map((x,i)=>mk(x,i)).join(''); }
 
     $('loja').textContent = D.loja;
     $('att').textContent = 'Atualizado em ' + fmtData(D.atualizadoEm);
@@ -342,9 +369,36 @@ QString RelatorioMobileService::montarHtml() const
       $('kLucro').textContent = p.lucro||'—';
       $('kNum').textContent = (p.numVendas!=null? p.numVendas : '—');
       $('kTicket').textContent = p.ticket||'—';
-      rows($('formas'), p.formas, f => `<div class="row"><div class="n">${cap(f.forma)}</div><div class="val">${f.valor}</div></div>`);
+      // Barra mostra o peso de cada forma no total do período.
+      const nums = (p.formas||[]).map(f => parseFloat(String(f.valor).replace(/[^0-9,]/g,'').replace(',','.'))||0);
+      const maxF = Math.max(1, ...nums);
+      rows($('formas'), p.formas, (f,i) => `<div class="row"><div style="flex:1;min-width:0">`
+        + `<div class="n">${cap(f.forma)}</div>`
+        + `<div class="bar"><i style="width:${Math.round((nums[i]/maxF)*100)}%"></i></div></div>`
+        + `<div class="val">${f.valor}</div></div>`);
       rows($('maisVendidos'), p.maisVendidos, m => `<div class="row"><div class="n">${m.nome}</div><div class="val">${m.qtd}</div></div>`);
     }
+
+    // Alertas no topo: o que exige ação, antes de qualquer número.
+    (function(){
+      const av = [];
+      const falta = (D.estoque||[]).filter(e => e.baixo);
+      if (falta.length)
+        av.push({erro:false, t: falta.length + ' produto(s) no estoque mínimo',
+                 s: falta.slice(0,3).map(e=>e.nome).join(', ') + (falta.length>3?'…':'')});
+      const venc = ((D.aPagar||{}).contas||[]).filter(c => c.vencida);
+      if (venc.length)
+        av.push({erro:true, t: venc.length + ' conta(s) vencida(s)',
+                 s: venc.slice(0,3).map(c=>c.descricao+' · '+c.valor).join(' · ')});
+      const cxA = D.caixa||{};
+      if (cxA.temDados && (cxA.difValor||0) !== 0)
+        av.push({erro:(cxA.difValor||0) < 0,
+                 t: 'Caixa com diferença de ' + cxA.diferenca,
+                 s: (cxA.difValor<0?'Faltou':'Sobrou') + ' dinheiro na conferência'});
+      $('alertas').innerHTML = av.map(a =>
+        `<div class="alerta ${a.erro?'erro':''}"><div>${a.erro?'🔴':'⚠️'}</div>`
+        + `<div><div class="t">${a.t}</div><div class="s">${a.s}</div></div></div>`).join('');
+    })();
 
     // --- Seções que não dependem do período ---
 
@@ -371,7 +425,14 @@ QString RelatorioMobileService::montarHtml() const
     // Estoque (com valor imobilizado e quantos estão baixos).
     $('hEstoque').textContent = 'Estoque · ' + (D.estoqueValor||'R$ 0,00')
       + (D.estoqueEmFalta ? ('  ·  ' + D.estoqueEmFalta + ' em falta') : '');
-    rows($('estoque'), D.estoque, e => `<div class="row"><div><div class="n">${e.nome}</div><div class="s">custo ${e.custoMedio}</div></div><div style="display:flex;align-items:center;gap:8px">${e.baixo?'<span class="pill">baixo</span>':''}<span class="val">${e.quantidade} ${e.unidade||''}</span></div></div>`);
+    const linhaEstoque = e => `<div class="row"><div><div class="n">${e.nome}</div><div class="s">custo ${e.custoMedio}</div></div><div style="display:flex;align-items:center;gap:8px">${e.baixo?'<span class="pill">baixo</span>':''}<span class="val">${e.quantidade} ${e.unidade||''}</span></div></div>`;
+    rows($('estoque'), D.estoque, linhaEstoque);
+    // Busca instantânea — numa lista grande, achar um produto no celular é o que importa.
+    $('buscaEstoque').addEventListener('input', function(){
+      const t = this.value.trim().toLowerCase();
+      const f = (D.estoque||[]).filter(e => e.nome.toLowerCase().indexOf(t) >= 0);
+      rows($('estoque'), f, linhaEstoque);
+    });
 
     // Fiado a receber.
     (function(){
@@ -411,61 +472,106 @@ QString RelatorioMobileService::montarHtml() const
 QString RelatorioMobileService::resumoTexto() const
 {
     const QJsonObject d = coletarDados();
-    const QJsonObject hoje = d.value(QStringLiteral("periodos")).toObject()
-                                 .value(QStringLiteral("0")).toObject();
-    const QJsonObject cx = d.value(QStringLiteral("caixa")).toObject();
+    const QJsonObject periodos = d.value(QStringLiteral("periodos")).toObject();
+    const QJsonObject hoje = periodos.value(QStringLiteral("0")).toObject();
+    const QJsonObject mes  = periodos.value(QStringLiteral("30")).toObject();
+    const QJsonObject cx   = d.value(QStringLiteral("caixa")).toObject();
 
     QStringList l;
-    l << QStringLiteral("<b>🍺 Empório dos Amigos</b>");
-    l << QDateTime::currentDateTime().toString(QStringLiteral("dd/MM/yyyy HH:mm"));
-    l << QString();
 
-    l << QStringLiteral("<b>Hoje</b>");
-    l << QStringLiteral("Faturamento: <b>%1</b>").arg(hoje.value(QStringLiteral("faturamento")).toString());
-    l << QStringLiteral("Lucro: %1").arg(hoje.value(QStringLiteral("lucro")).toString());
-    l << QStringLiteral("Vendas: %1  ·  Ticket: %2")
+    // Cabeçalho: o que importa primeiro, já visível na notificação.
+    l << QStringLiteral("<b>EMPÓRIO DOS AMIGOS</b>");
+    l << QStringLiteral("<i>Fechamento de %1</i>")
+             .arg(QDateTime::currentDateTime().toString(QStringLiteral("dd/MM/yyyy 'às' HH:mm")));
+    l << QStringLiteral("──────────────");
+
+    // 1) O dia.
+    l << QStringLiteral("💰 <b>VENDAS DE HOJE</b>");
+    l << QStringLiteral("Faturamento  <b>%1</b>").arg(hoje.value(QStringLiteral("faturamento")).toString());
+    l << QStringLiteral("Lucro        <b>%1</b>").arg(hoje.value(QStringLiteral("lucro")).toString());
+    l << QStringLiteral("%1 vendas · ticket %2")
              .arg(hoje.value(QStringLiteral("numVendas")).toInt())
              .arg(hoje.value(QStringLiteral("ticket")).toString());
 
     const QJsonArray formas = hoje.value(QStringLiteral("formas")).toArray();
     if (!formas.isEmpty()) {
-        QStringList fs;
+        l << QString();
         for (const QJsonValue &v : formas) {
             const QJsonObject f = v.toObject();
             QString nome = f.value(QStringLiteral("forma")).toString();
             if (!nome.isEmpty())
                 nome[0] = nome[0].toUpper();
-            fs << QStringLiteral("%1 %2").arg(nome, f.value(QStringLiteral("valor")).toString());
+            l << QStringLiteral("  %1 %2").arg(_iconeForma(f.value(QStringLiteral("forma")).toString()),
+                                               QStringLiteral("%1  %2").arg(nome, f.value(QStringLiteral("valor")).toString()));
         }
-        l << QStringLiteral("Formas: %1").arg(fs.join(QStringLiteral(" · ")));
     }
 
+    // 2) A gaveta — é o motivo do fechamento.
     if (cx.value(QStringLiteral("temDados")).toBool()) {
-        l << QString();
-        l << QStringLiteral("<b>Fechamento do caixa</b>");
-        l << QStringLiteral("Vendido: %1 (%2 vendas)")
-                 .arg(cx.value(QStringLiteral("vendido")).toString())
-                 .arg(cx.value(QStringLiteral("numVendas")).toInt());
-        l << QStringLiteral("Esperado: %1  ·  Contado: %2")
-                 .arg(cx.value(QStringLiteral("esperado")).toString(),
-                      cx.value(QStringLiteral("contado")).toString());
         const qint64 dif = static_cast<qint64>(cx.value(QStringLiteral("difValor")).toDouble());
-        const QString marca = dif == 0 ? QStringLiteral("✅ confere")
-                            : (dif < 0 ? QStringLiteral("🔴 falta") : QStringLiteral("🟠 sobra"));
-        l << QStringLiteral("Diferença: <b>%1</b> %2")
-                 .arg(cx.value(QStringLiteral("diferenca")).toString(), marca);
+        l << QString();
+        l << QStringLiteral("🧾 <b>CONFERÊNCIA DO CAIXA</b>");
+        l << QStringLiteral("Esperado  %1").arg(cx.value(QStringLiteral("esperado")).toString());
+        l << QStringLiteral("Contado   %1").arg(cx.value(QStringLiteral("contado")).toString());
+        if (dif == 0) {
+            l << QStringLiteral("✅ <b>Caixa confere</b>");
+        } else {
+            l << QStringLiteral("%1 <b>%2 de %3</b>")
+                     .arg(dif < 0 ? QStringLiteral("🔴") : QStringLiteral("🟠"),
+                          dif < 0 ? QStringLiteral("Falta") : QStringLiteral("Sobra"),
+                          cx.value(QStringLiteral("diferenca")).toString());
+        }
+    }
+
+    // 3) O que exige ação.
+    QStringList alertas;
+    const int falta = d.value(QStringLiteral("estoqueEmFalta")).toInt();
+    if (falta > 0)
+        alertas << QStringLiteral("⚠️ <b>%1 produto(s)</b> no estoque mínimo").arg(falta);
+    int vencidas = 0;
+    const QJsonObject aPagar = d.value(QStringLiteral("aPagar")).toObject();
+    for (const QJsonValue &v : aPagar.value(QStringLiteral("contas")).toArray())
+        if (v.toObject().value(QStringLiteral("vencida")).toBool())
+            ++vencidas;
+    if (vencidas > 0)
+        alertas << QStringLiteral("🔴 <b>%1 conta(s) vencida(s)</b>").arg(vencidas);
+    if (!alertas.isEmpty()) {
+        l << QString();
+        l << QStringLiteral("❗ <b>PRECISA DE ATENÇÃO</b>");
+        l << alertas;
+    }
+
+    // 4) Panorama do negócio.
+    l << QString();
+    l << QStringLiteral("📊 <b>SITUAÇÃO</b>");
+    l << QStringLiteral("Mês (30 dias)  %1 · lucro %2")
+             .arg(mes.value(QStringLiteral("faturamento")).toString(),
+                  mes.value(QStringLiteral("lucro")).toString());
+    l << QStringLiteral("Estoque        %1 (%2 itens)")
+             .arg(d.value(QStringLiteral("estoqueValor")).toString())
+             .arg(d.value(QStringLiteral("estoqueItens")).toInt());
+    l << QStringLiteral("A receber      %1")
+             .arg(d.value(QStringLiteral("fiado")).toObject().value(QStringLiteral("total")).toString());
+    l << QStringLiteral("A pagar        %1").arg(aPagar.value(QStringLiteral("total")).toString());
+
+    // 5) Campeões do dia.
+    const QJsonArray top = hoje.value(QStringLiteral("maisVendidos")).toArray();
+    if (!top.isEmpty()) {
+        l << QString();
+        l << QStringLiteral("🏆 <b>MAIS VENDIDOS HOJE</b>");
+        int n = 0;
+        for (const QJsonValue &v : top) {
+            if (n++ >= 3)
+                break;
+            const QJsonObject o = v.toObject();
+            l << QStringLiteral("%1. %2 — %3")
+                     .arg(n)
+                     .arg(o.value(QStringLiteral("nome")).toString())
+                     .arg(static_cast<qint64>(o.value(QStringLiteral("qtd")).toDouble()));
+        }
     }
 
     l << QString();
-    l << QStringLiteral("<b>Situação</b>");
-    l << QStringLiteral("Estoque: %1").arg(d.value(QStringLiteral("estoqueValor")).toString());
-    const int falta = d.value(QStringLiteral("estoqueEmFalta")).toInt();
-    if (falta > 0)
-        l << QStringLiteral("⚠️ %1 produto(s) em falta").arg(falta);
-    l << QStringLiteral("A receber (fiado): %1")
-             .arg(d.value(QStringLiteral("fiado")).toObject().value(QStringLiteral("total")).toString());
-    l << QStringLiteral("A pagar: %1")
-             .arg(d.value(QStringLiteral("aPagar")).toObject().value(QStringLiteral("total")).toString());
-
+    l << QStringLiteral("<i>Relatório completo em anexo 👇</i>");
     return l.join(QStringLiteral("\n"));
 }
