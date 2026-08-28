@@ -23,6 +23,41 @@
 #include "utils/Money.h"
 
 namespace {
+// Escapa texto vindo do banco (nome de produto/cliente) para HTML.
+QString esc(const QString &t)
+{
+    QString o = t;
+    o.replace(QLatin1Char('&'), QLatin1String("&amp;"));
+    o.replace(QLatin1Char('<'), QLatin1String("&lt;"));
+    o.replace(QLatin1Char('>'), QLatin1String("&gt;"));
+    o.replace(QLatin1Char('"'), QLatin1String("&quot;"));
+    return o;
+}
+
+QString linha(const QString &esquerda, const QString &valor, const QString &sub = QString())
+{
+    const QString bloco = sub.isEmpty()
+        ? QStringLiteral("<div class=\"n\">%1</div>").arg(esquerda)
+        : QStringLiteral("<div><div class=\"n\">%1</div><div class=\"s\">%2</div></div>")
+              .arg(esquerda, sub);
+    return QStringLiteral("<div class=\"row\">%1<div class=\"val\">%2</div></div>")
+        .arg(bloco, valor);
+}
+
+QString vazio(const QString &texto)
+{
+    return QStringLiteral("<div class=\"empty\">%1</div>").arg(texto);
+}
+
+QString capitalizar(QString s)
+{
+    if (!s.isEmpty())
+        s[0] = s[0].toUpper();
+    return s;
+}
+} // namespace
+
+namespace {
 // Ícone por forma de pagamento, para a mensagem ficar escaneável no celular.
 QString _iconeForma(const QString &forma)
 {
@@ -324,7 +359,7 @@ QString RelatorioMobileService::montarHtml() const
 <body>
   <header>
     <h1 id="loja">Empório dos Amigos</h1>
-    <div class="att" id="att"></div>
+    <div class="att" id="att">%ATT%</div>
   </header>
   <div class="tabs" id="tabs">
     <div class="tab on" data-p="0">Hoje</div>
@@ -333,59 +368,59 @@ QString RelatorioMobileService::montarHtml() const
   </div>
   <div class="wrap">
     <div class="kpis">
-      <div class="kpi big"><div class="l">Faturamento</div><div class="v" id="kFat">—</div></div>
-      <div class="kpi big"><div class="l">Lucro</div><div class="v" id="kLucro">—</div></div>
-      <div class="kpi"><div class="l">Vendas</div><div class="v" id="kNum">—</div></div>
-      <div class="kpi"><div class="l">Ticket médio</div><div class="v" id="kTicket">—</div></div>
+      <div class="kpi big"><div class="l">Faturamento</div><div class="v" id="kFat">%KFAT%</div></div>
+      <div class="kpi big"><div class="l">Lucro</div><div class="v" id="kLucro">%KLUCRO%</div></div>
+      <div class="kpi"><div class="l">Vendas</div><div class="v" id="kNum">%KNUM%</div></div>
+      <div class="kpi"><div class="l">Ticket médio</div><div class="v" id="kTicket">%KTICKET%</div></div>
     </div>
 
-    <div id="alertas"></div>
+    <div id="alertas">%ALERTAS%</div>
 
     <details open>
       <summary><span class="chev">›</span><span class="tt">Formas de pagamento</span></summary>
-      <div class="corpo"><div class="card" id="formas"></div></div>
+      <div class="corpo"><div class="card" id="formas">%FORMAS%</div></div>
     </details>
 
     <details open>
       <summary><span class="chev">›</span><span class="tt">Mais vendidos</span></summary>
-      <div class="corpo"><div class="card" id="maisVendidos"></div></div>
+      <div class="corpo"><div class="card" id="maisVendidos">%TOP%</div></div>
     </details>
 
     <details open>
-      <summary><span class="chev">›</span><span class="tt" id="hCaixa">Último fechamento de caixa</span></summary>
-      <div class="corpo"><div class="card" id="caixa"></div></div>
+      <summary><span class="chev">›</span><span class="tt" id="hCaixa">%TCAIXA%</span></summary>
+      <div class="corpo"><div class="card" id="caixa">%CAIXA%</div></div>
     </details>
 
     <details>
-      <summary><span class="chev">›</span><span class="tt" id="hEstoque">Estoque</span></summary>
+      <summary><span class="chev">›</span><span class="tt" id="hEstoque">%TESTOQUE%</span></summary>
       <div class="corpo">
         <div class="filtros">
           <span class="chip on" id="chipFalta">Só os que faltam</span>
           <span class="chip" id="chipTodos">Todos</span>
         </div>
         <input class="busca" id="buscaEstoque" placeholder="Buscar produto…">
-        <div class="card" id="estoque"></div>
+        <div class="card" id="estoque">%ESTOQUE%</div>
       </div>
     </details>
 
     <details>
-      <summary><span class="chev">›</span><span class="tt" id="hFiado">A receber (fiado)</span></summary>
-      <div class="corpo"><div class="card" id="fiado"></div></div>
+      <summary><span class="chev">›</span><span class="tt" id="hFiado">%TFIADO%</span></summary>
+      <div class="corpo"><div class="card" id="fiado">%FIADO%</div></div>
     </details>
 
     <details>
-      <summary><span class="chev">›</span><span class="tt" id="hPagar">A pagar</span></summary>
-      <div class="corpo"><div class="card" id="pagar"></div></div>
+      <summary><span class="chev">›</span><span class="tt" id="hPagar">%TPAGAR%</span></summary>
+      <div class="corpo"><div class="card" id="pagar">%PAGAR%</div></div>
     </details>
 
     <details>
-      <summary><span class="chev">›</span><span class="tt" id="hCompras">Últimas compras</span></summary>
-      <div class="corpo"><div class="card" id="compras"></div></div>
+      <summary><span class="chev">›</span><span class="tt" id="hCompras">%TCOMPRAS%</span></summary>
+      <div class="corpo"><div class="card" id="compras">%COMPRAS%</div></div>
     </details>
 
     <details>
-      <summary><span class="chev">›</span><span class="tt" id="hParados">Parados (30 dias sem vender)</span></summary>
-      <div class="corpo"><div class="card" id="parados"></div></div>
+      <summary><span class="chev">›</span><span class="tt" id="hParados">%TPARADOS%</span></summary>
+      <div class="corpo"><div class="card" id="parados">%PARADOS%</div></div>
     </details>
 
     <div class="foot">Empório dos Amigos · relatório somente leitura</div>
@@ -549,6 +584,230 @@ QString RelatorioMobileService::montarHtml() const
 
     QString html = kTemplate;
     html.replace(QStringLiteral("%DADOS%"), json);
+
+    // ---- Conteúdo JÁ RENDERIZADO no HTML ----
+    // O JavaScript apenas melhora a experiência (trocar período, filtrar,
+    // buscar). Sem isto o relatório aparecia EM BRANCO em qualquer visualizador
+    // que não execute scripts — o dono abriria o anexo e não veria nada.
+    const QJsonObject hoje = dados.value(QStringLiteral("periodos")).toObject()
+                                 .value(QStringLiteral("0")).toObject();
+
+    html.replace(QStringLiteral("%ATT%"),
+                 QStringLiteral("Atualizado em %1")
+                     .arg(QDateTime::currentDateTime().toString(QStringLiteral("dd/MM/yyyy HH:mm"))));
+    html.replace(QStringLiteral("%KFAT%"), hoje.value(QStringLiteral("faturamento")).toString());
+    html.replace(QStringLiteral("%KLUCRO%"), hoje.value(QStringLiteral("lucro")).toString());
+    html.replace(QStringLiteral("%KNUM%"), QString::number(hoje.value(QStringLiteral("numVendas")).toInt()));
+    html.replace(QStringLiteral("%KTICKET%"), hoje.value(QStringLiteral("ticket")).toString());
+
+    // Alertas: o que exige ação, antes de qualquer número.
+    {
+        QString a;
+        QStringList nomesFalta;
+        int emFalta = 0;
+        for (const QJsonValue &v : dados.value(QStringLiteral("estoque")).toArray()) {
+            const QJsonObject e = v.toObject();
+            if (e.value(QStringLiteral("baixo")).toBool()) {
+                ++emFalta;
+                if (nomesFalta.size() < 3)
+                    nomesFalta << esc(e.value(QStringLiteral("nome")).toString());
+            }
+        }
+        if (emFalta > 0)
+            a += QStringLiteral("<div class=\"alerta\"><div>&#9888;&#65039;</div><div>"
+                                "<div class=\"t\">%1 produto(s) no estoque mínimo</div>"
+                                "<div class=\"s\">%2%3</div></div></div>")
+                     .arg(emFalta)
+                     .arg(nomesFalta.join(QStringLiteral(", ")),
+                          emFalta > 3 ? QStringLiteral("…") : QString());
+
+        int vencidas = 0;
+        for (const QJsonValue &v : dados.value(QStringLiteral("aPagar")).toObject()
+                                       .value(QStringLiteral("contas")).toArray())
+            if (v.toObject().value(QStringLiteral("vencida")).toBool())
+                ++vencidas;
+        if (vencidas > 0)
+            a += QStringLiteral("<div class=\"alerta erro\"><div>&#128308;</div><div>"
+                                "<div class=\"t\">%1 conta(s) vencida(s)</div>"
+                                "<div class=\"s\">Confira a seção A pagar</div></div></div>").arg(vencidas);
+
+        const QJsonObject cx = dados.value(QStringLiteral("caixa")).toObject();
+        const qint64 dif = static_cast<qint64>(cx.value(QStringLiteral("difValor")).toDouble());
+        if (cx.value(QStringLiteral("temDados")).toBool() && dif != 0)
+            a += QStringLiteral("<div class=\"alerta %1\"><div>%2</div><div>"
+                                "<div class=\"t\">Caixa com diferença de %3</div>"
+                                "<div class=\"s\">%4 dinheiro na conferência</div></div></div>")
+                     .arg(dif < 0 ? QStringLiteral("erro") : QString(),
+                          dif < 0 ? QStringLiteral("&#128308;") : QStringLiteral("&#128992;"),
+                          cx.value(QStringLiteral("diferenca")).toString(),
+                          dif < 0 ? QStringLiteral("Faltou") : QStringLiteral("Sobrou"));
+        html.replace(QStringLiteral("%ALERTAS%"), a);
+    }
+
+    // Formas de pagamento, com barra de proporção.
+    {
+        QString f;
+        const QJsonArray arr = hoje.value(QStringLiteral("formas")).toArray();
+        qint64 maior = 1;
+        for (const QJsonValue &v : arr)
+            maior = qMax(maior, Money::parse(v.toObject().value(QStringLiteral("valor")).toString()).value_or(0));
+        for (const QJsonValue &v : arr) {
+            const QJsonObject o = v.toObject();
+            const qint64 c = Money::parse(o.value(QStringLiteral("valor")).toString()).value_or(0);
+            f += QStringLiteral("<div class=\"row\"><div style=\"flex:1;min-width:0\">"
+                                "<div class=\"n\">%1</div>"
+                                "<div class=\"bar\"><i style=\"width:%2%\"></i></div></div>"
+                                "<div class=\"val\">%3</div></div>")
+                     .arg(esc(capitalizar(o.value(QStringLiteral("forma")).toString())))
+                     .arg(int((c * 100) / maior))
+                     .arg(o.value(QStringLiteral("valor")).toString());
+        }
+        html.replace(QStringLiteral("%FORMAS%"), f.isEmpty() ? vazio(QStringLiteral("Nada por aqui.")) : f);
+    }
+
+    // Mais vendidos.
+    {
+        QString t;
+        for (const QJsonValue &v : hoje.value(QStringLiteral("maisVendidos")).toArray()) {
+            const QJsonObject o = v.toObject();
+            t += linha(esc(o.value(QStringLiteral("nome")).toString()),
+                       QString::number(static_cast<qint64>(o.value(QStringLiteral("qtd")).toDouble())));
+        }
+        html.replace(QStringLiteral("%TOP%"), t.isEmpty() ? vazio(QStringLiteral("Sem vendas no período.")) : t);
+    }
+
+    // Fechamento de caixa.
+    {
+        const QJsonObject cx = dados.value(QStringLiteral("caixa")).toObject();
+        QString c;
+        QString titulo = QStringLiteral("Último fechamento de caixa");
+        if (!cx.value(QStringLiteral("temDados")).toBool()) {
+            c = vazio(QStringLiteral("Nenhum caixa fechado ainda."));
+        } else {
+            const qint64 dif = static_cast<qint64>(cx.value(QStringLiteral("difValor")).toDouble());
+            c += linha(QStringLiteral("Vendido no turno (%1)").arg(cx.value(QStringLiteral("numVendas")).toInt()),
+                       cx.value(QStringLiteral("vendido")).toString());
+            c += linha(QStringLiteral("Abertura"), cx.value(QStringLiteral("abertura")).toString());
+            c += linha(QStringLiteral("Vendas em dinheiro"), cx.value(QStringLiteral("dinheiro")).toString());
+            c += linha(QStringLiteral("Suprimentos"), cx.value(QStringLiteral("suprimentos")).toString());
+            c += linha(QStringLiteral("Recebimentos de fiado"), cx.value(QStringLiteral("recebimentos")).toString());
+            c += linha(QStringLiteral("Sangrias"), cx.value(QStringLiteral("sangrias")).toString());
+            c += linha(QStringLiteral("Esperado na gaveta"), cx.value(QStringLiteral("esperado")).toString());
+            c += linha(QStringLiteral("Contado"), cx.value(QStringLiteral("contado")).toString());
+            const QString cor = dif == 0 ? QStringLiteral("var(--green)")
+                              : (dif < 0 ? QStringLiteral("var(--red)") : QStringLiteral("var(--orange)"));
+            const QString rot = dif == 0 ? QStringLiteral("confere")
+                              : (dif < 0 ? QStringLiteral("falta") : QStringLiteral("sobra"));
+            c += QStringLiteral("<div class=\"row\"><div class=\"n\" style=\"color:%1\">Diferença (%2)</div>"
+                                "<div class=\"val\" style=\"color:%1\">%3</div></div>")
+                     .arg(cor, rot, cx.value(QStringLiteral("diferenca")).toString());
+            titulo += QStringLiteral(" · ") + cx.value(QStringLiteral("fechadaEm")).toString().left(16);
+        }
+        html.replace(QStringLiteral("%CAIXA%"), c);
+        html.replace(QStringLiteral("%TCAIXA%"), esc(titulo));
+    }
+
+    // Estoque: padrão = só os que faltam, primeiros 25 (o resto entra por toque).
+    {
+        QString e;
+        int mostrados = 0;
+        int faltando = 0;
+        for (const QJsonValue &v : dados.value(QStringLiteral("estoque")).toArray()) {
+            const QJsonObject o = v.toObject();
+            if (!o.value(QStringLiteral("baixo")).toBool())
+                continue;
+            ++faltando;
+            if (mostrados >= 25)
+                continue;
+            ++mostrados;
+            e += QStringLiteral("<div class=\"row\"><div><div class=\"n\">%1</div>"
+                                "<div class=\"s\">custo %2</div></div>"
+                                "<div style=\"display:flex;align-items:center;gap:8px\">"
+                                "<span class=\"pill\">baixo</span>"
+                                "<span class=\"val\">%3 %4</span></div></div>")
+                     .arg(esc(o.value(QStringLiteral("nome")).toString()),
+                          o.value(QStringLiteral("custoMedio")).toString())
+                     .arg(static_cast<qint64>(o.value(QStringLiteral("quantidade")).toDouble()))
+                     .arg(esc(o.value(QStringLiteral("unidade")).toString()));
+        }
+        if (faltando > mostrados)
+            e += QStringLiteral("<div class=\"maisitens\" id=\"verMais\">Mostrar mais %1</div>")
+                     .arg(faltando - mostrados);
+        html.replace(QStringLiteral("%ESTOQUE%"),
+                     e.isEmpty() ? vazio(QStringLiteral("Nenhum produto no estoque mínimo.")) : e);
+        html.replace(QStringLiteral("%TESTOQUE%"),
+                     QStringLiteral("Estoque · %1%2")
+                         .arg(dados.value(QStringLiteral("estoqueValor")).toString(),
+                              faltando > 0 ? QStringLiteral("  ·  %1 em falta").arg(faltando) : QString()));
+    }
+
+    // Fiado, a pagar, compras e parados.
+    {
+        const QJsonObject fi = dados.value(QStringLiteral("fiado")).toObject();
+        const QJsonArray cls = fi.value(QStringLiteral("clientes")).toArray();
+        QString f;
+        for (const QJsonValue &v : cls) {
+            const QJsonObject o = v.toObject();
+            f += linha(esc(o.value(QStringLiteral("nome")).toString()),
+                       o.value(QStringLiteral("saldo")).toString());
+        }
+        html.replace(QStringLiteral("%FIADO%"), f.isEmpty() ? vazio(QStringLiteral("Ninguém devendo.")) : f);
+        html.replace(QStringLiteral("%TFIADO%"),
+                     QStringLiteral("A receber (fiado) · %1%2")
+                         .arg(fi.value(QStringLiteral("total")).toString(),
+                              cls.isEmpty() ? QString() : QStringLiteral(" (%1)").arg(cls.size())));
+
+        const QJsonObject ap = dados.value(QStringLiteral("aPagar")).toObject();
+        const QJsonArray cts = ap.value(QStringLiteral("contas")).toArray();
+        QString g;
+        for (const QJsonValue &v : cts) {
+            const QJsonObject o = v.toObject();
+            QString sub = esc(o.value(QStringLiteral("fornecedor")).toString());
+            const QString vc = o.value(QStringLiteral("vencimento")).toString();
+            if (!vc.isEmpty())
+                sub += QStringLiteral(" · vence ") + vc;
+            if (o.value(QStringLiteral("vencida")).toBool())
+                sub = QStringLiteral("<span style=\"color:var(--red)\">%1 · VENCIDA</span>").arg(sub);
+            g += linha(esc(o.value(QStringLiteral("descricao")).toString()),
+                       o.value(QStringLiteral("valor")).toString(), sub);
+        }
+        html.replace(QStringLiteral("%PAGAR%"), g.isEmpty() ? vazio(QStringLiteral("Nada a pagar.")) : g);
+        html.replace(QStringLiteral("%TPAGAR%"),
+                     QStringLiteral("A pagar · %1%2")
+                         .arg(ap.value(QStringLiteral("total")).toString(),
+                              cts.isEmpty() ? QString() : QStringLiteral(" (%1)").arg(cts.size())));
+
+        const QJsonArray cps = dados.value(QStringLiteral("compras")).toArray();
+        QString cp;
+        for (const QJsonValue &v : cps) {
+            const QJsonObject o = v.toObject();
+            QString sub = o.value(QStringLiteral("data")).toString().left(16);
+            const QString nf = o.value(QStringLiteral("nota")).toString();
+            if (!nf.isEmpty())
+                sub += QStringLiteral(" · NF ") + esc(nf);
+            sub += QStringLiteral(" · %1 item(ns)").arg(o.value(QStringLiteral("itens")).toInt());
+            cp += linha(esc(o.value(QStringLiteral("fornecedor")).toString()),
+                        o.value(QStringLiteral("total")).toString(), sub);
+        }
+        html.replace(QStringLiteral("%COMPRAS%"),
+                     cp.isEmpty() ? vazio(QStringLiteral("Nenhuma compra registrada.")) : cp);
+        html.replace(QStringLiteral("%TCOMPRAS%"),
+                     QStringLiteral("Últimas compras%1")
+                         .arg(cps.isEmpty() ? QString() : QStringLiteral(" · %1").arg(cps.size())));
+
+        const QJsonArray prs = dados.value(QStringLiteral("parados")).toArray();
+        QString pr;
+        for (const QJsonValue &v : prs) {
+            const QJsonObject o = v.toObject();
+            pr += linha(esc(o.value(QStringLiteral("nome")).toString()),
+                        QString::number(static_cast<qint64>(o.value(QStringLiteral("estoque")).toDouble())));
+        }
+        html.replace(QStringLiteral("%PARADOS%"), pr.isEmpty() ? vazio(QStringLiteral("Tudo girando.")) : pr);
+        html.replace(QStringLiteral("%TPARADOS%"),
+                     QStringLiteral("Parados (30 dias)%1")
+                         .arg(prs.isEmpty() ? QString() : QStringLiteral(" · %1").arg(prs.size())));
+    }
+
     return html;
 }
 

@@ -1,6 +1,7 @@
 #include <QtTest>
 
 #include <QFile>
+#include <QRegularExpression>
 #include <QFileInfo>
 #include <QSqlQuery>
 #include <QTemporaryDir>
@@ -17,6 +18,7 @@ private slots:
     void initTestCase();
     void geraHtmlComDados();
     void aguentaEstoqueGrande();
+    void conteudoAparecemSemJavaScript();
 
 private:
     QTemporaryDir m_dbDir;
@@ -113,6 +115,37 @@ void TstRelatorioMobile::aguentaEstoqueGrande()
     QVERIFY2(msg.size() < 4096,
              qUtf8Printable(QStringLiteral("mensagem grande demais: %1").arg(msg.size())));
     QVERIFY(msg.contains(QStringLiteral("no estoque mínimo")));
+}
+
+void TstRelatorioMobile::conteudoAparecemSemJavaScript()
+{
+    // O relatório precisa mostrar os dados MESMO onde scripts não rodam
+    // (visualizadores de anexo, prévias, navegadores restritos). Antes o corpo
+    // vinha vazio e tudo era montado por JS — quem abria via só a página em branco.
+    RelatorioMobileService svc(m_db.connection(), m_outDir.path());
+    QString caminho;
+    QVERIFY2(svc.gerar(&caminho), qUtf8Printable(svc.ultimoErro()));
+
+    QFile f(caminho);
+    QVERIFY(f.open(QIODevice::ReadOnly));
+    QString html = QString::fromUtf8(f.readAll());
+    f.close();
+
+    // Remove TODO o JavaScript e verifica o que sobra na página.
+    static const QRegularExpression re(QStringLiteral("<script.*?</script>"),
+                                       QRegularExpression::DotMatchesEverythingOption);
+    const QString semJs = html.remove(re);
+
+    QVERIFY2(!semJs.contains(QStringLiteral("<div class=\"card\" id=\"estoque\"></div>")),
+             "a seção de estoque ficou vazia sem JavaScript");
+    QVERIFY2(semJs.contains(QStringLiteral("ProdutoTesteXYZ")),
+             "o produto não aparece na página sem JavaScript");
+    QVERIFY2(semJs.contains(QStringLiteral("R$")), "nenhum valor renderizado sem JavaScript");
+    // Nenhum placeholder pode escapar sem substituição.
+    for (const char *ph : {"%ESTOQUE%", "%FORMAS%", "%CAIXA%", "%ALERTAS%",
+                           "%KFAT%", "%PAGAR%", "%FIADO%", "%COMPRAS%", "%PARADOS%"})
+        QVERIFY2(!html.contains(QLatin1String(ph)),
+                 qUtf8Printable(QStringLiteral("placeholder %1 não foi preenchido").arg(QLatin1String(ph))));
 }
 
 QTEST_MAIN(TstRelatorioMobile)
