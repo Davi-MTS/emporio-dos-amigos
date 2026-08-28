@@ -9,6 +9,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QStandardPaths>
 #include <QStringList>
 
 #include <QSqlQuery>
@@ -29,13 +30,12 @@ RelatorioMobileService::RelatorioMobileService(QSqlDatabase db, const QString &d
 
 QString RelatorioMobileService::pastaPadrao()
 {
-    // A variável de ambiente OneDrive aponta para a pasta local sincronizada.
-    QString base = qEnvironmentVariable("OneDrive");
+    // Pasta local do próprio app. O relatório NÃO depende mais de nuvem: ele é
+    // enviado anexado na mensagem do Telegram, que é o canal de entrega.
+    QString base = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     if (base.isEmpty())
-        base = qEnvironmentVariable("OneDriveConsumer");
-    if (base.isEmpty())
-        base = QDir::homePath() + QStringLiteral("/Documentos");
-    return QDir::fromNativeSeparators(base) + QStringLiteral("/Empório dos Amigos/Relatório");
+        base = QDir::homePath() + QStringLiteral("/.distribuidora");
+    return base + QStringLiteral("/Relatorio");
 }
 
 QString RelatorioMobileService::caminhoArquivo() const

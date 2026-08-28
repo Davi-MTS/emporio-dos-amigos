@@ -1127,7 +1127,7 @@ QVariantMap AppBackend::fecharCaixa(const QString &dinheiroContadoTexto)
         // fechamento do caixa falhar). Mantém as 5 cópias mais recentes.
         if (m_backupService.criarBackup(nullptr))
             m_backupService.rotacionar(5);
-        // Atualiza o relatório do celular (OneDrive) com os números do dia.
+        // Atualiza o relatório completo (arquivo local anexado no Telegram).
         m_relatorioMobile.gerar(nullptr);
         // E manda o resumo para o celular dos donos (chega como notificação).
         if (m_telegram.configurado() && m_telegram.ativo()) {

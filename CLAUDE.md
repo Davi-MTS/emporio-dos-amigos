@@ -343,9 +343,12 @@ Ver `docs/plano-backup.md`. `src/services/backup/BackupService`:
 Ver `docs/plano-mobile.md`. Decisão do dono: acesso remoto + atualização periódica,
 sem servidor. `src/services/relatoriomobile/RelatorioMobileService`:
 - Gera um **HTML único autossuficiente** (CSS/JS/dados embutidos; `<` escapado no
-  JSON contra quebra de `</script>`) e grava em `%OneDrive%/Empório dos Amigos/
-  Relatório/relatorio.html` (fallback Documentos). O dono abre pelo app do OneDrive
-  no celular (privado, só leitura).
+  JSON contra quebra de `</script>`) numa **pasta LOCAL do app**
+  (`AppDataLocation/Relatorio/relatorio.html`).
+- **OneDrive foi REMOVIDO como canal de entrega** (decisão do dono): dependia de o
+  dono lembrar de olhar a pasta, com a conta certa, e falhava em silêncio quando a
+  sincronização do PC estava parada — foi o que aconteceu no teste real. A entrega
+  agora é **só pelo Telegram**, que anexa este HTML na mensagem.
 - Conteúdo: resumo Hoje/7/30 (faturamento, lucro, nº vendas, ticket), formas de
   pagamento, mais vendidos, estoque (baixos em destaque) e fiado a receber.
 - **SEM aba própria** (decisão do dono): é 100% automático, sempre **junto com o

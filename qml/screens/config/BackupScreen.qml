@@ -103,7 +103,7 @@ Rectangle {
                 Text {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
-                    text: qsTr("Ao fechar o caixa (e neste botão) são gerados automaticamente: o backup — mantendo as 5 cópias mais recentes — e o relatório do celular.")
+                    text: qsTr("Ao fechar o caixa (e neste botão) é feito o backup automaticamente, mantendo as 5 cópias mais recentes.")
                     color: Theme.textMuted
                     font.pixelSize: Theme.fontXs
                 }
@@ -164,7 +164,7 @@ Rectangle {
                 Text {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
-                    text: qsTr("Ao fechar o caixa, o resumo do dia é enviado como mensagem para o celular dos donos — chega como notificação, de qualquer lugar.")
+                    text: qsTr("Ao fechar o caixa, o resumo do dia é enviado como notificação para o celular dos donos, com o relatório completo anexado. Funciona de qualquer lugar, sem depender de nuvem.")
                     color: Theme.textMuted
                     font.pixelSize: Theme.fontXs
                 }

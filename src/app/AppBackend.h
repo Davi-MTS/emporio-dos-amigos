@@ -184,7 +184,7 @@ public:
     // Situação: { total, ultimoCriadoEm, ultimoResumo, pasta }.
     Q_INVOKABLE QVariantMap statusBackup();
 
-    // --- Relatório do celular (HTML numa pasta do OneDrive; só Admin na UI) ---
+    // --- Relatório do celular (HTML local, enviado anexado no Telegram) ---
     // Gera/atualiza o relatório HTML. { ok, caminho, pasta, erro }.
     Q_INVOKABLE QVariantMap gerarRelatorioCelular();
     // Situação: { pasta, caminho, existe, atualizadoEm }.
