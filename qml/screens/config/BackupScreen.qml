@@ -212,7 +212,7 @@ Rectangle {
                 Text {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
-                    text: qsTr("Para descobrir: adicione o seu bot ao grupo (ou converse com ele), mande qualquer mensagem lá e clique em “Descobrir”.")
+                    text: qsTr("Para descobrir: adicione o SEU bot ao grupo, mande lá uma mensagem começando com barra (ex.: /oi) e clique em “Descobrir”. O bot só enxerga mensagens com / — as comuns ficam ocultas para ele.")
                     color: Theme.textMuted
                     font.pixelSize: Theme.fontXs
                 }

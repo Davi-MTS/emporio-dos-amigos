@@ -136,7 +136,17 @@ void TelegramService::descobrirChat(const QString &tokenInformado)
         return;
     }
 
-    QNetworkRequest req{QUrl(apiUrl(tk, QStringLiteral("getUpdates")))};
+    // allowed_updates explícito: além das mensagens, queremos o evento de
+    // "bot foi adicionado ao grupo" (my_chat_member) — ele chega mesmo com o
+    // privacy mode ligado, que por padrão esconde as mensagens comuns do grupo.
+    QUrl url(apiUrl(tk, QStringLiteral("getUpdates")));
+    QUrlQuery params;
+    params.addQueryItem(QStringLiteral("allowed_updates"),
+                        QStringLiteral(R"(["message","channel_post","my_chat_member"])"));
+    params.addQueryItem(QStringLiteral("limit"), QStringLiteral("100"));
+    url.setQuery(params);
+
+    QNetworkRequest req{url};
     QNetworkReply *reply = m_net->get(req);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         reply->deleteLater();
@@ -172,7 +182,8 @@ void TelegramService::descobrirChat(const QString &tokenInformado)
             }
         }
         emit resultado(false, QStringLiteral(
-            "Nenhuma conversa encontrada. Mande uma mensagem qualquer no grupo "
-            "(ou para o bot) e clique de novo."));
+            "Nenhuma conversa encontrada. No GRUPO, mande uma mensagem começando "
+            "com barra — por exemplo /oi — e clique de novo. (Por padrão o bot não "
+            "enxerga mensagens comuns do grupo, só as que começam com /.)"));
     });
 }
