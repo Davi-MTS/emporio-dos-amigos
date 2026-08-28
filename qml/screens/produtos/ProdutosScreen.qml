@@ -20,6 +20,14 @@ Rectangle {
     }
 
     // Larguras de coluna compartilhadas entre cabeçalho e linhas.
+    // Colunas de largura fixa somem conforme a janela encolhe. Sem isto elas não
+    // cabem na lista e passam por cima do nome do produto (visto com a janela
+    // restaurada, fora de tela cheia).
+    readonly property bool mostrarEstoque:   listaBox.width > 250
+    readonly property bool mostrarStatus:    listaBox.width > 350
+    readonly property bool mostrarPreco:     listaBox.width > 460
+    readonly property bool mostrarCategoria: listaBox.width > 600
+
     readonly property int colCat: 130
     readonly property int colEst: 84
     readonly property int colPreco: 96
@@ -154,8 +162,10 @@ Rectangle {
             }
 
             Rectangle {
+                id: listaBox
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.minimumWidth: 260
                 radius: Theme.radius
                 color: Theme.surface
                 border.color: Theme.border
@@ -177,10 +187,10 @@ Rectangle {
                             anchors.rightMargin: Theme.spacingMd
                             spacing: Theme.spacingSm
                             Text { text: qsTr("Produto"); Layout.fillWidth: true; color: Theme.textMuted; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold }
-                            Text { text: qsTr("Categoria"); Layout.preferredWidth: tela.colCat; color: Theme.textMuted; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold }
-                            Text { text: qsTr("Estoque"); Layout.preferredWidth: tela.colEst; horizontalAlignment: Text.AlignRight; color: Theme.textMuted; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold }
-                            Text { text: qsTr("Preço"); Layout.preferredWidth: tela.colPreco; horizontalAlignment: Text.AlignRight; color: Theme.textMuted; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold }
-                            Text { text: qsTr("Status"); Layout.preferredWidth: tela.colStatus; color: Theme.textMuted; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold }
+                            Text { text: qsTr("Categoria"); visible: tela.mostrarCategoria; Layout.preferredWidth: tela.colCat; color: Theme.textMuted; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold }
+                            Text { text: qsTr("Estoque"); visible: tela.mostrarEstoque; Layout.preferredWidth: tela.colEst; horizontalAlignment: Text.AlignRight; color: Theme.textMuted; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold }
+                            Text { text: qsTr("Preço"); visible: tela.mostrarPreco; Layout.preferredWidth: tela.colPreco; horizontalAlignment: Text.AlignRight; color: Theme.textMuted; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold }
+                            Text { text: qsTr("Status"); visible: tela.mostrarStatus; Layout.preferredWidth: tela.colStatus; color: Theme.textMuted; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold }
                         }
                     }
                     Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Theme.border }
@@ -221,10 +231,11 @@ Rectangle {
                                     font.pixelSize: Theme.fontMd
                                     font.weight: Font.DemiBold
                                 }
-                                Text { Layout.preferredWidth: tela.colCat; text: linha.categoria; elide: Text.ElideRight; color: Theme.textMuted; font.pixelSize: Theme.fontMd }
-                                Text { Layout.preferredWidth: tela.colEst; text: linha.composto ? "—" : linha.estoque; horizontalAlignment: Text.AlignRight; color: Theme.text; font.pixelSize: Theme.fontMd }
-                                Text { Layout.preferredWidth: tela.colPreco; text: App.formatarDinheiro(linha.preco); horizontalAlignment: Text.AlignRight; color: Theme.text; font.pixelSize: Theme.fontMd }
+                                Text { visible: tela.mostrarCategoria; Layout.preferredWidth: tela.colCat; text: linha.categoria; elide: Text.ElideRight; color: Theme.textMuted; font.pixelSize: Theme.fontMd }
+                                Text { visible: tela.mostrarEstoque; Layout.preferredWidth: tela.colEst; text: linha.composto ? "—" : linha.estoque; horizontalAlignment: Text.AlignRight; color: Theme.text; font.pixelSize: Theme.fontMd }
+                                Text { visible: tela.mostrarPreco; Layout.preferredWidth: tela.colPreco; text: App.formatarDinheiro(linha.preco); horizontalAlignment: Text.AlignRight; color: Theme.text; font.pixelSize: Theme.fontMd }
                                 Item {
+                                    visible: tela.mostrarStatus
                                     Layout.preferredWidth: tela.colStatus
                                     implicitHeight: 22
                                     StatusBadge { visible: !linha.composto; status: linha.status; anchors.verticalCenter: parent.verticalCenter }
@@ -257,6 +268,7 @@ Rectangle {
         // ============================== EDITOR =============================
         Rectangle {
             Layout.preferredWidth: 520
+            Layout.minimumWidth: 380
             Layout.fillHeight: true
             radius: Theme.radius
             color: Theme.surface

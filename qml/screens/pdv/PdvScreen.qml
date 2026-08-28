@@ -24,6 +24,11 @@ Rectangle {
     readonly property int trocoVenda: Math.max(0, pagoVenda - totalVenda)
     // Aviso (não bloqueante) quando o carrinho pede mais do que há em estoque.
     property string avisoEstoque: ""
+    // Com a janela restaurada (fora de tela cheia) as colunas fixas do carrinho
+    // não cabem e se sobrepõem: escondemos as menos essenciais primeiro.
+    property real larguraCarrinho: 0
+    readonly property bool mostrarPrecoUnit: larguraCarrinho > 470
+    readonly property bool mostrarSubtotal:  larguraCarrinho > 360
 
     // Linha rótulo/valor (resumo do fechamento).
     component KV: RowLayout {
@@ -454,8 +459,8 @@ Rectangle {
                                 spacing: Theme.spacingSm
                                 Text { text: qsTr("Produto"); Layout.fillWidth: true; color: Theme.textMuted; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold }
                                 Text { text: qsTr("Qtd"); Layout.preferredWidth: 110; horizontalAlignment: Text.AlignHCenter; color: Theme.textMuted; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold }
-                                Text { text: qsTr("Preço"); Layout.preferredWidth: 90; horizontalAlignment: Text.AlignRight; color: Theme.textMuted; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold }
-                                Text { text: qsTr("Subtotal"); Layout.preferredWidth: 96; horizontalAlignment: Text.AlignRight; color: Theme.textMuted; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold }
+                                Text { text: qsTr("Preço"); visible: tela.mostrarPrecoUnit; Layout.preferredWidth: 90; horizontalAlignment: Text.AlignRight; color: Theme.textMuted; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold }
+                                Text { text: qsTr("Subtotal"); visible: tela.mostrarSubtotal; Layout.preferredWidth: 96; horizontalAlignment: Text.AlignRight; color: Theme.textMuted; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold }
                                 Item { Layout.preferredWidth: 28 }
                             }
                         }
@@ -465,6 +470,7 @@ Rectangle {
                             id: cartView
                             Layout.fillWidth: true
                             Layout.fillHeight: true
+                            onWidthChanged: tela.larguraCarrinho = width
                             clip: true
                             model: cart
                             ScrollBar.vertical: ScrollBar {}
@@ -537,8 +543,8 @@ Rectangle {
                                         // Permite digitar a quantidade (ex.: 24) além dos botões − / +.
                                         onValueModified: { cart.setProperty(linha.index, "qtd", value); tela.recomputar(); }
                                     }
-                                    Text { Layout.preferredWidth: 90; text: App.formatarDinheiro(linha.preco); horizontalAlignment: Text.AlignRight; color: Theme.textMuted; font.pixelSize: Theme.fontMd }
-                                    Text { Layout.preferredWidth: 96; text: App.formatarDinheiro(linha.qtd * linha.preco - linha.desconto); horizontalAlignment: Text.AlignRight; color: Theme.text; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold }
+                                    Text { visible: tela.mostrarPrecoUnit; Layout.preferredWidth: 90; text: App.formatarDinheiro(linha.preco); horizontalAlignment: Text.AlignRight; color: Theme.textMuted; font.pixelSize: Theme.fontMd }
+                                    Text { visible: tela.mostrarSubtotal; Layout.preferredWidth: 96; text: App.formatarDinheiro(linha.qtd * linha.preco - linha.desconto); horizontalAlignment: Text.AlignRight; color: Theme.text; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold }
                                     AppButton { kind: "ghost"; text: "✕"; implicitWidth: 28; onClicked: { cart.remove(linha.index); tela.recomputar(); } }
                                 }
                                 Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.border }
@@ -558,6 +564,7 @@ Rectangle {
             // -------------------- Direita: total + pagamento --------------------
             Rectangle {
                 Layout.preferredWidth: 380
+                Layout.minimumWidth: 300
                 Layout.fillHeight: true
                 radius: Theme.radius
                 color: Theme.surface
