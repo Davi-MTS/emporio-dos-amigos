@@ -287,6 +287,23 @@ dia é ENVIADO como notificação para o celular dos donos.
 - Coberto por `tst_venda_repository::cancelamentoDevolveEstoqueEFiado` e
   `::cancelamentoSaiDoCaixaEDoHistorico`.
 
+### Registro do sistema — log em arquivo (feito)
+
+Sem console no build de produção, um erro não deixaria rastro nenhum na loja.
+`src/services/log/LogService`:
+- `instalar()` no `main.cpp` (logo após nome/versão) captura tudo que passa por
+  `qDebug/qWarning/qCritical/qFatal` — **inclusive os erros de QML** — e delega
+  ao handler anterior (console segue funcionando em Debug).
+- Arquivo: `<AppDataLocation>/logs/sistema.log`, **com BOM UTF-8** (sem ele o
+  Bloco de Notas antigo mostra acento trocado — e é o dono que vai abrir).
+- **Rotação** aos 2 MB, mantendo `sistema.1.log`..`.3.log`. Mutex (o Qt loga de
+  várias threads). Filtra o ruído do QFontDatabase.
+- `registrar()` grava eventos do negócio: **cancelamento de venda** (quem, qual,
+  motivo) e **fechamento de caixa** (esperado × contado × diferença).
+- UI: painel "Registro do sistema" na tela de Backup — últimas 80 linhas
+  coloridas por nível + botão "Abrir pasta" (`Qt.openUrlExternally`, evita
+  depender de QtGui no Core). `AppBackend::statusLog/ultimasLinhasLog`.
+
 ### Empacotamento para a loja (feito)
 
 `deploy/empacotar.ps1` gera pasta autossuficiente + zip (~26 MB): compila em
@@ -295,6 +312,9 @@ LEIA-ME. **Verificado rodando com PATH limpo (sem Qt instalado).**
 Nota PS 5.1: stderr de .exe vira erro — o script usa `Exec{}` conferindo
 `$LASTEXITCODE` em vez de `ErrorActionPreference=Stop`.
 Inno Setup não está instalado; o pacote é "copiar a pasta e criar atalho".
+**Sem janela de console:** `WIN32_EXECUTABLE $<CONFIG:Release>` em
+`qml/CMakeLists.txt` — o exe era `Windows CUI` e abria um cmd preto junto (se o
+operador fechasse, matava o sistema no meio da venda). Debug segue CUI.
 
 - **Importador automático de NF-e (XML): PENDENTE** — o dono só tem DANFE em papel/PDF
   hoje. Combinado: construir o leitor de XML (parse fornecedor+itens via `QXmlStreamReader`,

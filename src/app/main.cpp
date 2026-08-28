@@ -2,6 +2,7 @@
 #include "database/Database.h"
 #include "database/MigrationRunner.h"
 #include "services/backup/BackupService.h"
+#include "services/log/LogService.h"
 
 #include <QFont>
 #include <QFontDatabase>
@@ -23,6 +24,11 @@ int main(int argc, char *argv[])
     QGuiApplication::setApplicationName(QStringLiteral("Distribuidora"));
     QGuiApplication::setOrganizationName(QStringLiteral("Distribuidora"));
     QGuiApplication::setApplicationVersion(QStringLiteral("0.1.0"));
+
+    // Registro em arquivo: o executável de produção não tem console, então sem
+    // isto um erro ou fechamento inesperado não deixaria rastro na loja.
+    // Instalado logo após o nome/versão do app (que entram na primeira linha).
+    LogService::instalar();
 
     // --- Restauração pendente: troca o arquivo do banco ANTES de abri-lo ---
     // (agendada na tela de Backup; roda uma vez, no próximo início).

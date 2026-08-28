@@ -5,6 +5,7 @@
 #include <utility>
 
 #include <QFileInfo>
+#include <QUrl>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSqlError>
@@ -1090,6 +1091,11 @@ QVariantMap AppBackend::cancelarVenda(int vendaId, const QString &motivo)
         return out;
     }
     const bool ok = m_vendaRepo.cancelarVenda(vendaId, motivo.trimmed(), m_usuarioId, m_sessaoId);
+    LogService::registrar(QStringLiteral("Venda #%1 %2 por '%3' — motivo: %4")
+                              .arg(vendaId)
+                              .arg(ok ? QStringLiteral("CANCELADA") : QStringLiteral("falha ao cancelar"),
+                                   m_usuarioAtual.value(QStringLiteral("nome")).toString(),
+                                   motivo.trimmed()));
     out[QStringLiteral("ok")] = ok;
     out[QStringLiteral("erro")] = ok ? QString() : m_vendaRepo.ultimoErro();
     if (ok) {
@@ -1169,6 +1175,10 @@ QVariantMap AppBackend::fecharCaixa(const QString &dinheiroContadoTexto)
     out[QStringLiteral("diferenca")] = static_cast<qlonglong>(r.diferenca);
     out[QStringLiteral("erro")] = r.erro;
     if (r.ok) {
+        LogService::registrar(QStringLiteral("Caixa fechado por '%1' — esperado %2, contado %3, diferença %4")
+                                  .arg(m_usuarioAtual.value(QStringLiteral("nome")).toString(),
+                                       Money::format(r.esperado), Money::format(r.informado),
+                                       Money::format(r.diferenca)));
         m_sessaoId = 0;
         emit caixaAbertoChanged();
         // Backup automático de fim de expediente (melhor esforço — nunca faz o
@@ -1310,6 +1320,24 @@ void AppBackend::testarTelegram()
 void AppBackend::descobrirChatTelegram(const QString &token)
 {
     m_telegram.descobrirChat(token);
+}
+
+// ----------------------------------------------------------- Registro (log)
+
+QVariantMap AppBackend::statusLog()
+{
+    QVariantMap m;
+    const QString arq = LogService::caminhoArquivo();
+    m[QStringLiteral("pasta")] = LogService::pasta();
+    m[QStringLiteral("arquivo")] = arq;
+    m[QStringLiteral("tamanho")] = static_cast<qlonglong>(QFileInfo(arq).size());
+    m[QStringLiteral("url")] = QUrl::fromLocalFile(LogService::pasta()).toString();
+    return m;
+}
+
+QStringList AppBackend::ultimasLinhasLog(int n)
+{
+    return LogService::ultimasLinhas(n);
 }
 
 QString AppBackend::formatarDinheiro(qlonglong centavos) const

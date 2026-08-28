@@ -52,6 +52,8 @@ target_sources(DistribuidoraCore
         services/backup/BackupService.cpp
         services/relatoriomobile/RelatorioMobileService.h
         services/relatoriomobile/RelatorioMobileService.cpp
+        services/log/LogService.h
+        services/log/LogService.cpp
         services/telegram/TelegramService.h
         services/telegram/TelegramService.cpp
         models/ProdutosListModel.h

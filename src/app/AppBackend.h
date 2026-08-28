@@ -12,6 +12,7 @@
 #include "domain/vendas/VendaRepository.h"
 #include "services/backup/BackupService.h"
 #include "services/relatoriomobile/RelatorioMobileService.h"
+#include "services/log/LogService.h"
 #include "services/telegram/TelegramService.h"
 #include "models/ClientesListModel.h"
 #include "models/ComprasListModel.h"
@@ -207,6 +208,11 @@ public:
     Q_INVOKABLE void salvarConfigTelegram(const QString &token, const QString &chatId, bool ativo);
     // Dispara um envio de teste; o retorno vem pelo sinal telegramResultado.
     Q_INVOKABLE void testarTelegram();
+
+    // --- Registro do sistema (log em arquivo) ---
+    // { pasta, arquivo, tamanho, url } — url serve p/ Qt.openUrlExternally.
+    Q_INVOKABLE QVariantMap statusLog();
+    Q_INVOKABLE QStringList ultimasLinhasLog(int n);
     // Descobre o chat/grupo automaticamente (resposta em telegramChatDescoberto).
     Q_INVOKABLE void descobrirChatTelegram(const QString &token);
 

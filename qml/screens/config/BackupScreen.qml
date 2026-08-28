@@ -11,6 +11,8 @@ Rectangle {
 
     property var status: ({})
     property var relatorio: ({})
+    property var log: ({})
+    property var linhasLog: []
 
     ListModel { id: backupsModel }
 
@@ -22,10 +24,15 @@ Rectangle {
         tgToken.text = tg.token || "";
         tgChat.text = tg.chatId || "";
         tgAtivo.checked = tg.ativo === true;
+        carregarLog();
         backupsModel.clear();
         var l = App.backupsDisponiveis();
         for (var i = 0; i < l.length; i++)
             backupsModel.append(l[i]);
+    }
+    function carregarLog() {
+        log = App.statusLog();
+        linhasLog = App.ultimasLinhasLog(80);
     }
     function fmtData(iso) {
         if (!iso || iso.length === 0) return "—";
@@ -258,6 +265,97 @@ Rectangle {
                         }
                     }
                     Item { Layout.fillWidth: true }
+                }
+            }
+        }
+
+        // ---- Registro do sistema (log) ----
+        Rectangle {
+            Layout.fillWidth: true
+            radius: Theme.radius
+            color: Theme.surface
+            border.color: Theme.border
+            implicitHeight: logCol.implicitHeight + 2 * Theme.spacingLg
+
+            ColumnLayout {
+                id: logCol
+                anchors.fill: parent
+                anchors.margins: Theme.spacingLg
+                spacing: Theme.spacingSm
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.spacingMd
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 2
+                        Text {
+                            text: qsTr("Registro do sistema")
+                            color: Theme.text
+                            font.family: Theme.fontDisplay
+                            font.pixelSize: Theme.fontLg
+                            font.weight: Font.DemiBold
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            text: qsTr("Guarda o que o sistema fez e os erros que aconteceram. É o que permite descobrir a causa se algo falhar ou fechar sozinho.")
+                            color: Theme.textMuted
+                            font.pixelSize: Theme.fontXs
+                        }
+                    }
+                    AppButton {
+                        kind: "default"
+                        text: qsTr("Abrir pasta")
+                        onClicked: Qt.openUrlExternally(tela.log.url || "")
+                    }
+                    AppButton {
+                        kind: "ghost"
+                        text: qsTr("↻")
+                        implicitWidth: 40
+                        onClicked: tela.carregarLog()
+                    }
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 150
+                    radius: Theme.radiusSm
+                    color: Theme.surfaceAlt
+                    border.color: Theme.border
+                    clip: true
+                    ListView {
+                        anchors.fill: parent
+                        anchors.margins: Theme.spacingSm
+                        clip: true
+                        model: tela.linhasLog
+                        ScrollBar.vertical: ScrollBar {}
+                        delegate: Text {
+                            required property var modelData
+                            width: ListView.view.width
+                            text: modelData
+                            wrapMode: Text.Wrap
+                            font.family: "Consolas"
+                            font.pixelSize: Theme.fontXs
+                            color: modelData.indexOf("[ERRO]") >= 0 || modelData.indexOf("[FATAL]") >= 0
+                                   ? Theme.danger
+                                   : (modelData.indexOf("[AVISO]") >= 0 ? Theme.warning : Theme.textMuted)
+                        }
+                        Label {
+                            anchors.centerIn: parent
+                            visible: tela.linhasLog.length === 0
+                            text: qsTr("Sem registros ainda.")
+                            color: Theme.textMuted
+                            font.pixelSize: Theme.fontSm
+                        }
+                    }
+                }
+                Text {
+                    Layout.fillWidth: true
+                    elide: Text.ElideMiddle
+                    text: (tela.log.arquivo || "") + "  ·  " + tela.fmtTam(tela.log.tamanho || 0)
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.fontXs
                 }
             }
         }
