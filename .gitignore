@@ -20,8 +20,7 @@ CMakeLists.txt.user*
 *.sqlite
 *.sqlite3
 
-# Pacote gerado pelo deploy/empacotar.ps1 (artefato, não fonte)
-/deploy/pacote/
+# O .zip continua fora (é só a pasta compactada — duplicaria tudo).
 /deploy/*.zip
 
 # Backup local e relatório gerado
@@ -36,3 +35,12 @@ relatorio.html
 
 # Segredos e config local (Claude Code)
 CLAUDE.local.md
+
+# EXCEÇÃO: a pasta pronta para rodar FICA versionada de propósito.
+# É o que permite baixar o repositório na loja e clicar no executável, sem
+# precisar de Qt, compilador nem nada instalado. As regras *.exe/*.dll acima
+# valem para o resto do projeto; aqui elas são desfeitas (a última regra que
+# casa é a que vale). Confira sempre o deploy/pacote/VERSAO.txt: ele diz de
+# qual commit aquele executável saiu.
+!/deploy/pacote/
+!/deploy/pacote/**

@@ -118,6 +118,26 @@ GUIA COMPLETO
    atualizacao e problemas comuns) em docs/instalacao.md no repositorio.
 "@ | Out-File -FilePath (Join-Path $Saida "LEIA-ME.txt") -Encoding utf8
 
+# --- 3b. Carimbo de versao -------------------------------------------------
+# A pasta vai versionada no Git. Sem este arquivo, ninguem consegue saber se o
+# executavel ali dentro e o do codigo atual ou de tres semanas atras.
+$commit = (& git -C $raiz rev-parse --short HEAD 2>$null)
+if (-not $commit) { $commit = "(fora de um repositorio git)" }
+$sujo = (& git -C $raiz status --porcelain 2>$null | Where-Object { $_ -notmatch 'deploy/pacote' })
+$estado = if ($sujo) { "COM ALTERACOES NAO COMMITADAS" } else { "limpo" }
+@"
+$app - pacote pronto para rodar
+=======================================
+
+Gerado em : $(Get-Date -Format 'dd/MM/yyyy HH:mm')
+Commit    : $commit
+Arvore    : $estado
+
+Este executavel foi compilado a partir do commit acima. Se voce alterou o
+codigo depois disso, rode deploy\empacotar.ps1 de novo antes de levar para a
+loja - senao estara instalando uma versao velha.
+"@ | Out-File -FilePath (Join-Path $Saida "VERSAO.txt") -Encoding utf8
+
 # --- 4. Compacta ----------------------------------------------------------
 Write-Host "[4/4] Compactando..." -ForegroundColor Yellow
 $zip = Join-Path $raiz ("deploy\{0}.zip" -f ($app -replace ' ','-'))

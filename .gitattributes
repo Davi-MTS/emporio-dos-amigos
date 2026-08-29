@@ -1,0 +1,3 @@
+# A pasta pronta é artefato binário: o Git não pode "consertar" fim de linha
+# dentro dela, ou corrompe DLL e executável.
+/deploy/pacote/** binary

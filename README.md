@@ -72,13 +72,24 @@ O executável fica em `build/mingw/distribuidora.exe`. Para rodar, o
 > Os presets em `CMakePresets.json` também funcionam (`cmake --preset
 > windows-debug`), desde que `CMAKE_PREFIX_PATH` aponte para o Qt.
 
+## Pacote pronto (já versionado)
+
+A pasta **`deploy/pacote/`** está no repositório com o sistema **já compilado e
+pronto para rodar**. Baixou o repositório na loja? É só entrar nela e clicar em
+`Emporio dos Amigos.exe` — sem Qt, sem compilador, sem instalar nada.
+
+O arquivo `deploy/pacote/VERSAO.txt` diz de qual commit aquele executável saiu.
+**Se você mexeu no código depois desse commit, regenere o pacote** (abaixo)
+antes de levar para a loja.
+
 ## Gerar o pacote para a loja
 
 ```bash
 powershell -ExecutionPolicy Bypass -File .\deploy\empacotar.ps1
 ```
 
-Gera `deploy/pacote/` e `deploy/Emporio-dos-Amigos.zip` (~26 MB) — **pasta
+Regera `deploy/pacote/` (que é versionado — comite depois) e o
+`deploy/Emporio-dos-Amigos.zip` (~26 MB, fora do Git) — **pasta
 autossuficiente, com o Qt junto**: no PC da loja é só copiar e criar o atalho,
 sem instalar nada. O executável de produção não abre janela de console.
 Detalhes e passo a passo da instalação: **[docs/instalacao.md](docs/instalacao.md)**.

@@ -6,6 +6,18 @@ feito **na loja** (instalar e configurar).
 
 ---
 
+## Parte 0 — O caminho curto
+
+O sistema **já compilado** está versionado no repositório, em
+**`deploy/pacote/`**. Se você tem o repositório na máquina (ou acabou de baixá-lo
+do GitHub), pule direto para a **Parte 2**: entre nessa pasta e clique em
+`Emporio dos Amigos.exe`.
+
+Confira antes o **`deploy/pacote/VERSAO.txt`** — ele diz a data e o commit de
+onde aquele executável saiu. Se o código mudou depois disso, faça a Parte 1.
+
+---
+
 ## Parte 1 — Gerar o pacote (na sua máquina)
 
 > Só precisa refazer isto quando houver mudança no sistema.
@@ -23,7 +35,7 @@ O script compila em modo de produção, junta o Qt e gera:
 
 | Saída | O que é |
 | --- | --- |
-| `deploy/pacote/` | Pasta pronta para copiar (~1.300 arquivos) |
+| `deploy/pacote/` | Pasta pronta para copiar (~1.300 arquivos) — **versionada; comite depois de regerar** |
 | `deploy/Emporio-dos-Amigos.zip` | A mesma coisa compactada (~26 MB) |
 
 Se o Qt estiver em outro caminho:
