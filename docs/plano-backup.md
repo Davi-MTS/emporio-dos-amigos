@@ -3,9 +3,10 @@
 > ✅ **IMPLEMENTADO.** Este é o plano original, mantido como registro das
 > decisões. O que foi entregue está em `CLAUDE.md` e o uso no dia a dia em
 > [instalacao.md](instalacao.md).
-> Uma mudança em relação ao plano: a **cópia externa** (§4 do item 12) continua
-> fora, mas hoje o backup **vai anexado no Telegram** ao fechar o caixa, o que
-> já tira a cópia de dentro do PC.
+> ⚠️ A **cópia externa** (item 12.4) continua **fora**: o backup do banco
+> **NUNCA sai do computador da loja**. O que o Telegram envia ao fechar o caixa
+> é o *relatório* em HTML, não o `.db`. Se o HD falhar ou o PC for roubado,
+> **os dados se perdem**. É a maior fragilidade em aberto do sistema.
 > Sistema: Empório dos Amigos (Qt6 + QML + C++ + SQLite, desktop Windows, offline, loja única).
 
 ---
