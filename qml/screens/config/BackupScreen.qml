@@ -24,6 +24,7 @@ Rectangle {
         tgToken.text = tg.token || "";
         tgChat.text = tg.chatId || "";
         tgAtivo.checked = tg.ativo === true;
+        tgBackup.checked = tg.enviaBackup === true;
         carregarLog();
         backupsModel.clear();
         var l = App.backupsDisponiveis();
@@ -237,6 +238,19 @@ Rectangle {
                     id: tgAtivo
                     text: qsTr("Enviar automaticamente ao fechar o caixa")
                 }
+                ToggleButton {
+                    id: tgBackup
+                    text: qsTr("Enviar também a cópia de segurança")
+                }
+                Text {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    text: tgBackup.checked
+                          ? qsTr("A cópia do banco vai junto, então os dados deixam de existir só neste computador. Se o HD falhar ou o PC for roubado, dá para recuperar pelo Telegram.")
+                          : qsTr("⚠️ Sem isto, o backup fica SÓ neste computador. Se o HD falhar ou o PC for roubado, os dados se perdem.")
+                    color: tgBackup.checked ? Theme.textMuted : Theme.warning
+                    font.pixelSize: Theme.fontXs
+                }
 
                 Label {
                     id: tgAviso
@@ -256,7 +270,7 @@ Rectangle {
                         kind: "accent"
                         text: qsTr("Salvar")
                         onClicked: {
-                            App.salvarConfigTelegram(tgToken.text, tgChat.text, tgAtivo.checked);
+                            App.salvarConfigTelegram(tgToken.text, tgChat.text, tgAtivo.checked, tgBackup.checked);
                             tgAviso.erro = false;
                             tgAviso.text = qsTr("Configuração salva.");
                             tgAviso.visible = true;
@@ -266,7 +280,7 @@ Rectangle {
                         kind: "default"
                         text: qsTr("Enviar teste agora")
                         onClicked: {
-                            App.salvarConfigTelegram(tgToken.text, tgChat.text, tgAtivo.checked);
+                            App.salvarConfigTelegram(tgToken.text, tgChat.text, tgAtivo.checked, tgBackup.checked);
                             tgAviso.erro = false;
                             tgAviso.text = qsTr("Enviando…");
                             tgAviso.visible = true;

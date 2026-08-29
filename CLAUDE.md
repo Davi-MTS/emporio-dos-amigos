@@ -16,15 +16,16 @@ na sidebar). Ver `docs/design-ui.md` e `docs/mockup-ui.html`.
 | | |
 | --- | --- |
 | Telas | Dashboard, PDV, Produtos, Estoque, **Vendas**, Compras, Clientes, Financeiro, Relatórios, Usuários, Backup |
-| Testes | **16 executáveis** no CTest, todos verdes |
+| Testes | **17 executáveis** no CTest, todos verdes (16 de regra + `tst_qml`, de interface) |
 | Migrations | **0001–0010** aplicadas |
 | Entrega | `deploy/empacotar.ps1` → pasta autossuficiente + zip (~26 MB), sem console |
 | Repositório | `github.com/Davi-MTS/emporio-dos-amigos` (privado) |
 
 **Fora do PDV/estoque, o que existe:** produto composto (copão) com receita por
 categoria; cancelamento de venda com devolução de estoque/fiado/dinheiro;
-backup automático (5 cópias) e restauração; relatório HTML enviado por
-**Telegram** ao fechar o caixa; registro do sistema em arquivo.
+backup automático (5 cópias) e restauração; relatório HTML **e a cópia do
+banco** enviados por **Telegram** ao fechar o caixa; registro do sistema em
+arquivo.
 
 **O que NÃO existe (decidido ou pendente):** emissão de NF-e, impressão de
 cupom, integração TEF/maquininha, delivery/WhatsApp, multi-PC; importador de
@@ -41,7 +42,9 @@ NF-e por XML (aguardando um XML real de exemplo); desconto em %.
   vender mesmo sem internet).
 - **Sistema operacional alvo:** Windows (PC do caixa).
 - **Backup:** local (arquivo SQLite), automático ao fechar o caixa. Sem
-  sincronização em nuvem — a cópia sai do PC anexada na mensagem do Telegram.
+  sincronização em nuvem, mas a cópia **sai do PC**: o `.db` vai anexado na
+  mensagem do Telegram (opção "Enviar também a cópia de segurança", ligada por
+  padrão). Sem isso, um HD queimado levaria junto o histórico da loja.
 
 ## Princípios de arquitetura
 
@@ -493,3 +496,45 @@ hora da venda** quando a categoria tem mais de um produto. Só baixa os insumos
 - Testes: casos novos em `tst_caixa` (recebimento na gaveta), `tst_cliente`
   (recebimento parcial FIFO) e `tst_financeiro` (parcial por conta). Seguem
   **14 executáveis** no CTest, todos verdes.
+
+### Riscos de operação — cópia fora do PC e testes de interface (feito)
+
+Dois riscos que sobreviviam a tudo: o backup nunca saía do computador e nenhum
+teste abria uma tela.
+
+**1. A cópia do banco sai do PC.** `TelegramService` ganhou `enviaBackup()`
+(`QSettings` `telegram/enviaBackup`, **ligada por padrão**) e `salvarConfig` passou
+a receber esse quarto parâmetro. No `AppBackend::fecharCaixa` e no botão "Fazer
+backup agora", depois do resumo e do relatório HTML, o `.db` do backup vai
+anexado (`enviarArquivo`) com legenda "Backup do sistema — <resumo>", e a linha
+fica no log. `enviarArquivo` recusa acima de **45 MB** (limite do Bot API) com
+mensagem clara em vez de erro de rede. A tela de Backup tem o botão e, quando
+ele está desligado, um aviso de que a cópia fica só neste computador.
+
+**2. Testes de interface (`tst_qml`).** O módulo QML saiu do executável e virou a
+biblioteca **`distribuidora_ui`** (+ `distribuidora_uiplugin`); o `distribuidora`
+passa a linkar as duas. Sem isso os `.qml` ficavam presos dentro do `.exe` e
+nenhum outro binário conseguia abrir as telas. `tests/qml/arnes_qml.cpp`
+(`QUICK_TEST_MAIN_WITH_SETUP`) sobe um `AppBackend` real sobre banco em
+`QTemporaryDir`, com `QStandardPaths` em modo de teste, cria e loga um admin, e
+registra o contexto `App` — as telas rodam sem saber que estão num teste. Casos
+em `tests/qml/casos/`:
+- `tst_telas.qml` — as 12 telas abrem em 1160×700 e em 760×560 (janela
+  restaurada), sem aviso de QML, e nada pode começar fora da largura da tela;
+- `tst_pdv.qml` — total, agrupamento, composto sem estoque e a receita
+  sobrevivendo ao `ListModel` (o defeito que travava a venda);
+- `tst_componentes.qml` — diálogo nunca maior que a janela, toggle, segmented,
+  campo que não corta a data/valor digitado;
+- `tst_backup.qml` — o botão de enviar a cópia existe, reflete o que está salvo
+  e o aviso aparece quando está desligado.
+
+**Bug real que esses testes acharam:** em `RelatoriosScreen`, o título do painel
+("Vendas por forma de pagamento") virava a **largura mínima** do painel; com a
+janela restaurada o painel encolhia abaixo disso e a lista de dentro ficava 45 px
+mais larga que o cartão, invadindo o painel vizinho. Corrigido com
+`Layout.fillWidth` + `Layout.minimumWidth: 0` + `elide` no título.
+
+Nota de arnês: `PdvScreen` expõe `linhaCarrinho(i)`/`itensNoCarrinho()` porque o
+`ListModel` do carrinho é interno e o teste não o enxerga.
+
+Ficam **17 executáveis** no CTest (`tst_qml` roda em `offscreen`, ~68 s).

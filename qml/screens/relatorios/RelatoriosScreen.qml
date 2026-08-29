@@ -56,7 +56,20 @@ Rectangle {
         ColumnLayout {
             anchors.fill: parent
             spacing: 0
-            Text { text: titulo; Layout.margins: 16; color: Theme.text; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold }
+            // fillWidth + minimumWidth 0 + elide: sem os três, o título longo
+            // ("Vendas por forma de pagamento") vira a largura MÍNIMA do painel.
+            // Com a janela restaurada o painel encolhe abaixo disso e a lista de
+            // dentro fica maior que o cartão, invadindo o painel do lado.
+            Text {
+                text: titulo
+                Layout.margins: 16
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                elide: Text.ElideRight
+                color: Theme.text
+                font.pixelSize: Theme.fontMd
+                font.weight: Font.DemiBold
+            }
             Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Theme.border }
             Item { id: slot; Layout.fillWidth: true; Layout.fillHeight: true }
         }

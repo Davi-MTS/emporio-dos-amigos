@@ -103,7 +103,8 @@ Na primeira vez o sistema pede para **criar o administrador**:
 | Fechar a loja | **PDV** → *Fechar caixa* → contar o dinheiro e informar |
 
 **Ao fechar o caixa**, o sistema faz sozinho: **backup**, **relatório
-atualizado** e **envia o resumo no Telegram**.
+atualizado** e **envia no Telegram** o resumo, o relatório completo e a
+**cópia de segurança do banco**.
 
 ---
 
@@ -124,8 +125,17 @@ Feito uma vez só, leva ~5 minutos.
    **Enviar teste agora**.
 
 Dali em diante, ao fechar o caixa chega no celular o resumo do dia
-(faturamento, lucro, conferência da gaveta, alertas) com o **relatório completo
-em anexo**.
+(faturamento, lucro, conferência da gaveta, alertas), o **relatório completo**
+e a **cópia de segurança do banco** em anexo.
+
+> **Deixe ligado o "Enviar também a cópia de segurança".** É o que faz os dados
+> da loja existirem em outro lugar além deste computador: com o arquivo `.db`
+> guardado na conversa do Telegram, um HD queimado ou um PC roubado não levam
+> junto o histórico. Para recuperar, basta baixar o `.db` do Telegram, colocá-lo
+> na pasta de backups e usar **Backup** → *Restaurar*.
+>
+> Arquivos acima de **45 MB** o Telegram não aceita; nesse caso o sistema avisa
+> na tela (o backup local continua sendo feito normalmente).
 
 ---
 

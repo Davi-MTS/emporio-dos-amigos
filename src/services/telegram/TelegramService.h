@@ -24,14 +24,20 @@ public:
     QString token() const;
     QString chatId() const;
     bool ativo() const;                 // envio automático ligado?
+    // Enviar também a CÓPIA DO BANCO ao fechar o caixa. É o que faz o backup
+    // sair do computador: sem isto, um HD queimado leva os dados junto.
+    bool enviaBackup() const;
 
-    void salvarConfig(const QString &token, const QString &chatId, bool ativo);
+    void salvarConfig(const QString &token, const QString &chatId, bool ativo,
+                      bool enviaBackup);
 
     // Envia texto (HTML simples do Telegram: <b>, <i>, <code>). Assíncrono:
     // nunca trava a UI nem faz o fechamento de caixa falhar.
     void enviarMensagem(const QString &texto);
 
-    // Envia um arquivo (o relatório HTML completo) como documento.
+    // Envia um arquivo (relatório HTML ou a cópia do banco) como documento.
+    // A API do Telegram recusa acima de 50 MB — arquivos maiores são ignorados
+    // com aviso, em vez de falharem silenciosamente.
     void enviarArquivo(const QString &caminho, const QString &legenda);
 
     // Descobre o chat/grupo sozinho: lê as últimas mensagens recebidas pelo bot

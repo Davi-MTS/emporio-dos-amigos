@@ -6,9 +6,11 @@
 # O main.cpp é referenciado por caminho absoluto (é só C++, sem esse problema).
 # =============================================================================
 
-qt_add_executable(distribuidora
-    ${CMAKE_SOURCE_DIR}/src/app/main.cpp
-)
+# A interface vive numa BIBLIOTECA (distribuidora_ui), não no executável, para
+# que os testes de QML (tests/qml) possam carregar as mesmas telas que a loja
+# usa. Se ficasse no executável, os .qml iriam para dentro do .exe e nenhum
+# outro binário conseguiria abri-los.
+qt_add_library(distribuidora_ui STATIC)
 
 # Theme.qml é um singleton (pragma Singleton no arquivo). A propriedade precisa
 # ser definida ANTES de qt_add_qml_module para entrar no qmldir gerado.
@@ -16,7 +18,7 @@ set_source_files_properties(theme/Theme.qml
     PROPERTIES QT_QML_SINGLETON_TYPE TRUE
 )
 
-qt_add_qml_module(distribuidora
+qt_add_qml_module(distribuidora_ui
     URI Distribuidora
     VERSION 1.0
     QML_FILES
@@ -50,7 +52,7 @@ qt_add_qml_module(distribuidora
 )
 
 # Fontes embutidas (:/fonts/...), carregadas em main.cpp.
-qt_add_resources(distribuidora "fontes"
+qt_add_resources(distribuidora_ui "fontes"
     PREFIX "/fonts"
     BASE ${CMAKE_SOURCE_DIR}/resources/fonts
     FILES
@@ -59,11 +61,23 @@ qt_add_resources(distribuidora "fontes"
 )
 
 # Imagens embutidas (:/images/...): logo da marca etc.
-qt_add_resources(distribuidora "imagens"
+qt_add_resources(distribuidora_ui "imagens"
     PREFIX "/images"
     BASE ${CMAKE_SOURCE_DIR}/resources/images
     FILES
         ${CMAKE_SOURCE_DIR}/resources/images/logo.png
+)
+
+target_link_libraries(distribuidora_ui
+    PUBLIC
+        Distribuidora::Core
+        Qt6::Quick
+        Qt6::QuickControls2
+)
+
+# --- Executável ---------------------------------------------------------------
+qt_add_executable(distribuidora
+    ${CMAKE_SOURCE_DIR}/src/app/main.cpp
 )
 
 # Sem janela de console no Windows quando for build de produção (Release).
@@ -74,9 +88,10 @@ set_target_properties(distribuidora PROPERTIES
     WIN32_EXECUTABLE $<CONFIG:Release>
 )
 
+# Liga o PLUGIN do módulo (e não só a biblioteca): é ele que inicializa os
+# recursos :/qt/qml/Distribuidora/... para o "import Distribuidora" funcionar.
 target_link_libraries(distribuidora
     PRIVATE
-        Distribuidora::Core
-        Qt6::Quick
-        Qt6::QuickControls2
+        distribuidora_ui
+        distribuidora_uiplugin
 )

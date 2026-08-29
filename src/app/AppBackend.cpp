@@ -1183,15 +1183,26 @@ QVariantMap AppBackend::fecharCaixa(const QString &dinheiroContadoTexto)
         emit caixaAbertoChanged();
         // Backup automático de fim de expediente (melhor esforço — nunca faz o
         // fechamento do caixa falhar). Mantém as 5 cópias mais recentes.
-        if (m_backupService.criarBackup(nullptr))
+        BackupInfo backup;
+        const bool temBackup = m_backupService.criarBackup(&backup);
+        if (temBackup)
             m_backupService.rotacionar(5);
         // Atualiza o relatório completo (arquivo local anexado no Telegram).
         m_relatorioMobile.gerar(nullptr);
-        // E manda o resumo para o celular dos donos (chega como notificação).
+        // E manda para o celular dos donos (chega como notificação).
         if (m_telegram.configurado() && m_telegram.ativo()) {
             m_telegram.enviarMensagem(m_relatorioMobile.resumoTexto());
             m_telegram.enviarArquivo(m_relatorioMobile.caminhoArquivo(),
                                      QStringLiteral("Relatório completo"));
+            // A CÓPIA DO BANCO vai junto: é o que tira o backup de dentro do PC.
+            // Sem isto, um HD queimado ou um roubo levam os dados junto.
+            if (temBackup && m_telegram.enviaBackup()) {
+                m_telegram.enviarArquivo(
+                    backup.caminho,
+                    QStringLiteral("Backup do sistema — %1").arg(backup.resumo));
+                LogService::registrar(QStringLiteral("Backup enviado ao Telegram: %1")
+                                          .arg(backup.caminho));
+            }
         }
     } else {
         m_erro = r.erro;
@@ -1213,6 +1224,10 @@ QVariantMap AppBackend::fazerBackup()
     m_backupService.rotacionar(5);
     // Backup e relatório do celular andam juntos (mesma "foto" dos dados).
     m_relatorioMobile.gerar(nullptr);
+    // Manda a cópia para fora do PC também no botão manual.
+    if (m_telegram.configurado() && m_telegram.ativo() && m_telegram.enviaBackup())
+        m_telegram.enviarArquivo(info.caminho,
+                                 QStringLiteral("Backup do sistema — %1").arg(info.resumo));
     out[QStringLiteral("ok")] = true;
     out[QStringLiteral("caminho")] = info.caminho;
     out[QStringLiteral("resumo")] = info.resumo;
@@ -1299,13 +1314,15 @@ QVariantMap AppBackend::configTelegram()
     m[QStringLiteral("token")] = m_telegram.token();
     m[QStringLiteral("chatId")] = m_telegram.chatId();
     m[QStringLiteral("ativo")] = m_telegram.ativo();
+    m[QStringLiteral("enviaBackup")] = m_telegram.enviaBackup();
     m[QStringLiteral("configurado")] = m_telegram.configurado();
     return m;
 }
 
-void AppBackend::salvarConfigTelegram(const QString &token, const QString &chatId, bool ativo)
+void AppBackend::salvarConfigTelegram(const QString &token, const QString &chatId,
+                                      bool ativo, bool enviaBackup)
 {
-    m_telegram.salvarConfig(token, chatId, ativo);
+    m_telegram.salvarConfig(token, chatId, ativo, enviaBackup);
 }
 
 void AppBackend::testarTelegram()

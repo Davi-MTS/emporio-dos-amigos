@@ -205,7 +205,8 @@ public:
     // --- Telegram (resumo no celular dos donos; só Admin na UI) ---
     // { token, chatId, ativo, configurado }.
     Q_INVOKABLE QVariantMap configTelegram();
-    Q_INVOKABLE void salvarConfigTelegram(const QString &token, const QString &chatId, bool ativo);
+    Q_INVOKABLE void salvarConfigTelegram(const QString &token, const QString &chatId,
+                                          bool ativo, bool enviaBackup);
     // Dispara um envio de teste; o retorno vem pelo sinal telegramResultado.
     Q_INVOKABLE void testarTelegram();
 

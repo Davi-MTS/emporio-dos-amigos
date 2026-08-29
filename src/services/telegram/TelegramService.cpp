@@ -17,6 +17,8 @@ namespace {
 constexpr auto kChaveToken = "telegram/token";
 constexpr auto kChaveChat  = "telegram/chatId";
 constexpr auto kChaveAtivo = "telegram/ativo";
+constexpr auto kChaveBackup = "telegram/enviaBackup";
+constexpr qint64 kLimiteEnvio = 45LL * 1024 * 1024;  // API do Telegram: 50 MB
 
 QString apiUrl(const QString &token, const QString &metodo)
 {
@@ -45,17 +47,24 @@ bool TelegramService::ativo() const
     return QSettings().value(QLatin1String(kChaveAtivo), true).toBool();
 }
 
+bool TelegramService::enviaBackup() const
+{
+    return QSettings().value(QLatin1String(kChaveBackup), true).toBool();
+}
+
 bool TelegramService::configurado() const
 {
     return !token().trimmed().isEmpty() && !chatId().trimmed().isEmpty();
 }
 
-void TelegramService::salvarConfig(const QString &token, const QString &chatId, bool ativo)
+void TelegramService::salvarConfig(const QString &token, const QString &chatId,
+                                   bool ativo, bool enviaBackup)
 {
     QSettings s;
     s.setValue(QLatin1String(kChaveToken), token.trimmed());
     s.setValue(QLatin1String(kChaveChat), chatId.trimmed());
     s.setValue(QLatin1String(kChaveAtivo), ativo);
+    s.setValue(QLatin1String(kChaveBackup), enviaBackup);
     s.sync();
 }
 
@@ -94,6 +103,13 @@ void TelegramService::enviarArquivo(const QString &caminho, const QString &legen
 {
     if (!configurado() || !QFileInfo::exists(caminho))
         return;
+    if (QFileInfo(caminho).size() > kLimiteEnvio) {
+        emit resultado(false, QStringLiteral(
+            "Arquivo grande demais para o Telegram (%1 MB). Backup não enviado — "
+            "copie manualmente para um pen drive.")
+            .arg(QFileInfo(caminho).size() / (1024 * 1024)));
+        return;
+    }
 
     auto *multi = new QHttpMultiPart(QHttpMultiPart::FormDataType);
 

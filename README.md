@@ -124,6 +124,8 @@ No primeiro acesso o sistema pede a criação do **usuário administrador**.
   `models/` models de lista para o QML, `app/` fachada + `main`).
 - `qml/` — telas (`screens/`) e componentes (`components/`, `theme/`).
 - `db/migrations/` — evolução do schema (SQL versionado, aplicado em ordem).
-- `tests/` — testes automatizados (QtTest, registrados no CTest).
+- `tests/` — testes automatizados, registrados no CTest: `cpp/` (regra de
+  negócio, QtTest) e `qml/` (interface, Qt Quick Test — abre as telas de verdade
+  contra um banco temporário).
 - `resources/` — fontes e a logo da marca.
 - `deploy/` — empacotamento para Windows.

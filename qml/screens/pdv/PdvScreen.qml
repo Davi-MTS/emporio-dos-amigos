@@ -41,6 +41,11 @@ Rectangle {
         Text { text: kvRoot.v; color: kvRoot.cor; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold }
     }
 
+    // Leitura do carrinho de fora da tela (usado pelos testes de interface, que
+    // não enxergam o ListModel interno). Devolve null se a linha não existe.
+    function linhaCarrinho(i) { return (i >= 0 && i < cart.count) ? cart.get(i) : null; }
+    function itensNoCarrinho() { return cart.count; }
+
     function recomputar() {
         var s = 0;
         for (var i = 0; i < cart.count; i++) {

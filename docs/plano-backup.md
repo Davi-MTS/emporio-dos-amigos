@@ -3,10 +3,11 @@
 > ✅ **IMPLEMENTADO.** Este é o plano original, mantido como registro das
 > decisões. O que foi entregue está em `CLAUDE.md` e o uso no dia a dia em
 > [instalacao.md](instalacao.md).
-> ⚠️ A **cópia externa** (item 12.4) continua **fora**: o backup do banco
-> **NUNCA sai do computador da loja**. O que o Telegram envia ao fechar o caixa
-> é o *relatório* em HTML, não o `.db`. Se o HD falhar ou o PC for roubado,
-> **os dados se perdem**. É a maior fragilidade em aberto do sistema.
+> ✅ A **cópia externa** (item 12.4) foi resolvida depois, por outro caminho:
+> ao fechar o caixa, o Telegram leva o relatório em HTML **e o `.db` do backup**
+> anexado (opção "Enviar também a cópia de segurança", na tela de Backup, ligada
+> por padrão). O histórico da loja deixou de existir só num HD. Limite do
+> Telegram: 45 MB por arquivo — acima disso o app avisa em vez de falhar calado.
 > Sistema: Empório dos Amigos (Qt6 + QML + C++ + SQLite, desktop Windows, offline, loja única).
 
 ---
