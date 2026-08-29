@@ -4,6 +4,10 @@ Sistema de gestão (ERP + PDV) para distribuidora de bebidas — **loja única**
 Desktop nativo em **Qt 6 + QML**, regras de negócio em **C++**, banco **SQLite**
 (**offline-first**, sem internet obrigatória), alvo **Windows**.
 
+> **Vai instalar na loja?** Siga o guia completo em
+> **[docs/instalacao.md](docs/instalacao.md)** — gerar o pacote, instalar,
+> primeiro acesso, Telegram, backup e solução de problemas.
+
 ## O que o sistema faz
 
 - **PDV / frente de caixa** — leitor de código de barras (bipe + Enter), busca por
@@ -23,7 +27,10 @@ Desktop nativo em **Qt 6 + QML**, regras de negócio em **C++**, banco **SQLite*
 - **Relatórios** — faturamento, lucro (custo travado no momento da venda), ticket
   médio, formas de pagamento, mais vendidos e produtos parados.
 - **Backup** automático ao fechar o caixa (5 cópias) e **restauração**.
-- **Relatório para o celular** — HTML gerado numa pasta do OneDrive.
+- **Aviso no celular** — ao fechar o caixa, envia o resumo do dia pelo **Telegram**
+  (notificação), com o relatório completo em HTML anexado.
+- **Histórico de vendas** e **cancelamento** (devolve estoque, fiado e dinheiro).
+- **Registro do sistema** em arquivo, para diagnosticar problemas na loja.
 
 ## Compilar e rodar
 
@@ -65,6 +72,17 @@ O executável fica em `build/mingw/distribuidora.exe`. Para rodar, o
 > Os presets em `CMakePresets.json` também funcionam (`cmake --preset
 > windows-debug`), desde que `CMAKE_PREFIX_PATH` aponte para o Qt.
 
+## Gerar o pacote para a loja
+
+```bash
+powershell -ExecutionPolicy Bypass -File .\deploy\empacotar.ps1
+```
+
+Gera `deploy/pacote/` e `deploy/Emporio-dos-Amigos.zip` (~26 MB) — **pasta
+autossuficiente, com o Qt junto**: no PC da loja é só copiar e criar o atalho,
+sem instalar nada. O executável de produção não abre janela de console.
+Detalhes e passo a passo da instalação: **[docs/instalacao.md](docs/instalacao.md)**.
+
 ## Dados
 
 O banco é criado sozinho na primeira execução em:
@@ -72,6 +90,10 @@ O banco é criado sozinho na primeira execução em:
 ```
 %APPDATA%\Distribuidora\Distribuidora\distribuidora.db
 ```
+
+O registro do sistema (erros e eventos) fica em
+`%APPDATA%\Distribuidora\Distribuidora\logs\sistema.log`, visível também na
+tela Backup.
 
 O schema evolui por **migrations versionadas** (`db/migrations/`), aplicadas
 automaticamente ao abrir o app. **O banco não vai para o Git** — ele contém os
@@ -90,6 +112,7 @@ No primeiro acesso o sistema pede a criação do **usuário administrador**.
 
 ## Documentação
 
+- **`docs/instalacao.md` — como instalar e configurar no computador da loja.**
 - `CLAUDE.md` — briefing completo: decisões, arquitetura e histórico de cada fase.
 - `docs/modelo-de-dados.md` — esquema das tabelas.
 - `docs/design-ui.md` — identidade visual e padrões de interface.

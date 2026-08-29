@@ -106,6 +106,16 @@ BACKUP
 AVISO NO CELULAR
    Na tela "Backup" configure o Telegram para receber o resumo do dia no
    celular ao fechar o caixa.
+
+SE ALGO DER ERRADO
+   O sistema grava tudo em:
+       %APPDATA%\Distribuidora\Distribuidora\logs\sistema.log
+   Na tela "Backup" ha um botao "Abrir pasta" para pegar esse arquivo e
+   enviar a quem da suporte.
+
+GUIA COMPLETO
+   Passo a passo detalhado (configuracao inicial, Telegram, backup,
+   atualizacao e problemas comuns) em docs/instalacao.md no repositorio.
 "@ | Out-File -FilePath (Join-Path $Saida "LEIA-ME.txt") -Encoding utf8
 
 # --- 4. Compacta ----------------------------------------------------------
