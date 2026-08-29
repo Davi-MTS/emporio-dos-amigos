@@ -8,6 +8,30 @@ financeiro, compras, clientes (fiado) e relatórios. **Loja única.**
 `resources/images/logo.png` (embutida como `:/images/logo.png`, usada no login e
 na sidebar). Ver `docs/design-ui.md` e `docs/mockup-ui.html`.
 
+## Estado atual (resumo)
+
+> Sistema **completo e empacotado**. O histórico detalhado de cada fase está no
+> fim deste arquivo; leia esta seção primeiro.
+
+| | |
+| --- | --- |
+| Telas | Dashboard, PDV, Produtos, Estoque, **Vendas**, Compras, Clientes, Financeiro, Relatórios, Usuários, Backup |
+| Testes | **16 executáveis** no CTest, todos verdes |
+| Migrations | **0001–0010** aplicadas |
+| Entrega | `deploy/empacotar.ps1` → pasta autossuficiente + zip (~26 MB), sem console |
+| Repositório | `github.com/Davi-MTS/emporio-dos-amigos` (privado) |
+
+**Fora do PDV/estoque, o que existe:** produto composto (copão) com receita por
+categoria; cancelamento de venda com devolução de estoque/fiado/dinheiro;
+backup automático (5 cópias) e restauração; relatório HTML enviado por
+**Telegram** ao fechar o caixa; registro do sistema em arquivo.
+
+**O que NÃO existe (decidido ou pendente):** emissão de NF-e, impressão de
+cupom, integração TEF/maquininha, delivery/WhatsApp, multi-PC; importador de
+NF-e por XML (aguardando um XML real de exemplo); desconto em %.
+
+**Instalação na loja:** ver `docs/instalacao.md`.
+
 ## Stack e plataforma (decidido)
 
 - **Plataforma:** aplicativo desktop nativo (não é web).
@@ -16,8 +40,8 @@ na sidebar). Ver `docs/design-ui.md` e `docs/mockup-ui.html`.
 - **Banco de dados:** SQLite (local, embutido, offline-first — o app precisa
   vender mesmo sem internet).
 - **Sistema operacional alvo:** Windows (PC do caixa).
-- **Backup:** local (arquivo SQLite) + sincronização na nuvem quando houver
-  internet.
+- **Backup:** local (arquivo SQLite), automático ao fechar o caixa. Sem
+  sincronização em nuvem — a cópia sai do PC anexada na mensagem do Telegram.
 
 ## Princípios de arquitetura
 
@@ -54,7 +78,8 @@ na sidebar). Ver `docs/design-ui.md` e `docs/mockup-ui.html`.
 
 ## Decisões de negócio importantes
 
-- **Nota fiscal:** FORA do escopo do sistema (emitida por fora).
+- **Nota fiscal:** a EMISSÃO está fora do escopo (feita por fora). O sistema
+  apenas REGISTRA o nº/data da nota na compra (migration `0008`).
 - **Pagamentos:** múltiplas formas na mesma venda (Pix, dinheiro, débito,
   crédito). Tabela `pagamentos` é separada de `vendas`.
 - **Cancelamento/troca:** nunca deletam registro — mudam `status` da venda e
@@ -86,7 +111,10 @@ Dinheiro é armazenado e manipulado SEMPRE como **inteiro em centavos**
 erro de arredondamento no fechamento de caixa (requisito crítico). A formatação
 para exibição e o parse da entrada do usuário ficam em `src/utils/Money.*`.
 
-## Estado atual
+## Histórico de implementação (fase a fase)
+
+> Registro de como o sistema foi construído e **por que** cada decisão foi
+> tomada. Os números citados (ex.: "4/4 testes") são do momento de cada fase.
 
 Fundação implementada (fatia inicial da fase 1):
 
@@ -266,7 +294,7 @@ dia é ENVIADO como notificação para o celular dos donos.
   `telegramResultado`; envio automático dentro de `fecharCaixa`.
 - UI: painel "Aviso no celular (Telegram)" na tela de Backup (só Admin), com
   botão de teste.
-- OneDrive segue ativo como reforço (relatório HTML completo).
+- O HTML completo vai ANEXADO na mensagem (não há mais canal separado).
 
 ### Histórico de vendas e cancelamento (feito)
 
@@ -386,7 +414,7 @@ Ver `docs/plano-backup.md`. `src/services/backup/BackupService`:
 - Coberto por `tst_backup_service` (cópia íntegra, retenção 5, round-trip de
   restauração).
 
-### Ver no celular — relatório HTML no OneDrive (feito)
+### Ver no celular — relatório HTML (feito; entregue via Telegram)
 
 Ver `docs/plano-mobile.md`. Decisão do dono: acesso remoto + atualização periódica,
 sem servidor. `src/services/relatoriomobile/RelatorioMobileService`:

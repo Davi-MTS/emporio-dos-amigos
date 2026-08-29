@@ -1,6 +1,13 @@
 # Plano — Visualização no celular (relatórios, vendas, estoque)
 
-> Planejamento. **Nada implementado ainda.**
+> ⚠️ **DOCUMENTO HISTÓRICO — IMPLEMENTADO E DEPOIS SUPERADO.**
+> O relatório HTML foi feito conforme este plano, mas a entrega **pelo OneDrive
+> foi abandonada**: dependia de o dono lembrar de abrir a pasta, com a conta
+> certa, e **falhava em silêncio** quando a sincronização do PC estava parada —
+> foi o que aconteceu no teste real.
+> **Hoje a entrega é pelo Telegram**, que envia o resumo como notificação com o
+> HTML anexado (ver `CLAUDE.md`). O HTML passou a ser gravado numa pasta local.
+> Mantido como registro de por que a decisão mudou.
 > Decisão do dono: **acesso de qualquer lugar** + **atualização periódica** (não precisa ser ao vivo).
 
 ## 1. Abordagem escolhida

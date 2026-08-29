@@ -1,6 +1,11 @@
 # Plano de implementação — Backup e Restauração
 
-> Documento de planejamento. **Nada implementado ainda** — apenas o plano/relatório.
+> ✅ **IMPLEMENTADO.** Este é o plano original, mantido como registro das
+> decisões. O que foi entregue está em `CLAUDE.md` e o uso no dia a dia em
+> [instalacao.md](instalacao.md).
+> Uma mudança em relação ao plano: a **cópia externa** (§4 do item 12) continua
+> fora, mas hoje o backup **vai anexado no Telegram** ao fechar o caixa, o que
+> já tira a cópia de dentro do PC.
 > Sistema: Empório dos Amigos (Qt6 + QML + C++ + SQLite, desktop Windows, offline, loja única).
 
 ---
