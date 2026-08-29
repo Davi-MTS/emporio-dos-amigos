@@ -108,6 +108,40 @@ atualizado** e **envia no Telegram** o resumo, o relatório completo e a
 
 ---
 
+## Criar o usuário do funcionário
+
+**Usuários** → *Novo usuário* → preencha nome, login e senha e escolha o perfil
+**Funcionário**. Cada pessoa com o seu próprio login: é assim que a venda, a
+sangria e o movimento de estoque ficam com nome em cima.
+
+O perfil já vem pronto. O que o funcionário **pode**:
+
+| Pode | Onde |
+| --- | --- |
+| Vender no PDV, receber e dar troco | **PDV** |
+| Consultar preço, código e estoque | **Produtos** (só olhar) |
+| Dar **entrada** de mercadoria que chegou | **Estoque** → *Entrada* |
+| Atender cliente, vender fiado e receber pagamento | **Clientes** |
+| Ver o histórico de vendas e o Dashboard do dia | **Vendas**, **Dashboard** |
+
+O que ele **não pode** — some da tela e, se for forçado, o sistema recusa:
+
+| Não pode | Por quê |
+| --- | --- |
+| Cadastrar ou alterar produto e **preço** | preço é decisão do dono |
+| **Dar desconto** na venda | o campo nem aparece; a venda é recusada se tentarem forçar |
+| **Ajustar o inventário** ou fazer retirada | reescreve o saldo sem nota — é o caminho de sumiço de mercadoria |
+| Ver **Relatórios** (faturamento, **lucro**) | número do negócio é do dono |
+| Ver **Compras** e **Financeiro** (a pagar, saldo) | idem — e some também do Dashboard |
+| **Cancelar venda** | cancelamento devolve estoque, fiado e dinheiro |
+| Ver **Usuários** e **Backup** | administração do sistema |
+
+> Precisou de uma dessas coisas no meio do expediente? Entre com o **login de
+> administrador**, faça, e volte para o login do funcionário. É de propósito: o
+> que passa pelo admin é decisão sua.
+
+---
+
 ## Receber o resumo no celular (Telegram)
 
 Feito uma vez só, leva ~5 minutos.

@@ -12,18 +12,20 @@ Rectangle {
 
     color: Theme.sidebar
 
+    // Cada rota diz de qual permissão depende. Sem `perm`, é para todo mundo
+    // que está logado (Dashboard, Estoque e Vendas são consulta do dia a dia).
     readonly property var operacao: [
         { rota: "dashboard", titulo: "Dashboard" },
-        { rota: "pdv",       titulo: "PDV" },
-        { rota: "produtos",  titulo: "Produtos" },
+        { rota: "pdv",       titulo: "PDV",       perm: "vende" },
+        { rota: "produtos",  titulo: "Produtos",  perm: "consulta_produtos" },
         { rota: "estoque",   titulo: "Estoque" },
         { rota: "vendas",    titulo: "Vendas" }
     ]
     readonly property var retaguarda: [
         { rota: "compras",    titulo: "Compras",     perm: "ve_financeiro" },
-        { rota: "clientes",   titulo: "Clientes" },
+        { rota: "clientes",   titulo: "Clientes",    perm: "atende_cliente" },
         { rota: "financeiro", titulo: "Financeiro",  perm: "ve_financeiro" },
-        { rota: "relatorios", titulo: "Relatórios" },
+        { rota: "relatorios", titulo: "Relatórios",  perm: "ve_relatorios" },
         { rota: "usuarios",   titulo: "Usuários",       perm: "gerencia_usuarios" },
         { rota: "backup",     titulo: "Backup",         perm: "gerencia_usuarios" }
     ]

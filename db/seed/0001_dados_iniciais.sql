@@ -16,11 +16,16 @@ INSERT OR IGNORE INTO perfis (id, nome, permissoes) VALUES
     }')),
     (2, 'Funcionário', json('{
         "vende": true,
-        "pode_dar_desconto": false,
-        "pode_cancelar_venda": false,
-        "ve_financeiro": false,
+        "consulta_produtos": true,
+        "recebe_mercadoria": true,
+        "atende_cliente": true,
         "edita_produto": false,
-        "edita_preco": false
+            "pode_dar_desconto": false,
+        "ajusta_estoque": false,
+        "ve_relatorios": false,
+        "ve_financeiro": false,
+        "pode_cancelar_venda": false,
+        "gerencia_usuarios": false
     }'));
 
 -- Categorias de produto mais comuns numa distribuidora de bebidas.

@@ -16,8 +16,8 @@ na sidebar). Ver `docs/design-ui.md` e `docs/mockup-ui.html`.
 | | |
 | --- | --- |
 | Telas | Dashboard, PDV, Produtos, Estoque, **Vendas**, Compras, Clientes, Financeiro, Relatórios, Usuários, Backup |
-| Testes | **17 executáveis** no CTest, todos verdes (16 de regra + `tst_qml`, de interface) |
-| Migrations | **0001–0010** aplicadas |
+| Testes | **17 executáveis** no CTest, todos verdes (16 de regra + `tst_qml`, com 52 casos de interface) |
+| Migrations | **0001–0011** aplicadas |
 | Entrega | `deploy/empacotar.ps1` → pasta autossuficiente + zip (~26 MB), sem console |
 | Repositório | `github.com/Davi-MTS/emporio-dos-amigos` (privado) |
 
@@ -538,3 +538,47 @@ Nota de arnês: `PdvScreen` expõe `linhaCarrinho(i)`/`itensNoCarrinho()` porque
 `ListModel` do carrinho é interno e o teste não o enxerga.
 
 Ficam **17 executáveis** no CTest (`tst_qml` roda em `offscreen`, ~68 s).
+
+### Perfil "Funcionário" — permissões estruturadas (feito)
+
+Regra: **toda chave declarada no perfil é lida em algum lugar do sistema.**
+Antes havia chave decorativa — o perfil dizia `pode_dar_desconto: false` e o
+funcionário dava desconto à vontade, porque ninguém lia a chave. `edita_preco`
+era do mesmo tipo e foi removida (preço faz parte de `edita_produto`).
+
+Migration `0011_perfil_funcionario.sql` (UPDATE no perfil 2, para bancos que já
+existem) + o mesmo JSON no seed (para banco novo — migrations rodam **antes** do
+seed, com `perfis` ainda vazia, então os dois precisam estar iguais).
+
+| Chave | Vale para | Onde é aplicada |
+| --- | --- | --- |
+| `vende` | ✅ | rota `pdv` na Sidebar |
+| `consulta_produtos` | ✅ | rota `produtos` na Sidebar (só consulta) |
+| `recebe_mercadoria` | ✅ | aba Entrada + `AppBackend::registrarEntrada` |
+| `atende_cliente` | ✅ | rota `clientes` na Sidebar |
+| `edita_produto` | ❌ | `ProdutosScreen.podeEditar` + `salvarProduto` / `inativarProduto` |
+| `pode_dar_desconto` | ❌ | campo F4 + atalho no PDV + `finalizarVenda` (recusa a venda) |
+| `ajusta_estoque` | ❌ | abas Inventário/Retirada + `registrarInventario` / `registrarRetirada` |
+| `ve_relatorios` | ❌ | rota `relatorios` na Sidebar |
+| `ve_financeiro` | ❌ | rotas `compras`/`financeiro` + painel Financeiro do Dashboard |
+| `pode_cancelar_venda` | ❌ | `VendasScreen` + `cancelarVenda` |
+| `gerencia_usuarios` | ❌ | rotas `usuarios`/`backup` na Sidebar |
+
+Administrador continua com `{"tudo": true}`, que atropela qualquer chave
+(`temPermissao` devolve `true` de saída).
+
+**Trava na tela E no backend.** A tela é conveniência (não mostra o que não dá
+para usar); a recusa que vale está no `AppBackend`. Antes só `cancelarVenda`
+fazia isso. No desconto a recusa é **explícita** — a venda não passa, em vez de
+passar com o desconto zerado em silêncio, que faria o operador cobrar errado
+sem entender o motivo.
+
+Decisões de escopo: Entrada de mercadoria fica **liberada** (é balcão, o
+funcionário recebe carga); Inventário e Retirada não, porque reescrevem saldo
+sem nota — é por onde mercadoria some sem rastro. No `EstoqueScreen` as abas
+restritas são as **últimas** da lista de propósito: quando somem, os índices das
+que sobram continuam válidos.
+
+Coberto por `tests/qml/casos/tst_permissoes.qml`: entra de fato como
+funcionário e confere as chaves, as telas, a Sidebar e a recusa do backend
+(inclusive forçando um desconto por fora da tela). São **52 testes** no `tst_qml`.

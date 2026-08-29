@@ -15,6 +15,11 @@ Rectangle {
     ListModel { id: pagsModel }   // forma, valor
     ListModel { id: sugestoes }   // itens de busca por nome
 
+    readonly property bool podeDarDesconto: {
+        var p = (App.usuarioAtual && App.usuarioAtual.permissoes) ? App.usuarioAtual.permissoes : ({});
+        return p.tudo === true || p.pode_dar_desconto === true;
+    }
+
     property int clienteId: 0
     property string clienteNome: qsTr("Consumidor final")
     property int descontoGeral: 0
@@ -242,7 +247,7 @@ Rectangle {
     // Atalhos de teclado.
     Shortcut { sequence: "F12"; onActivated: tela.finalizar() }
     Shortcut { sequence: "Esc"; onActivated: tela.limparVenda() }
-    Shortcut { sequence: "F4"; onActivated: descontoField.forceActiveFocus() }
+    Shortcut { sequence: "F4"; enabled: tela.podeDarDesconto; onActivated: descontoField.forceActiveFocus() }
     Shortcut { sequence: "F2"; onActivated: scanField.forceActiveFocus() }
     Shortcut { sequence: "F8"; onActivated: clienteDialog.abrir() }
 
@@ -602,9 +607,11 @@ Rectangle {
                         }
                     }
 
-                    // Desconto
+                    // Desconto — some inteiro para quem não pode dar desconto,
+                    // em vez de aparecer e recusar só na hora de finalizar.
                     RowLayout {
                         Layout.fillWidth: true
+                        visible: tela.podeDarDesconto
                         Text { text: qsTr("Desconto (F4)"); Layout.fillWidth: true; color: Theme.textMuted; font.pixelSize: Theme.fontSm }
                         AppTextField {
                             id: descontoField
@@ -714,7 +721,7 @@ Rectangle {
                 anchors.leftMargin: Theme.spacingLg
                 spacing: Theme.spacingLg
                 Text { text: qsTr("F2 Buscar"); color: Theme.textMuted; font.pixelSize: Theme.fontSm }
-                Text { text: qsTr("F4 Desconto"); color: Theme.textMuted; font.pixelSize: Theme.fontSm }
+                Text { visible: tela.podeDarDesconto; text: qsTr("F4 Desconto"); color: Theme.textMuted; font.pixelSize: Theme.fontSm }
                 Text { text: qsTr("F12 Finalizar"); color: Theme.textMuted; font.pixelSize: Theme.fontSm }
                 Text { text: qsTr("Esc Cancelar"); color: Theme.textMuted; font.pixelSize: Theme.fontSm }
             }

@@ -753,6 +753,13 @@ QVariantMap AppBackend::novoProduto()
 
 bool AppBackend::salvarProduto(const QVariantMap &dados)
 {
+    // A tela já desabilita os botões, mas a trava real fica aqui: assim vale
+    // para qualquer caminho e não depende de a UI ter lembrado de conferir.
+    if (!temPermissao(QStringLiteral("edita_produto"))) {
+        m_erro = tr("Seu usuário não pode cadastrar ou alterar produtos.");
+        return false;
+    }
+
     Produto p;
     p.id = dados.value(QStringLiteral("id")).toInt();
     p.nome = dados.value(QStringLiteral("nome")).toString();
@@ -802,6 +809,10 @@ bool AppBackend::salvarProduto(const QVariantMap &dados)
 
 bool AppBackend::inativarProduto(int id)
 {
+    if (!temPermissao(QStringLiteral("edita_produto"))) {
+        m_erro = tr("Seu usuário não pode inativar produtos.");
+        return false;
+    }
     if (!m_produtoRepo.inativar(id)) {
         m_erro = m_produtoRepo.ultimoErro();
         return false;
@@ -861,6 +872,11 @@ QVariantList AppBackend::embalagensDe(int produtoId)
 bool AppBackend::registrarEntrada(int produtoId, int embalagemId, int qtdEmb,
                                   const QString &custoTexto, const QString &observacao)
 {
+    if (!temPermissao(QStringLiteral("recebe_mercadoria"))) {
+        m_erro = tr("Seu usuário não pode dar entrada de mercadoria.");
+        return false;
+    }
+
     int fator = 1;
     const auto p = m_produtoRepo.obter(produtoId);
     if (p) {
@@ -896,6 +912,13 @@ bool AppBackend::registrarEntrada(int produtoId, int embalagemId, int qtdEmb,
 
 bool AppBackend::registrarInventario(int produtoId, int novaQtdBase, const QString &motivo)
 {
+    // Ajuste de inventário reescreve o saldo sem nota nenhuma: é por onde some
+    // mercadoria sem deixar rastro. Só quem tem "ajusta_estoque".
+    if (!temPermissao(QStringLiteral("ajusta_estoque"))) {
+        m_erro = tr("Seu usuário não pode ajustar o estoque por inventário.");
+        return false;
+    }
+
     if (!m_estoqueRepo.registrarInventario(produtoId, novaQtdBase, motivo, m_usuarioId)) {
         m_erro = m_estoqueRepo.ultimoErro();
         return false;
@@ -909,6 +932,12 @@ bool AppBackend::registrarInventario(int produtoId, int novaQtdBase, const QStri
 bool AppBackend::registrarRetirada(int produtoId, int embalagemId, int qtdEmb,
                                    const QString &motivo)
 {
+    // Retirada tira mercadoria fora da venda (quebra, consumo, brinde).
+    if (!temPermissao(QStringLiteral("ajusta_estoque"))) {
+        m_erro = tr("Seu usuário não pode registrar retirada de estoque.");
+        return false;
+    }
+
     int fator = 1;
     const auto p = m_produtoRepo.obter(produtoId);
     if (p) {
@@ -1037,6 +1066,23 @@ QVariantMap AppBackend::finalizarVenda(const QVariantMap &dados)
 
     const qint64 desconto = dados.value(QStringLiteral("desconto")).toLongLong();
     const int clienteId = dados.value(QStringLiteral("clienteId")).toInt();
+
+    // Desconto é dinheiro saindo do caixa por decisão de quem está no balcão.
+    // Sem a permissão, a venda não passa — em vez de passar com o desconto
+    // apagado em silêncio, que faria o operador cobrar errado sem entender.
+    if (!temPermissao(QStringLiteral("pode_dar_desconto"))) {
+        qint64 descontoItens = 0;
+        for (const LinhaVenda &l : itens)
+            descontoItens += l.desconto;
+        if (desconto > 0 || descontoItens > 0) {
+            QVariantMap out;
+            out[QStringLiteral("ok")] = false;
+            out[QStringLiteral("erro")] = tr("Seu usuário não pode dar desconto. "
+                                             "Chame o responsável.");
+            m_erro = out.value(QStringLiteral("erro")).toString();
+            return out;
+        }
+    }
 
     const ResultadoVenda r = m_vendaRepo.registrarVenda(
         m_sessaoId, clienteId, desconto, itens, pagamentos, m_usuarioId);

@@ -7,6 +7,11 @@ Rectangle {
     id: tela
     color: Theme.background
 
+    readonly property bool veFinanceiro: {
+        var p = (App.usuarioAtual && App.usuarioAtual.permissoes) ? App.usuarioAtual.permissoes : ({});
+        return p.tudo === true || p.ve_financeiro === true;
+    }
+
     property var kpis: ({})
     property var maisVendidos: []
     property var fin: ({})
@@ -123,6 +128,10 @@ Rectangle {
                 Layout.horizontalStretchFactor: 1
                 Layout.fillWidth: true
                 titulo: qsTr("Financeiro")
+                // A receber/A pagar/Saldo previsto é retaguarda: sem
+                // ve_financeiro, esconder aqui também — senão trancar a tela
+                // de Financeiro não adianta nada.
+                visible: tela.veFinanceiro
                 legenda: qsTr("em aberto")
                 ColumnLayout {
                     anchors.fill: parent

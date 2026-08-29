@@ -36,6 +36,7 @@ Esquema das tabelas, dividido em 3 blocos. Este documento acompanha o schema
 | `0008` | `compras.numero_nota` e `compras.data_nota` |
 | `0009` | Converte as datas gravadas para **hora local** |
 | `0010` | `contas_receber.status` aceita `'cancelada'`; `vendas.cancelada_em` e `vendas.motivo_cancelamento` |
+| `0011` | perfil `Funcionário` (id 2) com o conjunto de permissões estruturado — toda chave declarada é lida pelo sistema |
 
 ---
 
@@ -319,7 +320,8 @@ anteriores à migration `0006`.
 | --- | --- |
 | `%APPDATA%\Distribuidora\Distribuidora\distribuidora.db` | O banco |
 | `…\logs\sistema.log` | Registro de erros e eventos (rotaciona a 2 MB) |
-| `…\Relatorioelatorio.html` | Relatório enviado no Telegram |
+| `…\Relatorio
+elatorio.html` | Relatório enviado no Telegram |
 | `Documentos\Empório dos Amigos\Backups\` | Backups (5 mais recentes) |
 
 Configurações que não são do negócio (token do Telegram, chat de destino) ficam

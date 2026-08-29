@@ -9,13 +9,22 @@ Rectangle {
     id: tela
     color: Theme.background
 
+    readonly property var _perms: (App.usuarioAtual && App.usuarioAtual.permissoes)
+                                  ? App.usuarioAtual.permissoes : ({})
+    readonly property bool podeAjustarEstoque: _perms.tudo === true || _perms.ajusta_estoque === true
+    readonly property bool podeReceberMercadoria: _perms.tudo === true || _perms.recebe_mercadoria === true
+
     readonly property int colLoc: 150
     readonly property int colQtd: 96
     readonly property int colMin: 84
     readonly property int colCusto: 116
     readonly property int colStatus: 96
 
+    readonly property bool podeMovimentar: podeReceberMercadoria || podeAjustarEstoque
+
     function abrirMov(produtoId) {
+        if (!podeMovimentar)
+            return;   // sem permissão o diálogo não teria nenhuma ação válida
         movDialog.produtoId = produtoId;
         movDialog.embalagens = App.embalagensDe(produtoId);
         movDialog.atual = App.itemEstoque(produtoId);
@@ -40,7 +49,11 @@ Rectangle {
             }
             Item { Layout.fillWidth: true }
             Label {
-                text: qsTr("Clique num produto para dar entrada ou inventariar")
+                text: tela.podeAjustarEstoque
+                      ? qsTr("Clique num produto para dar entrada ou inventariar")
+                      : (tela.podeReceberMercadoria
+                         ? qsTr("Clique num produto para dar entrada de mercadoria")
+                         : qsTr("Consulta apenas — seu usuário não movimenta estoque"))
                 color: Theme.textMuted
                 font.pixelSize: Theme.fontSm
             }
@@ -217,11 +230,18 @@ Rectangle {
                 }
             }
 
+            // Entrada (receber mercadoria) é do dia a dia do balcão. Inventário e
+            // Retirada mexem no saldo sem nota — ficam só para quem pode ajustar.
+            // As abas restritas são as ÚLTIMAS da lista de propósito: assim os
+            // índices de Entrada continuam valendo quando elas somem.
             SegmentedControl {
                 id: tabs
                 Layout.fillWidth: true
                 Layout.preferredHeight: 42
-                options: [qsTr("Entrada"), qsTr("Inventário"), qsTr("Retirada")]
+                visible: tela.podeAjustarEstoque
+                options: tela.podeAjustarEstoque
+                         ? [qsTr("Entrada"), qsTr("Inventário"), qsTr("Retirada")]
+                         : [qsTr("Entrada")]
             }
 
             StackLayout {
@@ -368,7 +388,8 @@ Rectangle {
                     onClicked: {
                         var ok;
                         if (tabs.currentIndex === 0)
-                            ok = App.registrarEntrada(movDialog.produtoId, embCombo.currentValue,
+                            ok = tela.podeReceberMercadoria
+                                 && App.registrarEntrada(movDialog.produtoId, embCombo.currentValue,
                                                       qtdSpin.value, custoField.text, obsField.text);
                         else if (tabs.currentIndex === 1)
                             ok = App.registrarInventario(movDialog.produtoId, contagemSpin.value, motivoField.text);
