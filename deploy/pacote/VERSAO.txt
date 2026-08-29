@@ -1,0 +1,10 @@
+﻿Emporio dos Amigos - pacote pronto para rodar
+=======================================
+
+Gerado em : 29/08/2026 15:51
+Commit    : 880b59c
+Arvore    : limpo
+
+Este executavel foi compilado a partir do commit acima. Se voce alterou o
+codigo depois disso, rode deploy\empacotar.ps1 de novo antes de levar para a
+loja - senao estara instalando uma versao velha.

@@ -1,0 +1,42 @@
+﻿EMPORIO DOS AMIGOS - Sistema de Gestao
+=======================================
+
+COMO INSTALAR NO COMPUTADOR DA LOJA
+
+1. Copie esta pasta inteira para o computador, por exemplo em:
+       C:\Emporio dos Amigos
+
+2. Abra a pasta e clique com o botao direito em "Emporio dos Amigos.exe"
+   -> Enviar para -> Area de trabalho (criar atalho)
+
+3. Pronto. Use o atalho da area de trabalho para abrir o sistema.
+
+Nao precisa instalar mais nada: tudo o que o sistema usa ja esta nesta pasta.
+
+PRIMEIRO ACESSO
+   O sistema pede para criar o usuario administrador (nome, login e senha).
+   Guarde essa senha: e ela que libera relatorios, backup e cancelamento.
+
+ONDE FICAM OS DADOS
+   Os dados NAO ficam nesta pasta. Ficam em:
+       %APPDATA%\Distribuidora\Distribuidora\distribuidora.db
+   Assim voce pode atualizar o sistema (trocar esta pasta) sem perder nada.
+
+BACKUP
+   Ao fechar o caixa o sistema faz backup sozinho e guarda as 5 copias mais
+   recentes em Documentos\Emporio dos Amigos\Backups.
+   Na tela "Backup" da para fazer copia na hora e restaurar.
+
+AVISO NO CELULAR
+   Na tela "Backup" configure o Telegram para receber o resumo do dia no
+   celular ao fechar o caixa.
+
+SE ALGO DER ERRADO
+   O sistema grava tudo em:
+       %APPDATA%\Distribuidora\Distribuidora\logs\sistema.log
+   Na tela "Backup" ha um botao "Abrir pasta" para pegar esse arquivo e
+   enviar a quem da suporte.
+
+GUIA COMPLETO
+   Passo a passo detalhado (configuracao inicial, Telegram, backup,
+   atualizacao e problemas comuns) em docs/instalacao.md no repositorio.
