@@ -15,14 +15,16 @@ na sidebar). Ver `docs/design-ui.md` e `docs/mockup-ui.html`.
 
 | | |
 | --- | --- |
-| Telas | Dashboard, PDV, Produtos, Estoque, **Vendas**, Compras, Clientes, Financeiro, Relatórios, Usuários, Backup |
-| Testes | **17 executáveis** no CTest, todos verdes (16 de regra + `tst_qml`, com 52 casos de interface) |
-| Migrations | **0001–0011** aplicadas |
+| Telas | Dashboard, PDV, **Caixa**, Produtos, Estoque, **Vencimento**, Vendas, Compras, Clientes, Financeiro, Relatórios, Usuários, Backup |
+| Testes | **21 executáveis** no CTest, todos verdes (20 de regra + `tst_qml`, com 56 casos de interface) |
+| Migrations | **0001–0015** aplicadas |
 | Entrega | `deploy/empacotar.ps1` → pasta autossuficiente + zip (~26 MB), sem console |
-| Repositório | `github.com/Davi-MTS/emporio-dos-amigos` (privado) |
+| Repositório | `github.com/Davi-MTS/emporio-dos-amigos` (público; pacote pronto versionado em `deploy/pacote/`) |
 
 **Fora do PDV/estoque, o que existe:** produto composto (copão) com receita por
-categoria; cancelamento de venda com devolução de estoque/fiado/dinheiro;
+categoria; **dose como produto próprio ligado à garrafa**; **foto do produto**
+(no banco, reduzida); **validade por remessa** com FEFO; cancelamento de venda
+com devolução de estoque/fiado/dinheiro; **estorno de pagamento de conta**;
 backup automático (5 cópias) e restauração; relatório HTML **e a cópia do
 banco** enviados por **Telegram** ao fechar o caixa; registro do sistema em
 arquivo.
@@ -582,3 +584,80 @@ que sobram continuam válidos.
 Coberto por `tests/qml/casos/tst_permissoes.qml`: entra de fato como
 funcionário e confere as chaves, as telas, a Sidebar e a recusa do backend
 (inclusive forçando um desconto por fora da tela). São **52 testes** no `tst_qml`.
+
+### Retorno da loja — 13 ajustes de uso (feito)
+
+Lista trazida pelo dono depois de operar o sistema. Agrupados em fases; cada
+uma foi commitada e testada separadamente.
+
+**Atrito diário.**
+- **Botão ＋ ao lado da categoria** no cadastro (`ProdutoRepository::criarCategoria`,
+  reaproveita nome existente sem diferenciar maiúsculas). Antes só existiam as 12
+  do seed: chegando um produto que não se encaixa, o cadastro parava.
+- **Cartões do Dashboard viraram atalho**: "Produtos em falta" → Estoque,
+  "A receber (fiado)" → Clientes. `Main.qml` ganhou `irPara(rota)`, que também
+  acende o item certo na barra lateral (as telas pedem por um `signal navegar`).
+- **"Restaurar de um arquivo…"** na tela de Backup — a lista só enxergava a pasta
+  de backups, então a cópia vinda do Telegram não tinha como ser restaurada,
+  justo o caso de HD queimado. Junto veio `BackupService::validarArquivoBackup`
+  (SQLite íntegro + tabelas deste sistema + versão não mais nova): sem isso,
+  escolher por engano o `relatorio.html` trocaria o banco por lixo.
+- **PDV: pagamento não fica mais preso.** A tela guarda o total de quando o
+  pagamento foi lançado; se o carrinho muda, os pagamentos saem sozinhos com
+  aviso, em vez de exigir caçar o ✕.
+- **Aba própria do Caixa** (`CaixaScreen`, rota `caixa`, permissão `vende`).
+  Abertura, sangria, suprimento e fechamento moravam numa barra de 46 px dentro
+  do PDV; o caixa é a prestação de contas do dia e precisa de espaço para
+  conferir. O PDV ficou só com a venda (−200 linhas).
+
+**Dinheiro.**
+- **Financeiro explícito:** botões (Gaveta/Pix/Débito/Crédito) no lugar do combo
+  e, ao vivo, de onde o dinheiro sai, quanto tem na gaveta **agora** e quanto
+  fica **depois** (`AppBackend::efeitoDoPagamento`). Alerta quando a gaveta
+  ficaria negativa e quando o **caixa está fechado** — caso em que a conta é
+  quitada mas a saída não entra na conferência de turno nenhum (acontecia calado).
+- **Estorno de pagamento** (despesas e compras): migration `0012` grava
+  `contas_pagar.forma_pagamento`; `estornarPagamento` reabre a conta e devolve o
+  dinheiro à gaveta como **suprimento**, na mesma transação. Pagamento de outro
+  dia entra no caixa de hoje, com o motivo escrito — não reabre turno fechado.
+  A lista ganhou o filtro **"Mostrar já pagas"**, sem o qual a conta paga por
+  engano sumia da tela.
+- **Fiado na tela de Clientes:** faixa com o que está na rua, o **atrasado**, o
+  maior devedor e quantos passaram do limite; no cliente aberto, quanto ainda
+  cabe no limite, última compra × último pagamento e a conta mais antiga em
+  aberto (`ClienteRepository::resumoFiado` / `historicoFiado`).
+- **Cancelamento achável:** a lógica já existia, ninguém encontrava. O botão
+  saiu de dentro do detalhe e foi para a **linha** da venda, e o aviso de venda
+  concluída no PDV ganhou **"Errei — cancelar esta venda"**. `AppButton` ganhou
+  o kind `perigo`.
+
+**Cadastro e venda.**
+- **Dose como produto próprio** (migration `0013`): `dose_de_produto_id` +
+  `dose_quantidade`. Vende com um bipe; não tem estoque próprio (não aparece no
+  Estoque); `estoqueDisponivel` = estoque da garrafa ÷ quantidade da dose; a
+  venda baixa a garrafa. `VendaRepository` passou a baixar por insumos sempre
+  que a linha tiver insumos (antes só quando o produto fosse composto).
+- **Unidade base explicada:** a escolha (unidade/ml/litro/g/kg) agora mostra o
+  que significa, com exemplo; o cabeçalho do fator diz a unidade do produto
+  ("Fator (ml)"). Era o ponto que confundia na entrada de estoque.
+
+**Novidades.**
+- **Foto do produto** (migration `0014`): guardada **no banco** — o backup é um
+  arquivo só e é ele que sai pelo Telegram; em pasta, restaurar perderia as
+  imagens. Reduzida a 320 px/JPEG (20–30 KB). `ProdutoFotoProvider`
+  (`image://produto/<id>?v=App.versaoFotos`, o `?v=` fura o cache do Qt) vive na
+  biblioteca de interface. Miniatura em Produtos, Estoque, sugestões do PDV e
+  carrinho; sem foto, mostra a inicial do nome.
+- **Vencimento por remessa** (migration `0015`, tabela `lotes` que existia sem
+  uso): validade opcional na entrada, saída consome o lote que vence primeiro
+  (**FEFO**) na venda e na retirada, lote zerado é apagado, e `divergencias()`
+  aponta quando estoque e lotes não batem (entrada sem validade ou ajuste de
+  inventário) em vez de fingir que fecham. Aba **Vencimento** com cartões,
+  filtro e o prazo em português.
+
+**Testes novos:** `tst_estorno`, `tst_dose`, `tst_foto_produto`, `tst_lotes`,
+mais Caixa e Vencimento no `tst_telas`. **21 executáveis, 56 casos de QML.**
+
+**Regressão pega pelos testes de tela:** a linha de filtros nova do Financeiro
+não cabia na janela restaurada e empurrava a lista 79 px para fora — virou
+`Flow`, que quebra a linha em vez de estourar.

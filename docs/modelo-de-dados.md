@@ -37,6 +37,10 @@ Esquema das tabelas, dividido em 3 blocos. Este documento acompanha o schema
 | `0009` | Converte as datas gravadas para **hora local** |
 | `0010` | `contas_receber.status` aceita `'cancelada'`; `vendas.cancelada_em` e `vendas.motivo_cancelamento` |
 | `0011` | perfil `Funcionário` (id 2) com o conjunto de permissões estruturado — toda chave declarada é lida pelo sistema |
+| `0012` | `contas_pagar.forma_pagamento` — sem saber por onde o dinheiro saiu não dá para estornar |
+| `0013` | `produtos.dose_de_produto_id` e `dose_quantidade` — dose como produto próprio, ligado à garrafa |
+| `0014` | `produtos.foto` vira BLOB (a coluna antiga guardava caminho de arquivo e nunca foi usada) |
+| `0015` | índice de `lotes(produto_id, data_validade)` — a tabela existia desde o início e passou a ser usada |
 
 ---
 
