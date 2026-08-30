@@ -55,8 +55,11 @@ NF-e por XML (aguardando um XML real de exemplo); desconto em %.
 - As partes mais críticas e que NÃO podem ter erro silencioso:
   **conversão de embalagem** e **fechamento de caixa** — cobrir com testes
   em `tests/cpp/`.
-- Integração com hardware (`src/services/hardware/`) é **plugável**: leitor de
-  código de barras e maquininha (TEF). O resto do sistema não depende dela.
+- Integração com hardware fica **plugável** e isolada em `src/services/`: o
+  resto do sistema não depende dela. Hoje não existe nenhuma — o leitor de
+  código de barras funciona como teclado (não precisa de código) e a maquininha
+  (TEF) está fora do escopo. A pasta vazia que reservava esse lugar foi
+  removida; quando houver integração de verdade, ela nasce aqui.
 - Alterações de schema sempre via **migrations versionadas** em `db/migrations/`
   (arquivos SQL numerados). Nunca alterar o banco "na mão".
 
