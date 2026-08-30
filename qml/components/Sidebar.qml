@@ -17,6 +17,7 @@ Rectangle {
     readonly property var operacao: [
         { rota: "dashboard", titulo: "Dashboard" },
         { rota: "pdv",       titulo: "PDV",       perm: "vende" },
+        { rota: "caixa",     titulo: "Caixa",     perm: "vende" },
         { rota: "produtos",  titulo: "Produtos",  perm: "consulta_produtos" },
         { rota: "estoque",   titulo: "Estoque" },
         { rota: "vendas",    titulo: "Vendas" }

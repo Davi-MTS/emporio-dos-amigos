@@ -10,6 +10,9 @@ Rectangle {
     id: tela
     color: Theme.background
 
+    // Pedido de navegação para quem hospeda a tela (Main.qml).
+    signal navegar(string rota)
+
     // Carrinho e pagamentos.
     ListModel { id: cart }        // produtoId, nome, embId, embNome, fator, preco, qtd, desconto
     ListModel { id: pagsModel }   // forma, valor
@@ -19,6 +22,11 @@ Rectangle {
         var p = (App.usuarioAtual && App.usuarioAtual.permissoes) ? App.usuarioAtual.permissoes : ({});
         return p.tudo === true || p.pode_dar_desconto === true;
     }
+
+    // Total do carrinho no instante em que o pagamento foi lançado. Se o carrinho
+    // mudar depois, aquele pagamento vira um valor errado preso na tela — e o
+    // operador tinha que caçar o ✕ para tirar. Agora sai sozinho, com aviso.
+    property int totalNoPagamento: -1
 
     property int clienteId: 0
     property string clienteNome: qsTr("Consumidor final")
@@ -58,6 +66,15 @@ Rectangle {
             s += e.qtd * e.preco - e.desconto;
         }
         totalVenda = Math.max(0, s - descontoGeral);
+
+        // Mexeu no carrinho depois de lançar pagamento? O que estava lançado não
+        // vale mais. Some sozinho em vez de ficar lá cobrando um clique no ✕.
+        if (pagsModel.count > 0 && totalNoPagamento >= 0 && totalVenda !== totalNoPagamento) {
+            pagsModel.clear();
+            totalNoPagamento = -1;
+            avisoScan.mostrar(qsTr("A conta mudou — lance o pagamento de novo."));
+        }
+
         var p = 0;
         for (var j = 0; j < pagsModel.count; j++)
             p += pagsModel.get(j).valor;
@@ -187,6 +204,7 @@ Rectangle {
             avisoScan.mostrar(qsTr("Ajustado para o valor que faltava."));
         }
         pagsModel.append({ forma: forma, valor: val });
+        totalNoPagamento = totalVenda;
         valorField.clear();
         recomputar();
     }
@@ -201,6 +219,7 @@ Rectangle {
     function limparVenda() {
         cart.clear();
         pagsModel.clear();
+        totalNoPagamento = -1;
         sugestoes.clear();
         descontoGeral = 0;
         descontoField.text = "";
@@ -251,55 +270,46 @@ Rectangle {
     Shortcut { sequence: "F2"; onActivated: scanField.forceActiveFocus() }
     Shortcut { sequence: "F8"; onActivated: clienteDialog.abrir() }
 
-    // ============================ CAIXA FECHADO ============================
+    // ====================== CAIXA FECHADO ======================
+    // Abrir, sangria, suprimento e fechamento moram na aba Caixa. Aqui só o
+    // recado de que não dá para vender ainda, com o caminho a um clique.
     Item {
         anchors.fill: parent
         visible: !App.caixaAberto
 
         Rectangle {
             anchors.centerIn: parent
-            width: 380
+            width: Math.min(400, parent.width - 2 * Theme.spacingLg)
             radius: Theme.radius
             color: Theme.surface
             border.color: Theme.border
-            implicitHeight: colAbrir.implicitHeight + 2 * Theme.spacingLg
+            implicitHeight: colFechado.implicitHeight + 2 * Theme.spacingLg
 
             ColumnLayout {
-                id: colAbrir
+                id: colFechado
                 anchors.centerIn: parent
                 width: parent.width - 2 * Theme.spacingLg
                 spacing: Theme.spacingMd
 
                 Text {
-                    text: qsTr("Abrir caixa")
+                    text: qsTr("Caixa fechado")
                     color: Theme.text
                     font.family: Theme.fontDisplay
                     font.pixelSize: Theme.fontXl
                     font.weight: Font.DemiBold
                 }
                 Text {
-                    text: qsTr("Informe o troco inicial para começar a vender.")
-                    color: Theme.textMuted
-                    font.pixelSize: Theme.fontSm
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
-                }
-                FormField {
-                    label: qsTr("Troco inicial")
-                    Layout.fillWidth: true
-                    AppTextField {
-                        id: aberturaField
-                        width: parent.width
-                        placeholderText: qsTr("ex.: 100,00")
-                        horizontalAlignment: Text.AlignRight
-                        onAccepted: App.abrirCaixa(text)
-                    }
+                    text: qsTr("Para vender, abra o caixa informando o troco inicial.")
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.fontSm
                 }
                 AppButton {
                     kind: "accent"
-                    text: qsTr("Abrir caixa")
+                    text: qsTr("Abrir o caixa")
                     Layout.fillWidth: true
-                    onClicked: App.abrirCaixa(aberturaField.text)
+                    onClicked: tela.navegar("caixa")
                 }
             }
         }
@@ -322,11 +332,11 @@ Rectangle {
                 anchors.leftMargin: Theme.spacingLg
                 anchors.rightMargin: Theme.spacingLg
                 spacing: Theme.spacingSm
+                Rectangle { implicitWidth: 8; implicitHeight: 8; radius: 4; color: Theme.success }
                 Text { text: qsTr("Caixa aberto"); color: Theme.textMuted; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold }
                 Item { Layout.fillWidth: true }
-                AppButton { kind: "ghost"; text: qsTr("Sangria"); onClicked: movCaixaDialog.abrir("sangria") }
-                AppButton { kind: "ghost"; text: qsTr("Suprimento"); onClicked: movCaixaDialog.abrir("suprimento") }
-                AppButton { kind: "default"; text: qsTr("Fechar caixa"); onClicked: fecharDialog.abrir() }
+                // Sangria, suprimento e fechamento agora vivem na aba Caixa.
+                AppButton { kind: "ghost"; text: qsTr("Caixa"); onClicked: tela.navegar("caixa") }
             }
         }
 
@@ -672,7 +682,7 @@ Rectangle {
                             required property var valor
                             Text { text: forma.charAt(0).toUpperCase() + forma.slice(1); Layout.fillWidth: true; color: Theme.text; font.pixelSize: Theme.fontMd }
                             Text { text: App.formatarDinheiro(valor); color: Theme.text; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold }
-                            AppButton { kind: "ghost"; text: "✕"; implicitWidth: 26; onClicked: { pagsModel.remove(index); tela.recomputar(); } }
+                            AppButton { kind: "ghost"; text: "✕"; implicitWidth: 26; onClicked: { pagsModel.remove(index); if (pagsModel.count === 0) tela.totalNoPagamento = -1; tela.recomputar(); } }
                         }
                     }
 
@@ -1049,203 +1059,6 @@ Rectangle {
                 AppButton { kind: "default"; text: qsTr("Cancelar"); onClicked: compostoDialog.close() }
                 Item { Layout.fillWidth: true }
             }
-            }
-        }
-    }
-
-    // Sangria / Suprimento
-    AppDialog {
-        id: movCaixaDialog
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
-        width: 400
-        padding: Theme.spacingLg
-        property string tipo: "sangria"
-        function abrir(t) { tipo = t; movValor.text = ""; movMotivo.text = ""; movErro.text = ""; open(); }
-        title: tipo === "sangria" ? qsTr("Sangria (retirada de dinheiro)")
-                                  : qsTr("Suprimento (reforço de dinheiro)")
-        contentItem: ColumnLayout {
-            spacing: Theme.spacingMd
-            FormField {
-                label: qsTr("Valor")
-                Layout.fillWidth: true
-                AppTextField { id: movValor; width: parent.width; horizontalAlignment: Text.AlignRight; placeholderText: "0,00" }
-            }
-            FormField {
-                label: qsTr("Motivo")
-                Layout.fillWidth: true
-                AppTextField { id: movMotivo; width: parent.width; placeholderText: qsTr("ex.: pagamento fornecedor, troco") }
-            }
-            Label { id: movErro; visible: text.length > 0; color: Theme.danger; font.pixelSize: Theme.fontSm; Layout.fillWidth: true; wrapMode: Text.WordWrap }
-            RowLayout {
-                Layout.fillWidth: true
-                AppButton {
-                    kind: "accent"
-                    text: qsTr("Confirmar")
-                    onClicked: {
-                        var ok = movCaixaDialog.tipo === "sangria"
-                                 ? App.registrarSangria(movValor.text, movMotivo.text)
-                                 : App.registrarSuprimento(movValor.text, movMotivo.text);
-                        if (ok) movCaixaDialog.close();
-                        else movErro.text = App.ultimoErro();
-                    }
-                }
-                AppButton { kind: "default"; text: qsTr("Cancelar"); onClicked: movCaixaDialog.close() }
-                Item { Layout.fillWidth: true }
-            }
-        }
-    }
-
-    // Fechamento de caixa
-    AppDialog {
-        id: fecharDialog
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
-        width: 460
-        padding: Theme.spacingLg
-        property var resumo: ({})
-        property int diferenca: 0
-        property bool contadoValido: false
-        function abrir() {
-            resumo = App.caixaResumo();
-            contadoField.text = "";
-            diferenca = 0;
-            contadoValido = false;
-            fecharErro.text = "";
-            open();
-        }
-        function recalcular() {
-            var v = App.parseDinheiro(contadoField.text);
-            contadoValido = contadoField.text.trim().length > 0 && v >= 0;
-            diferenca = (v < 0 ? 0 : v) - (resumo.dinheiroEsperado || 0);
-        }
-        title: qsTr("Fechar caixa")
-        contentItem: ScrollView {
-            id: rolFechar
-            contentWidth: availableWidth
-            clip: true
-            ColumnLayout {
-            width: rolFechar.availableWidth
-            spacing: Theme.spacingXs
-
-            // --- Bloco informativo: o que foi vendido no turno ---
-            KV { k: qsTr("Vendas do turno (%1)").arg(fecharDialog.resumo.numVendas || 0); v: App.formatarDinheiro(fecharDialog.resumo.totalVendas || 0); cor: Theme.text }
-            KV { k: qsTr("  Dinheiro"); v: App.formatarDinheiro(fecharDialog.resumo.vendasDinheiro || 0) }
-            KV { k: qsTr("  Pix"); v: App.formatarDinheiro(fecharDialog.resumo.vendasPix || 0) }
-            KV { k: qsTr("  Débito"); v: App.formatarDinheiro(fecharDialog.resumo.vendasDebito || 0) }
-            KV { k: qsTr("  Crédito"); v: App.formatarDinheiro(fecharDialog.resumo.vendasCredito || 0) }
-            KV { k: qsTr("  Fiado"); v: App.formatarDinheiro(fecharDialog.resumo.vendasFiado || 0) }
-            Text {
-                Layout.fillWidth: true
-                Layout.topMargin: 2
-                wrapMode: Text.WordWrap
-                text: qsTr("Pix, cartão e fiado não entram na gaveta — só o dinheiro é conferido abaixo.")
-                color: Theme.textMuted
-                font.pixelSize: Theme.fontXs
-            }
-
-            // --- Bloco do dinheiro: é isto que forma o esperado ---
-            Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Theme.border; Layout.topMargin: 8; Layout.bottomMargin: 6 }
-            Text {
-                text: qsTr("DINHEIRO NA GAVETA")
-                color: Theme.textMuted
-                font.pixelSize: Theme.fontXs
-                font.weight: Font.DemiBold
-                font.letterSpacing: 0.8
-                Layout.bottomMargin: 2
-            }
-            KV { k: qsTr("Abertura (troco inicial)"); v: "+ " + App.formatarDinheiro(fecharDialog.resumo.abertura || 0) }
-            KV { k: qsTr("Vendas em dinheiro"); v: "+ " + App.formatarDinheiro(fecharDialog.resumo.vendasDinheiro || 0) }
-            KV { k: qsTr("Suprimentos"); v: "+ " + App.formatarDinheiro(fecharDialog.resumo.suprimentos || 0) }
-            KV { k: qsTr("Recebimentos de fiado"); v: "+ " + App.formatarDinheiro(fecharDialog.resumo.recebimentos || 0) }
-            KV { k: qsTr("Troco devolvido"); v: "− " + App.formatarDinheiro(fecharDialog.resumo.troco || 0) }
-            KV { k: qsTr("Sangrias / pagamentos"); v: "− " + App.formatarDinheiro(fecharDialog.resumo.sangrias || 0) }
-            Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Theme.border; Layout.topMargin: 4; Layout.bottomMargin: 4 }
-            RowLayout {
-                Layout.fillWidth: true
-                Text { text: qsTr("Dinheiro esperado na gaveta"); Layout.fillWidth: true; color: Theme.text; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold }
-                Text { text: App.formatarDinheiro(fecharDialog.resumo.dinheiroEsperado || 0); color: Theme.primary; font.pixelSize: Theme.fontLg; font.weight: Font.Bold }
-            }
-
-            FormField {
-                label: qsTr("Dinheiro contado na gaveta")
-                Layout.fillWidth: true
-                Layout.topMargin: Theme.spacingSm
-                AppTextField {
-                    id: contadoField
-                    width: parent.width
-                    horizontalAlignment: Text.AlignRight
-                    placeholderText: "0,00"
-                    onTextChanged: fecharDialog.recalcular()
-                }
-            }
-            RowLayout {
-                Layout.fillWidth: true
-                visible: fecharDialog.contadoValido
-                Text { text: qsTr("Diferença"); Layout.fillWidth: true; color: Theme.text; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold }
-                Text {
-                    text: App.formatarDinheiro(fecharDialog.diferenca)
-                    color: fecharDialog.diferenca === 0 ? Theme.success
-                         : (fecharDialog.diferenca < 0 ? Theme.danger : Theme.warning)
-                    font.pixelSize: Theme.fontMd
-                    font.weight: Font.DemiBold
-                }
-            }
-            Label { id: fecharErro; visible: text.length > 0; color: Theme.danger; font.pixelSize: Theme.fontSm; Layout.fillWidth: true; wrapMode: Text.WordWrap }
-
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.topMargin: Theme.spacingSm
-                AppButton {
-                    kind: "accent"
-                    text: qsTr("Fechar caixa")
-                    enabled: fecharDialog.contadoValido
-                    onClicked: {
-                        var r = App.fecharCaixa(contadoField.text);
-                        if (r.ok) {
-                            fecharDialog.close();
-                            resultadoDialog.r = r;
-                            resultadoDialog.open();
-                        } else {
-                            fecharErro.text = r.erro;
-                        }
-                    }
-                }
-                AppButton { kind: "default"; text: qsTr("Cancelar"); onClicked: fecharDialog.close() }
-                Item { Layout.fillWidth: true }
-            }
-            }
-        }
-    }
-
-    // Resultado do fechamento
-    AppDialog {
-        id: resultadoDialog
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
-        width: 380
-        padding: Theme.spacingLg
-        property var r: ({})
-        title: qsTr("Caixa fechado")
-        standardButtons: Dialog.Ok
-        contentItem: ColumnLayout {
-            spacing: Theme.spacingXs
-            KV { k: qsTr("Esperado"); v: App.formatarDinheiro(resultadoDialog.r.esperado || 0); cor: Theme.text }
-            KV { k: qsTr("Contado"); v: App.formatarDinheiro(resultadoDialog.r.informado || 0); cor: Theme.text }
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.topMargin: 4
-                Text { text: qsTr("Diferença"); Layout.fillWidth: true; color: Theme.text; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold }
-                Text {
-                    text: App.formatarDinheiro(resultadoDialog.r.diferenca || 0)
-                    color: (resultadoDialog.r.diferenca || 0) === 0 ? Theme.success
-                         : ((resultadoDialog.r.diferenca || 0) < 0 ? Theme.danger : Theme.warning)
-                    font.pixelSize: Theme.fontMd
-                    font.weight: Font.DemiBold
-                }
             }
         }
     }

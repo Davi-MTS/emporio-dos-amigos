@@ -20,6 +20,7 @@ TestCase {
     Component { id: cProdutos;   ProdutosScreen   {} }
     Component { id: cEstoque;    EstoqueScreen    {} }
     Component { id: cPdv;        PdvScreen        {} }
+    Component { id: cCaixa;      CaixaScreen      {} }
     Component { id: cLogin;      LoginScreen      {} }
     Component { id: cUsuarios;   UsuariosScreen   {} }
     Component { id: cCompras;    ComprasScreen    {} }
@@ -44,6 +45,7 @@ TestCase {
             { tag: "Produtos",   comp: cProdutos   },
             { tag: "Estoque",    comp: cEstoque    },
             { tag: "PDV",        comp: cPdv        },
+            { tag: "Caixa",      comp: cCaixa      },
             { tag: "Login",      comp: cLogin      },
             { tag: "Usuarios",   comp: cUsuarios   },
             { tag: "Compras",    comp: cCompras    },

@@ -42,6 +42,7 @@ ApplicationWindow {
     readonly property var cabecalhos: ({
         "dashboard":  { t: qsTr("Dashboard"),            s: qsTr("Visão geral da loja") },
         "pdv":        { t: qsTr("PDV — Frente de caixa"), s: qsTr("Venda em andamento") },
+        "caixa":      { t: qsTr("Caixa"),               s: qsTr("Abertura, sangria e fechamento do turno") },
         "produtos":   { t: qsTr("Produtos"),             s: qsTr("Cadastro, embalagens e preços") },
         "estoque":    { t: qsTr("Estoque"),              s: qsTr("Quantidades, custo médio e alertas") },
         "compras":    { t: qsTr("Compras"),              s: qsTr("Fornecedores e entrada de mercadoria") },
@@ -196,6 +197,8 @@ ApplicationWindow {
                         conteudo.replace(estoqueComp);
                     else if (rota === "pdv")
                         conteudo.replace(pdvComp);
+                    else if (rota === "caixa")
+                        conteudo.replace(caixaComp);
                     else if (rota === "usuarios")
                         conteudo.replace(usuariosComp);
                     else if (rota === "compras")
@@ -240,7 +243,15 @@ ApplicationWindow {
     }
     Component {
         id: pdvComp
-        PdvScreen {}
+        PdvScreen {
+            onNavegar: (rota) => janela.irPara(rota)
+        }
+    }
+    Component {
+        id: caixaComp
+        CaixaScreen {
+            onNavegar: (rota) => janela.irPara(rota)
+        }
     }
     Component {
         id: usuariosComp

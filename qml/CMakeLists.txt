@@ -41,6 +41,7 @@ qt_add_qml_module(distribuidora_ui
         screens/produtos/ProdutosScreen.qml
         screens/estoque/EstoqueScreen.qml
         screens/pdv/PdvScreen.qml
+        screens/caixa/CaixaScreen.qml
         screens/usuarios/LoginScreen.qml
         screens/usuarios/UsuariosScreen.qml
         screens/compras/ComprasScreen.qml
