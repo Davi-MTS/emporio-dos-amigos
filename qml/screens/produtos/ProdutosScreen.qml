@@ -36,6 +36,13 @@ Rectangle {
     ListModel { id: embModel }
     ListModel { id: compModel }   // composição do copão (insumoId, insumoNome, quantidade)
 
+    // Recarrega a lista de categorias e deixa selecionada a que acabou de nascer.
+    function recarregarCategorias(selecionarId) {
+        listaCategorias = App.categorias();
+        if (selecionarId > 0)
+            categoriaCombo.currentIndex = categoriaCombo.indexOfValue(selecionarId);
+    }
+
     function abrirNovo() {
         produtoAtual = App.novoProduto();
         _carregarEmbalagens();
@@ -350,12 +357,26 @@ Rectangle {
                             FormField {
                                 label: qsTr("Categoria")
                                 Layout.fillWidth: true
-                                AppComboBox {
-                                    id: categoriaCombo
+                                RowLayout {
                                     width: parent.width
-                                    model: tela.listaCategorias
-                                    textRole: "nome"
-                                    valueRole: "id"
+                                    spacing: Theme.spacingSm
+                                    AppComboBox {
+                                        id: categoriaCombo
+                                        Layout.fillWidth: true
+                                        model: tela.listaCategorias
+                                        textRole: "nome"
+                                        valueRole: "id"
+                                    }
+                                    // Antes só dava para usar as 12 categorias do seed: se
+                                    // chegasse um produto que não se encaixa, o cadastro
+                                    // parava até alguém mexer no banco.
+                                    AppButton {
+                                        kind: "ghost"
+                                        text: "＋"
+                                        implicitWidth: 40
+                                        enabled: tela.podeEditar
+                                        onClicked: novaCategoriaDialog.abrir()
+                                    }
                                 }
                             }
                             FormField {
@@ -635,6 +656,79 @@ Rectangle {
             if (tela.produtoAtual)
                 App.inativarProduto(tela.produtoAtual.id);
             tela.fecharEditor();
+        }
+    }
+
+    // ------------------------------------------------------- Nova categoria
+    AppDialog {
+        id: novaCategoriaDialog
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: 420
+        modal: true
+        title: qsTr("Nova categoria")
+
+        function abrir() {
+            nomeCategoriaField.text = "";
+            erroCategoria.text = "";
+            open();
+            nomeCategoriaField.forceActiveFocus();
+        }
+
+        function salvar() {
+            var id = App.criarCategoria(nomeCategoriaField.text);
+            if (id > 0) {
+                tela.recarregarCategorias(id);
+                novaCategoriaDialog.close();
+            } else {
+                erroCategoria.text = App.ultimoErro();
+            }
+        }
+
+        ColumnLayout {
+            width: parent.width
+            spacing: Theme.spacingSm
+
+            FormField {
+                label: qsTr("Nome da categoria")
+                Layout.fillWidth: true
+                AppTextField {
+                    id: nomeCategoriaField
+                    width: parent.width
+                    placeholderText: qsTr("Ex.: Doces, Salgadinhos, Sorvete…")
+                    onAccepted: novaCategoriaDialog.salvar()
+                }
+            }
+            Text {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: qsTr("Se já existir uma categoria com esse nome, ela é reaproveitada.")
+                color: Theme.textMuted
+                font.pixelSize: Theme.fontXs
+            }
+            Label {
+                id: erroCategoria
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                visible: text.length > 0
+                color: Theme.danger
+                font.pixelSize: Theme.fontSm
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: Theme.spacingSm
+                AppButton {
+                    kind: "accent"
+                    text: qsTr("Criar")
+                    onClicked: novaCategoriaDialog.salvar()
+                }
+                AppButton {
+                    kind: "default"
+                    text: qsTr("Cancelar")
+                    onClicked: novaCategoriaDialog.close()
+                }
+                Item { Layout.fillWidth: true }
+            }
         }
     }
 }

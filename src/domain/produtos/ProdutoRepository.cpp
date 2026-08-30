@@ -402,3 +402,28 @@ QVector<QPair<int, QString>> ProdutoRepository::listarCategorias()
         lista.push_back({q.value(0).toInt(), q.value(1).toString()});
     return lista;
 }
+
+int ProdutoRepository::criarCategoria(const QString &nome)
+{
+    const QString limpo = nome.trimmed();
+    if (limpo.isEmpty()) {
+        m_erro = QStringLiteral("Informe o nome da categoria.");
+        return 0;
+    }
+
+    QSqlQuery busca(m_db);
+    busca.prepare(QStringLiteral(
+        "SELECT id FROM categorias WHERE nome = :nome COLLATE NOCASE"));
+    busca.bindValue(QStringLiteral(":nome"), limpo);
+    if (busca.exec() && busca.next())
+        return busca.value(0).toInt();   // já existe: reaproveita
+
+    QSqlQuery ins(m_db);
+    ins.prepare(QStringLiteral("INSERT INTO categorias (nome) VALUES (:nome)"));
+    ins.bindValue(QStringLiteral(":nome"), limpo);
+    if (!ins.exec()) {
+        m_erro = ins.lastError().text();
+        return 0;
+    }
+    return ins.lastInsertId().toInt();
+}

@@ -37,6 +37,11 @@ public:
 
     QVector<QPair<int, QString>> listarCategorias();
 
+    // Cria uma categoria e devolve o id. Se já existir uma com o mesmo nome
+    // (sem diferenciar maiúsculas), devolve o id da existente em vez de falhar:
+    // no balcão, "Cerveja" e "cerveja" são a mesma coisa.
+    int criarCategoria(const QString &nome);
+
     // Produtos (não compostos, ativos) de uma categoria — para o cliente escolher
     // o insumo específico na hora da venda.
     QVector<QPair<int, QString>> produtosDaCategoria(int categoriaId);

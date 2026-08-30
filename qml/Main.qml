@@ -54,6 +54,18 @@ ApplicationWindow {
     })
     readonly property var _cab: cabecalhos[rotaAtual] ? cabecalhos[rotaAtual] : cabecalhos["dashboard"]
 
+    // Navegação pedida por uma tela (ex.: clicar em "Produtos em falta" no
+    // Dashboard e cair no Estoque). Mantém a barra lateral em sincronia — sem
+    // isto o item aceso continuaria sendo o antigo.
+    function irPara(rota) {
+        var cab = cabecalhos[rota];
+        if (!cab)
+            return;
+        rotaAtual = rota;
+        sidebar.rotaAtual = rota;
+        conteudo.mostrar(rota, cab.t);
+    }
+
     RowLayout {
         anchors.fill: parent
         spacing: 0
@@ -214,7 +226,9 @@ ApplicationWindow {
 
     Component {
         id: dashboardComp
-        DashboardScreen {}
+        DashboardScreen {
+            onNavegar: (rota) => janela.irPara(rota)
+        }
     }
     Component {
         id: produtosComp

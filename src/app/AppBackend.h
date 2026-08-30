@@ -71,6 +71,8 @@ public:
     // --- Produtos ---
     Q_INVOKABLE void recarregarProdutos(const QString &filtro = QString());
     Q_INVOKABLE QVariantList categorias();
+    // Cria a categoria e devolve o id (0 em caso de erro). Exige edita_produto.
+    Q_INVOKABLE int criarCategoria(const QString &nome);
     // Linhas da composição de um produto composto, com os produtos de cada
     // categoria para escolha na venda: [{categoriaId, categoriaNome, unidade,
     // quantidade, produtos:[{id,nome}]}].
@@ -192,6 +194,9 @@ public:
     Q_INVOKABLE QVariantList backupsDisponiveis();
     // Agenda restaurar a cópia informada no próximo início (com backup de emergência).
     // { ok, erro }. A UI deve avisar para fechar e reabrir o app.
+    // Confere um arquivo escolhido à mão antes de oferecer a restauração.
+    // { ok, erro, resumo, tamanho, criadoEm }
+    Q_INVOKABLE QVariantMap conferirArquivoBackup(const QString &caminho);
     Q_INVOKABLE QVariantMap agendarRestauracao(const QString &caminho);
     // Situação: { total, ultimoCriadoEm, ultimoResumo, pasta }.
     Q_INVOKABLE QVariantMap statusBackup();

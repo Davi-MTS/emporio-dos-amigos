@@ -654,6 +654,21 @@ QVariantList AppBackend::categorias()
     return lista;
 }
 
+int AppBackend::criarCategoria(const QString &nome)
+{
+    if (!temPermissao(QStringLiteral("edita_produto"))) {
+        m_erro = tr("Seu usuário não pode criar categorias.");
+        return 0;
+    }
+    const int id = m_produtoRepo.criarCategoria(nome);
+    if (id <= 0) {
+        m_erro = m_produtoRepo.ultimoErro();
+        return 0;
+    }
+    m_erro.clear();
+    return id;
+}
+
 QVariantList AppBackend::composicaoParaVenda(int produtoId)
 {
     QVariantList lista;
@@ -1294,6 +1309,20 @@ QVariantList AppBackend::backupsDisponiveis()
         lista.push_back(m);
     }
     return lista;
+}
+
+
+QVariantMap AppBackend::conferirArquivoBackup(const QString &caminho)
+{
+    QVariantMap out;
+    BackupInfo info;
+    const bool ok = m_backupService.validarArquivoBackup(caminho, &info);
+    out[QStringLiteral("ok")] = ok;
+    out[QStringLiteral("erro")] = ok ? QString() : m_backupService.ultimoErro();
+    out[QStringLiteral("resumo")] = info.resumo;
+    out[QStringLiteral("tamanho")] = static_cast<qlonglong>(info.tamanho);
+    out[QStringLiteral("criadoEm")] = info.criadoEm;
+    return out;
 }
 
 QVariantMap AppBackend::agendarRestauracao(const QString &caminho)

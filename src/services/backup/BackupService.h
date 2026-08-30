@@ -39,6 +39,12 @@ public:
     // Mantém apenas os `manter` mais recentes; apaga o resto (.db + .json).
     bool rotacionar(int manter);
 
+    // Confere se o arquivo é MESMO um banco deste sistema antes de deixar
+    // restaurar. Sem isto, escolher um arquivo errado (o relatório .html que o
+    // Telegram baixou, por exemplo) trocaria o banco por lixo e o sistema não
+    // abriria mais. Preenche *resumo (se != nullptr) com o conteúdo encontrado.
+    bool validarArquivoBackup(const QString &caminho, BackupInfo *resumo = nullptr);
+
     // Agenda a restauração de `caminhoBackup` para o próximo início do app: faz um
     // backup de emergência do estado atual e grava um marcador ao lado do banco.
     bool agendarRestauracao(const QString &caminhoBackup);

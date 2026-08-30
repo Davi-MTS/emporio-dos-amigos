@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 import QtQuick.Layouts
 import Distribuidora
 
@@ -383,13 +384,42 @@ Rectangle {
             }
         }
 
-        Text {
-            text: qsTr("Cópias disponíveis")
-            color: Theme.textMuted
-            font.pixelSize: Theme.fontSm
-            font.weight: Font.DemiBold
-            font.capitalization: Font.AllUppercase
-            font.letterSpacing: 0.6
+        RowLayout {
+            Layout.fillWidth: true
+            Text {
+                Layout.fillWidth: true
+                text: qsTr("Cópias disponíveis")
+                color: Theme.textMuted
+                font.pixelSize: Theme.fontSm
+                font.weight: Font.DemiBold
+                font.capitalization: Font.AllUppercase
+                font.letterSpacing: 0.6
+            }
+            // A lista só enxerga a pasta de backups. A cópia que veio do
+            // Telegram (ou de um pendrive) está em Downloads — sem isto não
+            // havia como restaurá-la, que é justo o caso de HD queimado.
+            AppButton {
+                kind: "ghost"
+                text: qsTr("Restaurar de um arquivo…")
+                onClicked: escolherBackupDialog.open()
+            }
+        }
+
+        FileDialog {
+            id: escolherBackupDialog
+            title: qsTr("Escolha o arquivo de backup")
+            nameFilters: [qsTr("Backup do sistema (*.db)"), qsTr("Todos os arquivos (*)")]
+            onAccepted: {
+                var caminho = escolherBackupDialog.selectedFile.toString()
+                                  .replace(/^file:\/{2,3}/, "");
+                caminho = decodeURIComponent(caminho);
+                var c = App.conferirArquivoBackup(caminho);
+                if (!c.ok) {
+                    aviso.mostrar(c.erro, true);
+                    return;
+                }
+                restaurarDialog.abrir(caminho, tela.fmtData(c.criadoEm), c.resumo);
+            }
         }
 
         // ---- Lista de backups ----

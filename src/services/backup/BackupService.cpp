@@ -172,12 +172,92 @@ bool BackupService::rotacionar(int manter)
     return true;
 }
 
-bool BackupService::agendarRestauracao(const QString &caminhoBackup)
+bool BackupService::validarArquivoBackup(const QString &caminho, BackupInfo *resumo)
 {
-    if (!QFileInfo::exists(caminhoBackup)) {
-        m_erro = QStringLiteral("Backup não encontrado.");
+    const QFileInfo fi(caminho);
+    if (!fi.exists() || !fi.isFile()) {
+        m_erro = QStringLiteral("Arquivo não encontrado.");
         return false;
     }
+    if (fi.size() < 4096) {
+        m_erro = QStringLiteral("Arquivo pequeno demais para ser um banco do sistema.");
+        return false;
+    }
+
+    // Conexão temporária e nomeada: não encosta na conexão da aplicação.
+    const QString nomeConexao = QStringLiteral("validacao_backup");
+    bool ok = false;
+    {
+        QSqlDatabase teste = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), nomeConexao);
+        teste.setDatabaseName(caminho);
+        if (!teste.open()) {
+            m_erro = QStringLiteral("Não é um banco de dados válido.");
+        } else {
+            QSqlQuery q(teste);
+            // 1) O arquivo é um SQLite são?
+            if (!q.exec(QStringLiteral("PRAGMA quick_check")) || !q.next()
+                    || q.value(0).toString() != QStringLiteral("ok")) {
+                m_erro = QStringLiteral("O arquivo está corrompido.");
+            // 2) É o banco DESTE sistema (e não de outro programa qualquer)?
+            } else if (!q.exec(QStringLiteral(
+                           "SELECT COUNT(*) FROM sqlite_master WHERE type='table' "
+                           "AND name IN ('schema_migrations','vendas','produtos','usuarios')"))
+                       || !q.next() || q.value(0).toInt() < 4) {
+                m_erro = QStringLiteral("Este arquivo não é um backup do Empório dos Amigos.");
+            } else {
+                // 3) Não é de uma versão MAIS NOVA do sistema (restaurar para
+                //    trás deixaria o banco com tabelas que este app não conhece).
+                QString versaoArquivo;
+                if (q.exec(QStringLiteral("SELECT MAX(version) FROM schema_migrations")) && q.next())
+                    versaoArquivo = q.value(0).toString();
+
+                QSqlQuery atual(m_db);
+                QString versaoAtual;
+                if (atual.exec(QStringLiteral("SELECT MAX(version) FROM schema_migrations")) && atual.next())
+                    versaoAtual = atual.value(0).toString();
+
+                if (!versaoArquivo.isEmpty() && !versaoAtual.isEmpty()
+                        && versaoArquivo > versaoAtual) {
+                    m_erro = QStringLiteral("Este backup é de uma versão mais nova do sistema (%1). "
+                                            "Atualize o programa antes de restaurar.")
+                                 .arg(versaoArquivo);
+                } else {
+                    ok = true;
+                    if (resumo) {
+                        resumo->caminho = caminho;
+                        resumo->tamanho = fi.size();
+                        resumo->criadoEm = fi.lastModified().toString(Qt::ISODate);
+                        QVariantMap contagens;
+                        const QVector<QPair<QString, QString>> alvos = {
+                            {QStringLiteral("vendas"), QStringLiteral("vendas")},
+                            {QStringLiteral("produtos"), QStringLiteral("produtos")},
+                            {QStringLiteral("clientes"), QStringLiteral("clientes")},
+                            {QStringLiteral("compras"), QStringLiteral("compras")}};
+                        for (const auto &alvo : alvos) {
+                            if (q.exec(QStringLiteral("SELECT COUNT(*) FROM %1").arg(alvo.second))
+                                    && q.next())
+                                contagens[alvo.first] = q.value(0).toInt();
+                        }
+                        resumo->contagens = contagens;
+                        resumo->resumo = resumoDe(contagens);
+                    }
+                }
+            }
+            teste.close();
+        }
+    }
+    QSqlDatabase::removeDatabase(nomeConexao);
+    if (ok)
+        m_erro.clear();
+    return ok;
+}
+
+bool BackupService::agendarRestauracao(const QString &caminhoBackup)
+{
+    // Vale para a lista da pasta e para arquivo escolhido à mão: o caminho de
+    // fora é justamente o que pode trazer um arquivo errado.
+    if (!validarArquivoBackup(caminhoBackup))
+        return false; // m_erro já preenchido
     // Backup de emergência do estado atual (para poder desfazer a restauração).
     if (!criarBackup(nullptr))
         return false; // m_erro já preenchido

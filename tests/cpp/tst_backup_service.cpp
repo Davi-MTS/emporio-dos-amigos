@@ -1,6 +1,7 @@
 #include <QtTest>
 
 #include <QFileInfo>
+#include <QFile>
 #include <QSqlQuery>
 #include <QTemporaryDir>
 
@@ -17,6 +18,7 @@ private slots:
     void backupCriaArquivoIntegro();
     void retencaoMantemCincoMaisRecentes();
     void restauracaoRoundTrip();
+    void recusaArquivoQueNaoEBackup();
 
 private:
     QTemporaryDir m_dbDir;
@@ -124,6 +126,55 @@ void TstBackupService::restauracaoRoundTrip()
     MigrationRunner runner(m_db.connection());
     QVERIFY2(runner.migrate(), qUtf8Printable(runner.lastError())); // no-op (mesmo schema)
     QCOMPARE(contarEm(dbPath, QStringLiteral("produtos")), qint64(2));
+}
+
+// Restaurar troca o banco inteiro. Se aceitar qualquer arquivo, escolher o
+// relatório .html que veio junto no Telegram destrói a loja: o app não abre
+// mais e não há o que desfazer. A validação é a última porta antes disso.
+void TstBackupService::recusaArquivoQueNaoEBackup()
+{
+    BackupService svc(m_db.connection(), m_bkpDir.path());
+
+    // 1) Arquivo que nem existe.
+    QVERIFY(!svc.validarArquivoBackup(m_dbDir.filePath(QStringLiteral("nao-existe.db"))));
+
+    // 2) Arquivo de texto com cara de relatório (o caso real do Telegram).
+    const QString html = m_dbDir.filePath(QStringLiteral("relatorio.html"));
+    {
+        QFile f(html);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write(QByteArray("<html><body>Relatorio do dia</body></html>").repeated(200));
+    }
+    QVERIFY2(!svc.validarArquivoBackup(html), "aceitou um HTML como banco");
+    QVERIFY(!svc.ultimoErro().isEmpty());
+
+    // 3) Um SQLite de verdade, mas de outro programa.
+    const QString outro = m_dbDir.filePath(QStringLiteral("outro.db"));
+    {
+        const QString conn = QStringLiteral("outro_programa");
+        QSqlDatabase o = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), conn);
+        o.setDatabaseName(outro);
+        QVERIFY(o.open());
+        QSqlQuery q(o);
+        QVERIFY(q.exec(QStringLiteral("CREATE TABLE agenda (id INTEGER PRIMARY KEY, nome TEXT)")));
+        for (int i = 0; i < 500; ++i)
+            q.exec(QStringLiteral("INSERT INTO agenda (nome) VALUES ('x')"));
+        o.close();
+        QSqlDatabase::removeDatabase(conn);
+    }
+    QVERIFY2(!svc.validarArquivoBackup(outro), "aceitou o banco de outro programa");
+
+    // 4) Agendar tem que recusar pelos mesmos motivos.
+    QVERIFY(!svc.agendarRestauracao(html));
+
+    // 5) E um backup de verdade tem que passar, com o resumo preenchido.
+    BackupInfo criado;
+    QVERIFY2(svc.criarBackup(&criado), qUtf8Printable(svc.ultimoErro()));
+    BackupInfo lido;
+    QVERIFY2(svc.validarArquivoBackup(criado.caminho, &lido),
+             qUtf8Printable(svc.ultimoErro()));
+    QVERIFY(!lido.resumo.isEmpty());
+    QVERIFY(lido.tamanho > 0);
 }
 
 QTEST_MAIN(TstBackupService)

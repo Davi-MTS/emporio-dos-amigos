@@ -23,16 +23,31 @@ Rectangle {
         fin = App.resumoFinanceiro();
     }
 
+    // Pedido de navegação para quem hospeda a tela (Main.qml).
+    signal navegar(string rota)
+
     component KpiCard: Rectangle {
         property string rotulo: ""
         property string valor: ""
         property string nota: ""
         property color corValor: Theme.text
+        // Quando `rota` está preenchida, o cartão vira um atalho clicável.
+        property string rota: ""
         Layout.fillWidth: true
         Layout.preferredHeight: 104
         radius: Theme.radius
-        color: Theme.surface
-        border.color: Theme.border
+        color: areaKpi.containsMouse ? Theme.surfaceAlt : Theme.surface
+        border.color: areaKpi.containsMouse && rota !== "" ? Theme.primary : Theme.border
+
+        MouseArea {
+            id: areaKpi
+            anchors.fill: parent
+            enabled: rota !== ""
+            hoverEnabled: rota !== ""
+            cursorShape: Qt.PointingHandCursor
+            onClicked: tela.navegar(rota)
+        }
+
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: 20
@@ -80,8 +95,8 @@ Rectangle {
             spacing: Theme.spacingMd
             KpiCard { rotulo: qsTr("Vendas hoje"); valor: App.formatarDinheiro(tela.kpis.vendasHoje || 0); corValor: Theme.success; nota: (tela.kpis.numVendasHoje || 0) + qsTr(" vendas") }
             KpiCard { rotulo: qsTr("Ticket médio"); valor: App.formatarDinheiro(tela.kpis.ticketMedio || 0) }
-            KpiCard { rotulo: qsTr("A receber (fiado)"); valor: App.formatarDinheiro(tela.kpis.aReceber || 0) }
-            KpiCard { rotulo: qsTr("Produtos em falta"); valor: "" + (tela.kpis.produtosEmFalta || 0); corValor: (tela.kpis.produtosEmFalta || 0) > 0 ? Theme.danger : Theme.text; nota: qsTr("abaixo do mínimo") }
+            KpiCard { rotulo: qsTr("A receber (fiado)"); valor: App.formatarDinheiro(tela.kpis.aReceber || 0); nota: qsTr("abrir Clientes"); rota: "clientes" }
+            KpiCard { rotulo: qsTr("Produtos em falta"); valor: "" + (tela.kpis.produtosEmFalta || 0); corValor: (tela.kpis.produtosEmFalta || 0) > 0 ? Theme.danger : Theme.text; nota: qsTr("abrir o Estoque"); rota: "estoque" }
         }
 
         RowLayout {
