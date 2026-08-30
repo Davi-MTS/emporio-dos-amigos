@@ -256,6 +256,8 @@ Rectangle {
                                        itens: itens, pagamentos: pags });
         if (res.ok) {
             sucessoDialog.troco = res.troco;
+            sucessoDialog.vendaId = res.vendaId;
+            sucessoDialog.erro = "";
             sucessoDialog.open();
             limparVenda();
         } else {
@@ -747,8 +749,13 @@ Rectangle {
         width: 440
         padding: Theme.spacingLg
         property int troco: 0
+        property int vendaId: 0
+        property string erro: ""
+        readonly property bool podeCancelar: {
+            var p = (App.usuarioAtual && App.usuarioAtual.permissoes) ? App.usuarioAtual.permissoes : ({});
+            return p.tudo === true || p.pode_cancelar_venda === true;
+        }
         title: qsTr("Venda concluída")
-        standardButtons: Dialog.Ok
         contentItem: ColumnLayout {
             spacing: Theme.spacingMd
             Text {
@@ -770,6 +777,38 @@ Rectangle {
                 color: sucessoDialog.troco > 0 ? Theme.primary : Theme.text
                 font.pixelSize: Theme.fontXxl
                 font.weight: Font.Bold
+            }
+            Label {
+                visible: sucessoDialog.erro.length > 0
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                horizontalAlignment: Text.AlignHCenter
+                text: sucessoDialog.erro
+                color: Theme.danger
+                font.pixelSize: Theme.fontSm
+            }
+            // O erro aparece agora, com a venda ainda na cabeça de quem digitou.
+            // Mandar procurar na aba Vendas era o caminho que ninguém achava.
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: Theme.spacingSm
+                spacing: Theme.spacingSm
+                AppButton {
+                    visible: sucessoDialog.podeCancelar && sucessoDialog.vendaId > 0
+                    kind: "perigo"
+                    text: qsTr("Errei — cancelar esta venda")
+                    onClicked: {
+                        var r = App.cancelarVenda(sucessoDialog.vendaId, qsTr("Cancelada logo após a venda"));
+                        if (r.ok) sucessoDialog.close();
+                        else sucessoDialog.erro = r.erro;
+                    }
+                }
+                Item { Layout.fillWidth: true }
+                AppButton {
+                    kind: "accent"
+                    text: qsTr("Próxima venda")
+                    onClicked: sucessoDialog.close()
+                }
             }
         }
         onClosed: scanField.forceActiveFocus()

@@ -65,6 +65,8 @@ Rectangle {
             readonly property bool mostrarCliente: width > 620
             readonly property bool mostrarFormas: width > 480
             readonly property bool mostrarItens: width > 380
+            // Com a janela apertada o botão não cabe; o detalhe (Ver) continua.
+            readonly property bool mostrarCancelar: width > 560
 
             ColumnLayout {
                 anchors.fill: parent
@@ -154,20 +156,30 @@ Rectangle {
                                 font.weight: Font.DemiBold
                                 font.strikeout: linha.cancelada
                             }
+                            // "Cancelar" fica NA LINHA. Antes só existia dentro do
+                            // detalhe, e nada dizia que "Ver" levava até lá — quem
+                            // errou uma venda simplesmente não achava como desfazer.
                             RowLayout {
-                                Layout.preferredWidth: 96
+                                Layout.preferredWidth: caixaLista.mostrarCancelar ? 170 : 60
                                 spacing: 4
                                 AppButton {
                                     kind: "ghost"
                                     text: qsTr("Ver")
-                                    implicitWidth: 44
+                                    implicitWidth: 48
+                                    onClicked: detalheDialog.abrir(linha.idVenda, linha.total, linha.cancelada)
+                                }
+                                AppButton {
+                                    visible: caixaLista.mostrarCancelar && !linha.cancelada && tela.podeCancelar
+                                    kind: "perigo"
+                                    text: qsTr("Cancelar")
+                                    implicitWidth: 96
                                     onClicked: detalheDialog.abrir(linha.idVenda, linha.total, linha.cancelada)
                                 }
                                 Rectangle {
                                     visible: linha.cancelada
-                                    implicitWidth: 48; implicitHeight: 20; radius: 6
+                                    implicitWidth: 62; implicitHeight: 20; radius: 6
                                     color: Qt.rgba(Theme.danger.r, Theme.danger.g, Theme.danger.b, 0.15)
-                                    Text { anchors.centerIn: parent; text: qsTr("cancel."); color: Theme.danger; font.pixelSize: Theme.fontXs; font.weight: Font.DemiBold }
+                                    Text { anchors.centerIn: parent; text: qsTr("cancelada"); color: Theme.danger; font.pixelSize: Theme.fontXs; font.weight: Font.DemiBold }
                                 }
                             }
                         }

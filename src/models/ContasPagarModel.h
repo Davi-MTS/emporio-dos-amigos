@@ -12,6 +12,7 @@ public:
     enum Roles {
         IdRole = Qt::UserRole + 1,
         DescricaoRole, ValorRole, VencimentoRole, StatusRole, FornecedorRole, VencidaRole,
+        PagoEmRole, FormaPagamentoRole,
     };
     explicit ContasPagarModel(QObject *parent = nullptr);
 

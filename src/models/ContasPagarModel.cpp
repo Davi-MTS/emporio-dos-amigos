@@ -25,6 +25,8 @@ QVariant ContasPagarModel::data(const QModelIndex &index, int role) const
     case StatusRole:      return c.status;
     case FornecedorRole:  return c.fornecedorNome;
     case VencidaRole:     return c.vencida;
+    case PagoEmRole:      return c.pagoEm;
+    case FormaPagamentoRole: return c.formaPagamento;
     default:              return {};
     }
 }
@@ -35,6 +37,7 @@ QHash<int, QByteArray> ContasPagarModel::roleNames() const
         {IdRole, "idConta"}, {DescricaoRole, "descricao"}, {ValorRole, "valor"},
         {VencimentoRole, "vencimento"}, {StatusRole, "status"},
         {FornecedorRole, "fornecedor"}, {VencidaRole, "vencida"},
+        {PagoEmRole, "pagoEm"}, {FormaPagamentoRole, "formaPagamento"},
     };
 }
 

@@ -14,6 +14,8 @@ struct ContaPagar
     QString status;
     QString fornecedorNome;
     bool vencida = false;
+    QString pagoEm;           // ISO date, vazio se ainda aberta
+    QString formaPagamento;   // dinheiro/pix/debito/credito; vazio = desconhecida
 };
 
 struct ContaReceber
@@ -43,7 +45,14 @@ public:
     QVector<ContaPagar> contasPagar(bool apenasAbertas);
     QVector<ContaReceber> contasReceber(bool apenasAbertas);
 
-    bool pagar(int contaPagarId);
+    // A forma fica gravada: é o que permite estornar depois sabendo se o
+    // dinheiro tem que voltar para a gaveta ou não.
+    bool pagar(int contaPagarId, const QString &forma = QString());
+
+    // Reabre uma conta paga. Devolve em *forma como ela tinha sido paga (para
+    // quem chamou decidir o que fazer com o caixa) e em *valor o valor dela.
+    bool estornarPagamento(int contaPagarId, QString *forma = nullptr,
+                           qint64 *valor = nullptr, QString *descricao = nullptr);
     bool receber(int contaReceberId);
     // Recebe um pagamento (parcial ou total) de UMA conta a receber. Se cobrir
     // o valor, marca 'paga'; senão reduz o saldo da conta. Retorna o valor

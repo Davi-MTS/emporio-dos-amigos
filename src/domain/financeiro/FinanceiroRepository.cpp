@@ -19,7 +19,8 @@ QVector<ContaPagar> FinanceiroRepository::contasPagar(bool apenasAbertas)
         "  COALESCE(cp.descricao, 'Compra #' || cp.compra_id), "
         "  cp.valor, cp.vencimento, cp.status, COALESCE(f.nome, '—'), "
         "  CASE WHEN cp.status='aberta' AND cp.vencimento IS NOT NULL "
-        "       AND cp.vencimento < date('now','localtime') THEN 1 ELSE 0 END "
+        "       AND cp.vencimento < date('now','localtime') THEN 1 ELSE 0 END, "
+        "  COALESCE(cp.pago_em, ''), COALESCE(cp.forma_pagamento, '') "
         "FROM contas_pagar cp "
         "LEFT JOIN compras c ON c.id = cp.compra_id "
         "LEFT JOIN fornecedores f ON f.id = c.fornecedor_id ");
@@ -41,6 +42,8 @@ QVector<ContaPagar> FinanceiroRepository::contasPagar(bool apenasAbertas)
         c.status = q.value(4).toString();
         c.fornecedorNome = q.value(5).toString();
         c.vencida = q.value(6).toInt() != 0;
+        c.pagoEm = q.value(7).toString();
+        c.formaPagamento = q.value(8).toString();
         lista.push_back(c);
     }
     return lista;
@@ -77,15 +80,53 @@ QVector<ContaReceber> FinanceiroRepository::contasReceber(bool apenasAbertas)
     return lista;
 }
 
-bool FinanceiroRepository::pagar(int contaPagarId)
+bool FinanceiroRepository::pagar(int contaPagarId, const QString &forma)
 {
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral(
-        "UPDATE contas_pagar SET status='paga', pago_em=date('now','localtime') "
-        "WHERE id=:id AND status='aberta'"));
+        "UPDATE contas_pagar SET status='paga', pago_em=date('now','localtime'), "
+        "forma_pagamento=:forma WHERE id=:id AND status='aberta'"));
+    q.bindValue(QStringLiteral(":forma"), forma.isEmpty() ? QVariant() : QVariant(forma));
     q.bindValue(QStringLiteral(":id"), contaPagarId);
     if (!q.exec()) {
         m_erro = q.lastError().text();
+        return false;
+    }
+    if (q.numRowsAffected() <= 0) {
+        m_erro = QStringLiteral("Conta não encontrada ou já paga.");
+        return false;
+    }
+    return true;
+}
+
+bool FinanceiroRepository::estornarPagamento(int contaPagarId, QString *forma,
+                                             qint64 *valor, QString *descricao)
+{
+    QSqlQuery leitura(m_db);
+    leitura.prepare(QStringLiteral(
+        "SELECT valor, COALESCE(forma_pagamento, ''), "
+        "       COALESCE(descricao, 'Compra #' || compra_id) "
+        "FROM contas_pagar WHERE id = :id AND status = 'paga'"));
+    leitura.bindValue(QStringLiteral(":id"), contaPagarId);
+    if (!leitura.exec() || !leitura.next()) {
+        m_erro = QStringLiteral("Esta conta não está paga.");
+        return false;
+    }
+    if (valor)     *valor = leitura.value(0).toLongLong();
+    if (forma)     *forma = leitura.value(1).toString();
+    if (descricao) *descricao = leitura.value(2).toString();
+
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral(
+        "UPDATE contas_pagar SET status='aberta', pago_em=NULL, forma_pagamento=NULL "
+        "WHERE id=:id AND status='paga'"));
+    q.bindValue(QStringLiteral(":id"), contaPagarId);
+    if (!q.exec()) {
+        m_erro = q.lastError().text();
+        return false;
+    }
+    if (q.numRowsAffected() <= 0) {
+        m_erro = QStringLiteral("Não foi possível estornar esta conta.");
         return false;
     }
     return true;

@@ -172,6 +172,17 @@ public:
     // forma "dinheiro" (padrão) com caixa aberto lança uma SANGRIA (o dinheiro
     // sai da gaveta); outras formas só quitam a conta.
     Q_INVOKABLE bool pagarConta(int id, const QString &forma = QStringLiteral("dinheiro"));
+
+    // Desfaz um pagamento lançado por engano: reabre a conta e, se tinha saído
+    // da gaveta, devolve o dinheiro para o caixa aberto. { ok, erro, aviso }.
+    Q_INVOKABLE QVariantMap estornarPagamento(int id);
+
+    // Mostra as contas JÁ PAGAS junto com as abertas (para achar o que estornar).
+    Q_INVOKABLE void mostrarContasPagas(bool mostrar);
+
+    // Onde o dinheiro vai passar, em português, para a tela avisar ANTES de
+    // confirmar. { sai, gavetaAgora, gavetaDepois, caixaAberto, alerta }.
+    Q_INVOKABLE QVariantMap efeitoDoPagamento(const QString &forma, qlonglong valor);
     // Recebe uma conta a receber específica (parcial ou total). valorTexto vazio =
     // recebe o valor cheio da conta. forma "dinheiro" com caixa aberto entra na
     // gaveta. Retorna { ok, aplicado, erro }.
@@ -265,5 +276,9 @@ private:
     QVariantMap m_usuarioAtual;
     int m_usuarioId = 0;
     int m_sessaoId = 0;
+    // Financeiro: por padrão a lista traz só o que está em aberto (é o que
+    // importa no dia). Ligado, mostra também o que já foi pago — é como se
+    // acha uma conta lançada por engano para estornar.
+    bool m_mostrarContasPagas = false;
     QString m_erro;
 };

@@ -33,6 +33,14 @@ Rectangle {
         }
     }
 
+    function nomeForma(f) {
+        if (f === "dinheiro") return qsTr("dinheiro da gaveta");
+        if (f === "pix")      return qsTr("pix / transferência");
+        if (f === "debito")   return qsTr("cartão de débito");
+        if (f === "credito")  return qsTr("cartão de crédito");
+        return f;
+    }
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: Theme.spacingLg
@@ -51,15 +59,27 @@ Rectangle {
             }
         }
 
-        RowLayout {
+        // Flow, e não RowLayout: com a janela restaurada os quatro controles não
+        // cabem lado a lado e o RowLayout empurrava a coluna inteira para fora
+        // da tela (a lista ficava 79 px mais larga que a janela). Aqui eles
+        // simplesmente passam para a linha de baixo.
+        Flow {
             Layout.fillWidth: true
+            spacing: Theme.spacingSm
             SegmentedControl {
                 id: tabs
-                Layout.preferredWidth: 260
-                Layout.preferredHeight: 42
+                width: 260
+                height: 42
                 options: [qsTr("A pagar"), qsTr("A receber")]
             }
-            Item { Layout.fillWidth: true }
+            // Sem isto a lista só mostrava contas abertas: uma conta paga por
+            // engano sumia da tela e não havia como achá-la para desfazer.
+            ToggleButton {
+                id: verPagas
+                visible: tabs.currentIndex === 0
+                text: qsTr("Mostrar já pagas")
+                onCheckedChanged: { App.mostrarContasPagas(checked); tela.carregar(); }
+            }
             AppButton { kind: "accent"; text: qsTr("＋ Nova despesa"); onClicked: despesaDialog.abrir() }
         }
 
@@ -88,6 +108,10 @@ Rectangle {
                         required property var valor
                         required property string vencimento
                         required property bool vencida
+                        required property string status
+                        required property string pagoEm
+                        required property string formaPagamento
+                        readonly property bool paga: status === "paga"
                         width: ListView.view.width
                         height: 54
                         color: "transparent"
@@ -99,11 +123,45 @@ Rectangle {
                             ColumnLayout {
                                 Layout.fillWidth: true
                                 spacing: 0
-                                Text { text: rp.descricao; color: Theme.text; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold; elide: Text.ElideRight }
-                                Text { text: rp.fornecedor + (rp.vencimento ? " · vence " + rp.vencimento : ""); color: rp.vencida ? Theme.danger : Theme.textMuted; font.pixelSize: Theme.fontXs }
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: rp.descricao
+                                    color: rp.paga ? Theme.textMuted : Theme.text
+                                    font.pixelSize: Theme.fontMd
+                                    font.weight: Font.DemiBold
+                                    elide: Text.ElideRight
+                                }
+                                Text {
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideRight
+                                    text: rp.paga
+                                          ? qsTr("PAGA em ") + rp.pagoEm
+                                            + (rp.formaPagamento.length > 0
+                                               ? qsTr(" · saiu de: ") + tela.nomeForma(rp.formaPagamento)
+                                               : qsTr(" · forma não registrada"))
+                                          : rp.fornecedor + (rp.vencimento ? qsTr(" · vence ") + rp.vencimento : "")
+                                    color: rp.paga ? Theme.success : (rp.vencida ? Theme.danger : Theme.textMuted)
+                                    font.pixelSize: Theme.fontXs
+                                }
                             }
-                            Text { text: App.formatarDinheiro(rp.valor); color: Theme.text; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold }
-                            AppButton { kind: "default"; text: qsTr("Pagar"); onClicked: pagarDialog.abrir(rp.idConta, rp.valor, rp.descricao) }
+                            Text {
+                                text: App.formatarDinheiro(rp.valor)
+                                color: rp.paga ? Theme.textMuted : Theme.text
+                                font.pixelSize: Theme.fontMd
+                                font.weight: Font.DemiBold
+                            }
+                            AppButton {
+                                visible: !rp.paga
+                                kind: "default"
+                                text: qsTr("Pagar")
+                                onClicked: pagarDialog.abrir(rp.idConta, rp.valor, rp.descricao)
+                            }
+                            AppButton {
+                                visible: rp.paga
+                                kind: "ghost"
+                                text: qsTr("Desfazer")
+                                onClicked: estornoDialog.abrir(rp.idConta, rp.valor, rp.descricao, rp.formaPagamento)
+                            }
                         }
                         Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.border }
                     }
@@ -190,53 +248,142 @@ Rectangle {
         }
     }
 
-    // Pagar uma conta. Dinheiro sai da gaveta (sangria no caixa aberto).
+    // Pagar uma conta. A tela precisa dizer, ANTES de confirmar, de onde o
+    // dinheiro sai e como a gaveta fica depois — antes era uma linha cinza.
     AppDialog {
         id: pagarDialog
         parent: Overlay.overlay
         anchors.centerIn: parent
         modal: true
-        width: 460
+        width: 520
         padding: Theme.spacingLg
         property int contaId: 0
         property int valorConta: 0
         property string descricao: ""
+        readonly property var formas: ["dinheiro", "pix", "debito", "credito"]
+        property var efeito: ({})
+
         function abrir(id, valor, desc) {
             contaId = id; valorConta = valor; descricao = desc || "";
-            pgForma.currentIndex = 0;
+            formaTabs.currentIndex = 0;
             pgErro.text = "";
+            recalcular();
             open();
         }
+        function formaAtual() { return formas[formaTabs.currentIndex]; }
+        function recalcular() { efeito = App.efeitoDoPagamento(formaAtual(), valorConta); }
+
         title: qsTr("Pagar conta")
         contentItem: ColumnLayout {
             spacing: Theme.spacingMd
-            Text {
-                Layout.fillWidth: true; elide: Text.ElideRight
-                text: pagarDialog.descricao + qsTr(" · ") + App.formatarDinheiro(pagarDialog.valorConta)
-                color: Theme.text; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold
-            }
-            FormField {
-                label: qsTr("Forma de pagamento")
+
+            // O que está sendo pago, em destaque.
+            Rectangle {
                 Layout.fillWidth: true
-                AppComboBox {
-                    id: pgForma
-                    width: parent.width
-                    model: [
-                        { l: qsTr("Dinheiro (sai da gaveta)"), v: "dinheiro" },
-                        { l: qsTr("Pix / transferência"),      v: "pix" },
-                        { l: qsTr("Débito"),                   v: "debito" },
-                        { l: qsTr("Crédito"),                  v: "credito" }
-                    ]
-                    textRole: "l"
-                    valueRole: "v"
-                    Component.onCompleted: currentIndex = 0
+                radius: Theme.radiusSm
+                color: Theme.surfaceAlt
+                border.color: Theme.border
+                implicitHeight: cabPag.implicitHeight + 2 * Theme.spacingMd
+                ColumnLayout {
+                    id: cabPag
+                    anchors.fill: parent
+                    anchors.margins: Theme.spacingMd
+                    spacing: 2
+                    Text {
+                        Layout.fillWidth: true
+                        elide: Text.ElideRight
+                        text: pagarDialog.descricao
+                        color: Theme.textMuted
+                        font.pixelSize: Theme.fontSm
+                    }
+                    Text {
+                        text: App.formatarDinheiro(pagarDialog.valorConta)
+                        color: Theme.text
+                        font.family: Theme.fontDisplay
+                        font.pixelSize: Theme.fontXl
+                        font.weight: Font.Bold
+                    }
                 }
             }
+
             Text {
-                Layout.fillWidth: true; wrapMode: Text.WordWrap
-                text: qsTr("Se for em dinheiro, o valor é lançado como sangria (retirada) no caixa aberto, para o fechamento bater.")
-                color: Theme.textMuted; font.pixelSize: Theme.fontXs
+                text: qsTr("De onde sai o dinheiro?")
+                color: Theme.text
+                font.pixelSize: Theme.fontMd
+                font.weight: Font.DemiBold
             }
+            SegmentedControl {
+                id: formaTabs
+                Layout.fillWidth: true
+                Layout.preferredHeight: 42
+                options: [qsTr("Gaveta"), qsTr("Pix"), qsTr("Débito"), qsTr("Crédito")]
+                onCurrentIndexChanged: pagarDialog.recalcular()
+            }
+
+            // A consequência em português, com o antes e o depois da gaveta.
+            Rectangle {
+                Layout.fillWidth: true
+                radius: Theme.radiusSm
+                color: Theme.surface
+                border.color: (pagarDialog.efeito.alerta || "").length > 0 ? Theme.warning : Theme.border
+                implicitHeight: efeitoCol.implicitHeight + 2 * Theme.spacingMd
+                ColumnLayout {
+                    id: efeitoCol
+                    anchors.fill: parent
+                    anchors.margins: Theme.spacingMd
+                    spacing: 4
+                    Text {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        text: pagarDialog.efeito.sai || ""
+                        color: Theme.text
+                        font.pixelSize: Theme.fontSm
+                        font.weight: Font.DemiBold
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        visible: pagarDialog.efeito.gavetaAgora !== undefined
+                        Text {
+                            Layout.fillWidth: true
+                            text: qsTr("Gaveta agora")
+                            color: Theme.textMuted
+                            font.pixelSize: Theme.fontSm
+                        }
+                        Text {
+                            text: App.formatarDinheiro(pagarDialog.efeito.gavetaAgora || 0)
+                            color: Theme.textMuted
+                            font.pixelSize: Theme.fontSm
+                        }
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        visible: pagarDialog.efeito.gavetaDepois !== undefined
+                        Text {
+                            Layout.fillWidth: true
+                            text: qsTr("Gaveta depois de pagar")
+                            color: Theme.text
+                            font.pixelSize: Theme.fontSm
+                            font.weight: Font.DemiBold
+                        }
+                        Text {
+                            text: App.formatarDinheiro(pagarDialog.efeito.gavetaDepois || 0)
+                            color: (pagarDialog.efeito.gavetaDepois || 0) < 0 ? Theme.danger : Theme.primary
+                            font.pixelSize: Theme.fontMd
+                            font.weight: Font.Bold
+                        }
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        visible: (pagarDialog.efeito.alerta || "").length > 0
+                        text: "⚠  " + (pagarDialog.efeito.alerta || "")
+                        color: Theme.warning
+                        font.pixelSize: Theme.fontXs
+                        font.weight: Font.DemiBold
+                    }
+                }
+            }
+
             Label { id: pgErro; visible: text.length > 0; color: Theme.danger; font.pixelSize: Theme.fontSm; Layout.fillWidth: true; wrapMode: Text.WordWrap }
             RowLayout {
                 Layout.fillWidth: true
@@ -244,8 +391,12 @@ Rectangle {
                     kind: "accent"
                     text: qsTr("Confirmar pagamento")
                     onClicked: {
-                        if (App.pagarConta(pagarDialog.contaId, pgForma.currentValue)) { tela.carregar(); pagarDialog.close(); }
-                        else pgErro.text = App.ultimoErro();
+                        if (App.pagarConta(pagarDialog.contaId, pagarDialog.formaAtual())) {
+                            tela.carregar();
+                            pagarDialog.close();
+                        } else {
+                            pgErro.text = App.ultimoErro();
+                        }
                     }
                 }
                 AppButton { kind: "default"; text: qsTr("Cancelar"); onClicked: pagarDialog.close() }
@@ -254,7 +405,93 @@ Rectangle {
         }
     }
 
-    // Receber uma conta (parcial ou total). Dinheiro entra no caixa aberto.
+    // Desfazer um pagamento lançado por engano.
+    AppDialog {
+        id: estornoDialog
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: 480
+        padding: Theme.spacingLg
+        property int contaId: 0
+        property int valorConta: 0
+        property string descricao: ""
+        property string forma: ""
+        function abrir(id, valor, desc, f) {
+            contaId = id; valorConta = valor; descricao = desc || ""; forma = f || "";
+            estErro.text = "";
+            open();
+        }
+        title: qsTr("Desfazer o pagamento")
+        contentItem: ColumnLayout {
+            spacing: Theme.spacingMd
+            Text {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: qsTr("A conta volta para a lista de contas a pagar: ")
+                      + estornoDialog.descricao + " · "
+                      + App.formatarDinheiro(estornoDialog.valorConta)
+                color: Theme.text
+                font.pixelSize: Theme.fontMd
+                font.weight: Font.DemiBold
+            }
+            Text {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: estornoDialog.forma === "dinheiro"
+                      ? qsTr("Como saiu da gaveta, o dinheiro volta para o caixa aberto agora, lançado como suprimento com o motivo escrito. Se o caixa estiver fechado, a conta reabre mas o dinheiro não volta sozinho.")
+                      : (estornoDialog.forma.length > 0
+                         ? qsTr("Saiu por ") + tela.nomeForma(estornoDialog.forma)
+                           + qsTr(": o caixa não é tocado. Se a transferência já foi feita no banco, desfaça lá também.")
+                         : qsTr("Não há registro de como esta conta foi paga, então o caixa não será tocado."))
+                color: Theme.textMuted
+                font.pixelSize: Theme.fontSm
+            }
+            Label { id: estErro; visible: text.length > 0; color: Theme.danger; font.pixelSize: Theme.fontSm; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+            RowLayout {
+                Layout.fillWidth: true
+                AppButton {
+                    kind: "accent"
+                    text: qsTr("Desfazer pagamento")
+                    onClicked: {
+                        var r = App.estornarPagamento(estornoDialog.contaId);
+                        if (r.ok) {
+                            tela.carregar();
+                            estornoDialog.close();
+                            avisoEstornoTexto.text = r.aviso;
+                            avisoEstorno.open();
+                        } else {
+                            estErro.text = r.erro;
+                        }
+                    }
+                }
+                AppButton { kind: "default"; text: qsTr("Voltar"); onClicked: estornoDialog.close() }
+                Item { Layout.fillWidth: true }
+            }
+        }
+    }
+
+    // O estorno precisa dizer o que aconteceu com o dinheiro.
+    AppDialog {
+        id: avisoEstorno
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: 420
+        padding: Theme.spacingLg
+        title: qsTr("Pagamento desfeito")
+        standardButtons: Dialog.Ok
+        contentItem: ColumnLayout {
+            Text {
+                id: avisoEstornoTexto
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                color: Theme.text
+                font.pixelSize: Theme.fontSm
+            }
+        }
+    }
+
     AppDialog {
         id: receberDialog
         parent: Overlay.overlay

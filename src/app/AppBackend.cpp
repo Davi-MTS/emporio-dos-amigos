@@ -442,7 +442,7 @@ QVariantMap AppBackend::receberDeCliente(int clienteId, const QString &valorText
 
 void AppBackend::recarregarFinanceiro()
 {
-    m_contasPagarModel->setContas(m_financeiroRepo.contasPagar(/*apenasAbertas=*/true));
+    m_contasPagarModel->setContas(m_financeiroRepo.contasPagar(!m_mostrarContasPagas));
     m_contasReceberModel->setContas(m_financeiroRepo.contasReceber(/*apenasAbertas=*/true));
 }
 
@@ -477,7 +477,7 @@ bool AppBackend::pagarConta(int id, const QString &forma)
         m_erro = m_db.lastError().text();
         return false;
     }
-    if (!m_financeiroRepo.pagar(id)) {
+    if (!m_financeiroRepo.pagar(id, forma)) {
         m_db.rollback();
         m_erro = m_financeiroRepo.ultimoErro();
         return false;
@@ -500,6 +500,114 @@ bool AppBackend::pagarConta(int id, const QString &forma)
     m_erro.clear();
     recarregarFinanceiro();
     return true;
+}
+
+void AppBackend::mostrarContasPagas(bool mostrar)
+{
+    m_mostrarContasPagas = mostrar;
+    recarregarFinanceiro();
+}
+
+QVariantMap AppBackend::efeitoDoPagamento(const QString &forma, qlonglong valor)
+{
+    QVariantMap out;
+    const bool emDinheiro = (forma == QStringLiteral("dinheiro"));
+    const bool caixaAberto = m_sessaoId > 0;
+    out[QStringLiteral("caixaAberto")] = caixaAberto;
+
+    if (!emDinheiro) {
+        out[QStringLiteral("sai")] = tr("Sai da sua conta no banco. Não mexe na gaveta do caixa.");
+        out[QStringLiteral("alerta")] = QString();
+        return out;
+    }
+
+    if (!caixaAberto) {
+        // O pagamento é registrado, mas sem sessão aberta não há como lançar a
+        // sangria: o dinheiro sairia da gaveta sem aparecer na conferência.
+        out[QStringLiteral("sai")] = tr("Sai da gaveta do caixa.");
+        out[QStringLiteral("alerta")] =
+            tr("O caixa está FECHADO. A conta é quitada, mas a saída não entra na "
+               "conferência de nenhum turno. Abra o caixa antes, se o dinheiro "
+               "sair da gaveta agora.");
+        return out;
+    }
+
+    const ResumoCaixa r = m_caixaRepo.resumo(m_sessaoId);
+    const qint64 agora = r.dinheiroEsperado();
+    out[QStringLiteral("sai")] = tr("Sai da gaveta do caixa, como sangria.");
+    out[QStringLiteral("gavetaAgora")] = static_cast<qlonglong>(agora);
+    out[QStringLiteral("gavetaDepois")] = static_cast<qlonglong>(agora - valor);
+    out[QStringLiteral("alerta")] = (agora - valor) < 0
+        ? tr("A gaveta não tem esse valor: ela ficaria negativa. Confira antes de confirmar.")
+        : QString();
+    return out;
+}
+
+QVariantMap AppBackend::estornarPagamento(int id)
+{
+    QVariantMap out;
+    out[QStringLiteral("ok")] = false;
+
+    if (!temPermissao(QStringLiteral("ve_financeiro"))) {
+        out[QStringLiteral("erro")] = tr("Seu usuário não pode estornar pagamentos.");
+        m_erro = out.value(QStringLiteral("erro")).toString();
+        return out;
+    }
+
+    if (!m_db.transaction()) {
+        out[QStringLiteral("erro")] = m_db.lastError().text();
+        return out;
+    }
+
+    QString forma;
+    QString descricao;
+    qint64 valor = 0;
+    if (!m_financeiroRepo.estornarPagamento(id, &forma, &valor, &descricao)) {
+        m_db.rollback();
+        out[QStringLiteral("erro")] = m_financeiroRepo.ultimoErro();
+        m_erro = m_financeiroRepo.ultimoErro();
+        return out;
+    }
+
+    // Se o dinheiro saiu da gaveta, ele volta para a gaveta — no caixa ABERTO
+    // agora, que é onde a nota vai aparecer. Estornar um pagamento de ontem não
+    // reabre o turno de ontem: o dinheiro entra hoje, com o motivo escrito.
+    QString aviso;
+    if (forma == QStringLiteral("dinheiro") && valor > 0) {
+        if (m_sessaoId > 0) {
+            if (!m_caixaRepo.registrarMovimento(m_sessaoId, QStringLiteral("suprimento"), valor,
+                                                tr("Estorno de pagamento: %1").arg(descricao),
+                                                m_usuarioId)) {
+                m_db.rollback();
+                out[QStringLiteral("erro")] = m_caixaRepo.ultimoErro();
+                m_erro = m_caixaRepo.ultimoErro();
+                return out;
+            }
+            aviso = tr("O dinheiro voltou para a gaveta do caixa aberto.");
+        } else {
+            aviso = tr("A conta foi reaberta, mas o caixa está fechado: o dinheiro "
+                       "NÃO voltou para nenhuma gaveta. Lance um suprimento quando abrir.");
+        }
+    } else if (!forma.isEmpty()) {
+        aviso = tr("O pagamento foi por %1 — desfaça também no banco, se já tiver saído.")
+                    .arg(forma);
+    } else {
+        aviso = tr("Não havia registro de como esta conta foi paga, então o caixa "
+                   "não foi tocado.");
+    }
+
+    if (!m_db.commit()) {
+        m_db.rollback();
+        out[QStringLiteral("erro")] = m_db.lastError().text();
+        return out;
+    }
+
+    recarregarFinanceiro();
+    m_erro.clear();
+    out[QStringLiteral("ok")] = true;
+    out[QStringLiteral("aviso")] = aviso;
+    out[QStringLiteral("erro")] = QString();
+    return out;
 }
 
 QVariantMap AppBackend::receberContaValor(int id, const QString &valorTexto,

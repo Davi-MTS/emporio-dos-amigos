@@ -30,6 +30,7 @@ distribuidora_add_test(tst_relatorio_repository   cpp/tst_relatorio_repository.c
 distribuidora_add_test(tst_composicao             cpp/tst_composicao.cpp)
 distribuidora_add_test(tst_backup_service         cpp/tst_backup_service.cpp)
 distribuidora_add_test(tst_relatorio_mobile       cpp/tst_relatorio_mobile.cpp)
+distribuidora_add_test(tst_estorno                cpp/tst_estorno.cpp)
 
 # -----------------------------------------------------------------------------
 # Testes de INTERFACE (Qt Quick Test)
