@@ -21,6 +21,8 @@ public:
         UnidadeBaseRole,
         StatusRole,        // "ok" | "baixo" | "zerado"
         CompostoRole,
+        TemFotoRole,
+        DoseOrigemRole,
     };
 
     explicit ProdutosListModel(QObject *parent = nullptr);

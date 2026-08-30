@@ -27,6 +27,7 @@ QVariant EstoqueListModel::data(const QModelIndex &index, int role) const
     case CustoMedioRole:  return it.custoMedio;
     case UnidadeBaseRole: return it.unidadeBase;
     case StatusRole:      return statusDe(it);
+    case TemFotoRole:     return it.temFoto;
     default:              return {};
     }
 }
@@ -35,6 +36,7 @@ QHash<int, QByteArray> EstoqueListModel::roleNames() const
 {
     return {
         {ProdutoIdRole, "idProduto"},
+        {TemFotoRole, "temFoto"},
         {NomeRole, "nome"},
         {LocalizacaoRole, "localizacao"},
         {QuantidadeRole, "quantidade"},

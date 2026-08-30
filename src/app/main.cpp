@@ -1,4 +1,5 @@
 #include "app/AppBackend.h"
+#include "app/ProdutoFotoProvider.h"
 #include "database/Database.h"
 #include "database/MigrationRunner.h"
 #include "services/backup/BackupService.h"
@@ -67,6 +68,9 @@ int main(int argc, char *argv[])
     // --- Interface QML ---
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty(QStringLiteral("App"), &backend);
+    // Fotos dos produtos vêm do banco: image://produto/<id>
+    engine.addImageProvider(QString::fromLatin1(ProdutoFotoProvider::nome()),
+                            new ProdutoFotoProvider(db.connection()));
 
     QObject::connect(
         &engine,

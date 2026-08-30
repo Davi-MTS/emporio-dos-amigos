@@ -58,4 +58,5 @@ struct Produto
     QString doseOrigemUnidade;      // unidade base da garrafa (ml, litro…)
     qint64 quantidadeEstoque = 0;   // unidade base
     qint64 precoPrincipal = 0;      // centavos: preço da embalagem de menor fator
+    bool temFoto = false;           // evita pedir imagem de quem não tem
 };

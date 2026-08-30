@@ -15,6 +15,7 @@ struct ItemEstoque
     qint64 quantidade = 0;   // unidade base
     int minimo = 0;          // unidade base
     qint64 custoMedio = 0;   // centavos por unidade base
+    bool temFoto = false;    // evita pedir imagem de quem não tem
 };
 
 // Acesso a dados de estoque: listagem, entrada de mercadoria (com custo médio

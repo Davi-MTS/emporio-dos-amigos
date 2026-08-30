@@ -19,6 +19,7 @@ public:
         CustoMedioRole,
         UnidadeBaseRole,
         StatusRole,   // "ok" | "baixo" | "zerado"
+        TemFotoRole,
     };
 
     explicit EstoqueListModel(QObject *parent = nullptr);

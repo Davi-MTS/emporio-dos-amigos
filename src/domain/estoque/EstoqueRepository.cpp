@@ -17,7 +17,8 @@ QVector<ItemEstoque> EstoqueRepository::listar(const QString &filtro)
 
     QString sql = QStringLiteral(
         "SELECT p.id, p.nome, p.localizacao, p.unidade_base, p.estoque_minimo, "
-        "       COALESCE(e.quantidade_atual, 0), COALESCE(e.custo_medio_unitario, 0) "
+        "       COALESCE(e.quantidade_atual, 0), COALESCE(e.custo_medio_unitario, 0), "
+        "       (p.foto IS NOT NULL) "
         "FROM produtos p "
         "LEFT JOIN estoque e ON e.produto_id = p.id "
         // Composto e dose não têm estoque próprio (baixam insumo/garrafa):
@@ -48,6 +49,7 @@ QVector<ItemEstoque> EstoqueRepository::listar(const QString &filtro)
         it.minimo = q.value(4).toInt();
         it.quantidade = q.value(5).toLongLong();
         it.custoMedio = q.value(6).toLongLong() / 1000; // milésimos -> centavos
+        it.temFoto = q.value(7).toInt() != 0;
         itens.push_back(it);
     }
     return itens;

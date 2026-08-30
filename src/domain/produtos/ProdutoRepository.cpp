@@ -68,6 +68,7 @@ QVector<Produto> ProdutoRepository::listar(const QString &filtro)
         p.doseQuantidade = q.value(11).toLongLong();
         p.doseOrigemNome = q.value(12).toString();
         p.doseOrigemUnidade = q.value(13).toString();
+        p.temFoto = q.value(14).toInt() != 0;
         produtos.push_back(p);
     }
     return produtos;
@@ -141,6 +142,7 @@ std::optional<Produto> ProdutoRepository::obter(int id)
     p.doseQuantidade = q.value(14).toLongLong();
     p.doseOrigemNome = q.value(15).toString();
     p.doseOrigemUnidade = q.value(16).toString();
+    p.temFoto = q.value(17).toInt() != 0;
     p.embalagens = carregarEmbalagens(p.id);
     p.composicao = carregarComposicao(p.id);
     return p;
@@ -453,4 +455,34 @@ int ProdutoRepository::criarCategoria(const QString &nome)
         return 0;
     }
     return ins.lastInsertId().toInt();
+}
+
+bool ProdutoRepository::salvarFoto(int produtoId, const QByteArray &jpeg)
+{
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral("UPDATE produtos SET foto = :foto WHERE id = :id"));
+    q.bindValue(QStringLiteral(":foto"), jpeg.isEmpty() ? QVariant() : QVariant(jpeg));
+    q.bindValue(QStringLiteral(":id"), produtoId);
+    if (!q.exec()) {
+        m_erro = q.lastError().text();
+        return false;
+    }
+    return true;
+}
+
+QByteArray ProdutoRepository::foto(int produtoId)
+{
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral("SELECT foto FROM produtos WHERE id = :id"));
+    q.bindValue(QStringLiteral(":id"), produtoId);
+    if (!q.exec() || !q.next()) {
+        m_erro = q.lastError().text();
+        return {};
+    }
+    return q.value(0).toByteArray();
+}
+
+bool ProdutoRepository::removerFoto(int produtoId)
+{
+    return salvarFoto(produtoId, QByteArray());
 }

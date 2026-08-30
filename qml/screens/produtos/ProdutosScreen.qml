@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 import QtQuick.Layouts
 import Distribuidora
 
@@ -14,6 +15,7 @@ Rectangle {
     property var produtoAtual: null
     property var listaCategorias: App.categorias()
     property var origensDose: []
+    property bool temFoto: false
 
     function recarregarOrigens() {
         origensDose = App.produtosParaOrigemDose(
@@ -123,6 +125,7 @@ Rectangle {
         localField.text = produtoAtual.localizacao || "";
         categoriaCombo.currentIndex = categoriaCombo.indexOfValue(produtoAtual.categoriaId || 0);
         compostoCheck.checked = produtoAtual.composto || false;
+        temFoto = (produtoAtual.id || 0) > 0 && App.produtoTemFoto(produtoAtual.id);
         doseCheck.checked = (produtoAtual.doseDeProdutoId || 0) > 0;
         doseQtdField.text = (produtoAtual.doseQuantidade || 0) > 0
                             ? ("" + produtoAtual.doseQuantidade) : "";
@@ -269,9 +272,11 @@ Rectangle {
                             required property var preco
                             required property string status
                             required property bool composto
+                            required property bool temFoto
+                            required property string doseOrigem
 
                             width: ListView.view.width
-                            height: 46
+                            height: 52
                             leftPadding: Theme.spacingMd
                             rightPadding: Theme.spacingMd
                             highlighted: tela.produtoAtual && tela.produtoAtual.id === idProduto
@@ -279,13 +284,32 @@ Rectangle {
 
                             contentItem: RowLayout {
                                 spacing: Theme.spacingSm
-                                Text {
+                                FotoProduto {
+                                    produtoId: linha.idProduto
+                                    temFoto: linha.temFoto
+                                    nome: linha.nome
+                                    lado: 32
+                                }
+                                ColumnLayout {
                                     Layout.fillWidth: true
-                                    text: linha.nome
-                                    elide: Text.ElideRight
-                                    color: Theme.text
-                                    font.pixelSize: Theme.fontMd
-                                    font.weight: Font.DemiBold
+                                    Layout.minimumWidth: 0
+                                    spacing: 0
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: linha.nome
+                                        elide: Text.ElideRight
+                                        color: Theme.text
+                                        font.pixelSize: Theme.fontMd
+                                        font.weight: Font.DemiBold
+                                    }
+                                    Text {
+                                        visible: linha.doseOrigem.length > 0
+                                        Layout.fillWidth: true
+                                        elide: Text.ElideRight
+                                        text: qsTr("dose de ") + linha.doseOrigem
+                                        color: Theme.textMuted
+                                        font.pixelSize: Theme.fontXs
+                                    }
                                 }
                                 Text { visible: tela.mostrarCategoria; Layout.preferredWidth: tela.colCat; text: linha.categoria; elide: Text.ElideRight; color: Theme.textMuted; font.pixelSize: Theme.fontMd }
                                 Text { visible: tela.mostrarEstoque; Layout.preferredWidth: tela.colEst; text: linha.composto ? "—" : linha.estoque; horizontalAlignment: Text.AlignRight; color: Theme.text; font.pixelSize: Theme.fontMd }
@@ -389,6 +413,56 @@ Rectangle {
                         visible: abasProduto.currentIndex === 0
                         Layout.fillWidth: true
                         spacing: Theme.spacingMd
+
+                        // A foto ajuda quem não decorou o cadastro a achar o
+                        // produto certo, na lista e no PDV.
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: Theme.spacingMd
+                            FotoProduto {
+                                produtoId: tela.produtoAtual ? (tela.produtoAtual.id || 0) : 0
+                                temFoto: tela.temFoto
+                                nome: nomeField.text
+                                lado: 84
+                            }
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                Layout.minimumWidth: 0
+                                spacing: Theme.spacingXs
+                                Text {
+                                    Layout.fillWidth: true
+                                    wrapMode: Text.WordWrap
+                                    text: (tela.produtoAtual && (tela.produtoAtual.id || 0) > 0)
+                                          ? qsTr("A imagem é reduzida antes de ser guardada, e vai junto no backup.")
+                                          : qsTr("Salve o produto primeiro para poder adicionar a foto.")
+                                    color: Theme.textMuted
+                                    font.pixelSize: Theme.fontXs
+                                }
+                                Flow {
+                                    Layout.fillWidth: true
+                                    spacing: Theme.spacingSm
+                                    AppButton {
+                                        kind: "default"
+                                        text: qsTr("Escolher foto")
+                                        enabled: tela.podeEditar && tela.produtoAtual
+                                                 && (tela.produtoAtual.id || 0) > 0
+                                        onClicked: fotoDialog.open()
+                                    }
+                                    AppButton {
+                                        kind: "ghost"
+                                        text: qsTr("Remover")
+                                        visible: tela.temFoto
+                                        enabled: tela.podeEditar
+                                        onClicked: {
+                                            if (App.removerFotoProduto(tela.produtoAtual.id))
+                                                tela.temFoto = false;
+                                            else
+                                                erroLabel.text = App.ultimoErro();
+                                        }
+                                    }
+                                }
+                            }
+                        }
 
                         FormField {
                             label: qsTr("Nome *")
@@ -785,6 +859,23 @@ Rectangle {
             if (tela.produtoAtual)
                 App.inativarProduto(tela.produtoAtual.id);
             tela.fecharEditor();
+        }
+    }
+
+    FileDialog {
+        id: fotoDialog
+        title: qsTr("Escolha a foto do produto")
+        nameFilters: [qsTr("Imagens (*.png *.jpg *.jpeg *.bmp *.webp)"), qsTr("Todos os arquivos (*)")]
+        onAccepted: {
+            var caminho = decodeURIComponent(
+                fotoDialog.selectedFile.toString().replace(/^file:\/{2,3}/, ""));
+            var r = App.definirFotoProduto(tela.produtoAtual.id, caminho);
+            if (r.ok) {
+                tela.temFoto = true;
+                erroLabel.text = "";
+            } else {
+                erroLabel.text = r.erro;
+            }
         }
     }
 

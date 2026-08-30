@@ -10,7 +10,10 @@
 # que os testes de QML (tests/qml) possam carregar as mesmas telas que a loja
 # usa. Se ficasse no executável, os .qml iriam para dentro do .exe e nenhum
 # outro binário conseguiria abri-los.
-qt_add_library(distribuidora_ui STATIC)
+qt_add_library(distribuidora_ui STATIC
+    ${CMAKE_SOURCE_DIR}/src/app/ProdutoFotoProvider.h
+    ${CMAKE_SOURCE_DIR}/src/app/ProdutoFotoProvider.cpp
+)
 
 # Theme.qml é um singleton (pragma Singleton no arquivo). A propriedade precisa
 # ser definida ANTES de qt_add_qml_module para entrar no qmldir gerado.
@@ -35,6 +38,7 @@ qt_add_qml_module(distribuidora_ui
         components/SegmentedControl.qml
         components/ToggleButton.qml
         components/PlaceholderScreen.qml
+        components/FotoProduto.qml
         components/StatusBadge.qml
         components/FormField.qml
         screens/dashboard/DashboardScreen.qml

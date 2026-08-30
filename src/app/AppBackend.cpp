@@ -1,5 +1,9 @@
 #include "app/AppBackend.h"
 
+#include <QBuffer>
+#include <QImage>
+#include <QImageReader>
+
 #include "utils/Money.h"
 
 #include <utility>
@@ -999,6 +1003,85 @@ bool AppBackend::inativarProduto(int id)
     return true;
 }
 
+QVariantMap AppBackend::definirFotoProduto(int produtoId, const QString &caminhoArquivo)
+{
+    QVariantMap out;
+    out[QStringLiteral("ok")] = false;
+
+    if (!temPermissao(QStringLiteral("edita_produto"))) {
+        out[QStringLiteral("erro")] = tr("Seu usuário não pode alterar produtos.");
+        return out;
+    }
+    if (produtoId <= 0) {
+        out[QStringLiteral("erro")] = tr("Salve o produto antes de adicionar a foto.");
+        return out;
+    }
+
+    QImageReader leitor(caminhoArquivo);
+    leitor.setAutoTransform(true);   // respeita a rotação da foto do celular
+    const QImage original = leitor.read();
+    if (original.isNull()) {
+        out[QStringLiteral("erro")] = tr("Não consegui ler a imagem (%1).").arg(leitor.errorString());
+        return out;
+    }
+
+    // Reduz antes de gravar: a foto é só para reconhecer o produto na tela, e
+    // o banco inteiro viaja no backup. 320 px no lado maior resolve os dois.
+    const int kLadoMaximo = 320;
+    QImage reduzida = original;
+    if (original.width() > kLadoMaximo || original.height() > kLadoMaximo) {
+        reduzida = original.scaled(kLadoMaximo, kLadoMaximo,
+                                   Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    }
+
+    QByteArray jpeg;
+    {
+        QBuffer buffer(&jpeg);
+        buffer.open(QIODevice::WriteOnly);
+        if (!reduzida.save(&buffer, "JPEG", 80)) {
+            out[QStringLiteral("erro")] = tr("Não consegui converter a imagem.");
+            return out;
+        }
+    }
+
+    if (!m_produtoRepo.salvarFoto(produtoId, jpeg)) {
+        out[QStringLiteral("erro")] = m_produtoRepo.ultimoErro();
+        m_erro = out.value(QStringLiteral("erro")).toString();
+        return out;
+    }
+
+    ++m_versaoFotos;
+    Q_EMIT versaoFotosChanged();
+    recarregarProdutos();
+    m_erro.clear();
+    out[QStringLiteral("ok")] = true;
+    out[QStringLiteral("erro")] = QString();
+    out[QStringLiteral("bytes")] = jpeg.size();
+    return out;
+}
+
+bool AppBackend::removerFotoProduto(int produtoId)
+{
+    if (!temPermissao(QStringLiteral("edita_produto"))) {
+        m_erro = tr("Seu usuário não pode alterar produtos.");
+        return false;
+    }
+    if (!m_produtoRepo.removerFoto(produtoId)) {
+        m_erro = m_produtoRepo.ultimoErro();
+        return false;
+    }
+    ++m_versaoFotos;
+    Q_EMIT versaoFotosChanged();
+    recarregarProdutos();
+    m_erro.clear();
+    return true;
+}
+
+bool AppBackend::produtoTemFoto(int produtoId)
+{
+    return !m_produtoRepo.foto(produtoId).isEmpty();
+}
+
 // ---------------------------------------------------------------- Estoque
 
 void AppBackend::recarregarEstoque(const QString &filtro)
@@ -1172,6 +1255,7 @@ static QVariantMap itemVendaMapa(const Produto &p, const Embalagem &e)
     m[QStringLiteral("doseDeProdutoId")] = p.doseDeProdutoId;
     m[QStringLiteral("doseQuantidade")] = static_cast<qlonglong>(p.doseQuantidade);
     m[QStringLiteral("doseOrigemNome")] = p.doseOrigemNome;
+    m[QStringLiteral("temFoto")] = p.temFoto;
     m[QStringLiteral("unidadeBase")] = p.unidadeBase;
     m[QStringLiteral("embalagemId")] = e.id;
     m[QStringLiteral("embalagemNome")] = e.nome;

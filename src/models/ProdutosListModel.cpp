@@ -28,6 +28,8 @@ QVariant ProdutosListModel::data(const QModelIndex &index, int role) const
     case UnidadeBaseRole:   return p.unidadeBase;
     case StatusRole:        return statusDe(p);
     case CompostoRole:      return p.composto;
+    case TemFotoRole:       return p.temFoto;
+    case DoseOrigemRole:    return p.doseOrigemNome;
     default:                return {};
     }
 }
@@ -44,6 +46,8 @@ QHash<int, QByteArray> ProdutosListModel::roleNames() const
         {UnidadeBaseRole, "unidadeBase"},
         {StatusRole, "status"},
         {CompostoRole, "composto"},
+        {TemFotoRole, "temFoto"},
+        {DoseOrigemRole, "doseOrigem"},
     };
 }
 

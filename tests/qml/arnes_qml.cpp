@@ -21,6 +21,7 @@
 #include <QTemporaryDir>
 
 #include "app/AppBackend.h"
+#include "app/ProdutoFotoProvider.h"
 #include "database/Database.h"
 #include "database/MigrationRunner.h"
 
@@ -64,6 +65,8 @@ public Q_SLOTS:
         // Mesmo nome usado em main.cpp: as telas chamam App.* sem saber que
         // estão num teste.
         engine->rootContext()->setContextProperty(QStringLiteral("App"), m_backend.data());
+        engine->addImageProvider(QString::fromLatin1(ProdutoFotoProvider::nome()),
+                                 new ProdutoFotoProvider(m_db->connection()));
     }
 
     void cleanupTestCase()

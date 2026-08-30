@@ -85,6 +85,17 @@ public:
     Q_INVOKABLE bool salvarProduto(const QVariantMap &dados);
     Q_INVOKABLE bool inativarProduto(int id);
 
+    // Foto do produto. O arquivo escolhido é REDUZIDO antes de gravar (lado
+    // maior 320 px, JPEG) — o banco inteiro sai da loja no backup do Telegram.
+    // { ok, erro, bytes }. Exige edita_produto.
+    Q_INVOKABLE QVariantMap definirFotoProduto(int produtoId, const QString &caminhoArquivo);
+    Q_INVOKABLE bool removerFotoProduto(int produtoId);
+    Q_INVOKABLE bool produtoTemFoto(int produtoId);
+    // Muda a cada foto gravada: as telas põem isto na URL para o Qt não
+    // devolver a imagem antiga do cache depois de trocar a foto.
+    Q_PROPERTY(int versaoFotos READ versaoFotos NOTIFY versaoFotosChanged)
+    int versaoFotos() const { return m_versaoFotos; }
+
     // --- Estoque ---
     Q_INVOKABLE void recarregarEstoque(const QString &filtro = QString());
     Q_INVOKABLE QVariantMap itemEstoque(int produtoId);
@@ -246,6 +257,7 @@ public:
     Q_INVOKABLE QString ultimoErro() const { return m_erro; }
 
 signals:
+    void versaoFotosChanged();
     void caixaAbertoChanged();
     void sessaoUsuarioChanged();
     // Resposta do envio ao Telegram (assíncrono).
@@ -281,6 +293,7 @@ private:
     QVariantMap m_usuarioAtual;
     int m_usuarioId = 0;
     int m_sessaoId = 0;
+    int m_versaoFotos = 1;
     // Financeiro: por padrão a lista traz só o que está em aberto (é o que
     // importa no dia). Ligado, mostra também o que já foi pago — é como se
     // acha uma conta lançada por engano para estornar.

@@ -111,17 +111,25 @@ Rectangle {
                         required property var custoMedio
                         required property string unidadeBase
                         required property string status
+                        required property bool temFoto
 
                         width: ListView.view.width
-                        height: 48
+                        height: 52
                         leftPadding: Theme.spacingMd
                         rightPadding: Theme.spacingMd
                         onClicked: tela.abrirMov(idProduto)
 
                         contentItem: RowLayout {
                             spacing: Theme.spacingSm
+                            FotoProduto {
+                                produtoId: linha.idProduto
+                                temFoto: linha.temFoto
+                                nome: linha.nome
+                                lado: 32
+                            }
                             ColumnLayout {
                                 Layout.fillWidth: true
+                                Layout.minimumWidth: 0
                                 spacing: 0
                                 Text {
                                     text: linha.nome

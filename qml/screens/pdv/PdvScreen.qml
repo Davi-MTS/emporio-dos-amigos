@@ -126,6 +126,7 @@ Rectangle {
             produtoId: item.produtoId, nome: item.nome,
             embId: item.embalagemId, embNome: item.embalagemNome,
             fator: item.fator, preco: item.preco, qtd: 1, desconto: 0,
+            temFoto: item.temFoto === true,
             insumosJson: "[]", insumosLabel: "",
             // Todas as embalagens do produto (unidade/caixa/fardo) para trocar na linha.
             embalagensJson: JSON.stringify(App.embalagensDe(item.produtoId))
@@ -152,6 +153,7 @@ Rectangle {
             produtoId: item.produtoId, nome: item.nome,
             embId: item.embalagemId, embNome: item.embalagemNome,
             fator: item.fator, preco: precoFinal, qtd: 1, desconto: 0,
+            temFoto: item.temFoto === true,
             insumosJson: JSON.stringify(insumos), insumosLabel: nomes.join(", "),
             embalagensJson: "[]"   // composto não troca embalagem
         });
@@ -413,13 +415,24 @@ Rectangle {
                             clip: true
                             model: sugestoes
                             delegate: ItemDelegate {
+                                id: sug
                                 width: ListView.view.width
+                                height: 44
                                 required property int index
+                                required property int produtoId
                                 required property string nome
                                 required property var preco
+                                required property bool temFoto
                                 contentItem: RowLayout {
-                                    Text { text: nome; Layout.fillWidth: true; color: Theme.text; font.pixelSize: Theme.fontMd; elide: Text.ElideRight }
-                                    Text { text: App.formatarDinheiro(preco); color: Theme.textMuted; font.pixelSize: Theme.fontSm }
+                                    spacing: Theme.spacingSm
+                                    FotoProduto {
+                                        produtoId: sug.produtoId
+                                        temFoto: sug.temFoto
+                                        nome: sug.nome
+                                        lado: 28
+                                    }
+                                    Text { text: sug.nome; Layout.fillWidth: true; Layout.minimumWidth: 0; color: Theme.text; font.pixelSize: Theme.fontMd; elide: Text.ElideRight }
+                                    Text { text: App.formatarDinheiro(sug.preco); color: Theme.textMuted; font.pixelSize: Theme.fontSm }
                                 }
                                 onClicked: {
                                     tela.adicionar(sugestoes.get(index));
@@ -500,7 +513,9 @@ Rectangle {
                             delegate: Rectangle {
                                 id: linha
                                 required property int index
+                                required property int produtoId
                                 required property string nome
+                                required property bool temFoto
                                 required property int embId
                                 required property string embNome
                                 required property string insumosLabel
@@ -520,8 +535,18 @@ Rectangle {
                                     anchors.rightMargin: Theme.spacingMd
                                     spacing: Theme.spacingSm
 
+                                    // Some quando o carrinho está estreito: a
+                                    // foto ajuda, mas o nome e o preço mandam.
+                                    FotoProduto {
+                                        visible: tela.larguraCarrinho > 320
+                                        produtoId: linha.produtoId
+                                        temFoto: linha.temFoto
+                                        nome: linha.nome
+                                        lado: 30
+                                    }
                                     ColumnLayout {
                                         Layout.fillWidth: true
+                                        Layout.minimumWidth: 0
                                         spacing: 2
                                         Text { text: linha.nome; Layout.fillWidth: true; elide: Text.ElideRight; color: Theme.text; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold }
                                         // Composto: mostra os insumos escolhidos.

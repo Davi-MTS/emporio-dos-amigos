@@ -4,6 +4,7 @@
 
 #include <QSqlDatabase>
 #include <QString>
+#include <QByteArray>
 #include <QVector>
 #include <QPair>
 #include <optional>
@@ -41,6 +42,12 @@ public:
     // (sem diferenciar maiúsculas), devolve o id da existente em vez de falhar:
     // no balcão, "Cerveja" e "cerveja" são a mesma coisa.
     int criarCategoria(const QString &nome);
+
+    // Foto do produto (JPEG já reduzido). Guardada no próprio banco para
+    // acompanhar o backup — ver 0014_produto_foto.sql.
+    bool salvarFoto(int produtoId, const QByteArray &jpeg);
+    QByteArray foto(int produtoId);
+    bool removerFoto(int produtoId);
 
     // Produtos (não compostos, ativos) de uma categoria — para o cliente escolher
     // o insumo específico na hora da venda.
