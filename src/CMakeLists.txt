@@ -42,6 +42,8 @@ target_sources(DistribuidoraCore
         domain/clientes/Cliente.h
         domain/clientes/ClienteRepository.h
         domain/clientes/ClienteRepository.cpp
+        domain/lotes/LoteRepository.h
+        domain/lotes/LoteRepository.cpp
         domain/financeiro/FinanceiroRepository.h
         domain/financeiro/FinanceiroRepository.cpp
         domain/relatorios/RelatorioRepository.h
@@ -112,5 +114,6 @@ qt_add_resources(DistribuidoraCore "db_scripts"
         ${CMAKE_SOURCE_DIR}/db/migrations/0012_conta_forma_pagamento.sql
         ${CMAKE_SOURCE_DIR}/db/migrations/0013_produto_dose.sql
         ${CMAKE_SOURCE_DIR}/db/migrations/0014_produto_foto.sql
+        ${CMAKE_SOURCE_DIR}/db/migrations/0015_lote_validade.sql
         ${CMAKE_SOURCE_DIR}/db/seed/0001_dados_iniciais.sql
 )

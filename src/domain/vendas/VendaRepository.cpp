@@ -1,5 +1,7 @@
 #include "domain/vendas/VendaRepository.h"
 
+#include "domain/lotes/LoteRepository.h"
+
 #include <utility>
 
 #include <QSqlError>
@@ -171,6 +173,13 @@ ResultadoVenda VendaRepository::registrarVenda(int sessaoId, int clienteId,
         } else {
             baixas.push_back({l.produtoId, qtdBase});
         }
+
+        // O que sai da prateleira sai de uma remessa: consome o lote que vence
+        // primeiro (FEFO). Best effort — parte do estoque pode ter entrado sem
+        // validade informada, e aí simplesmente não há lote para baixar.
+        LoteRepository lotes(m_db);
+        for (const Baixa &b : baixas)
+            lotes.consumirFefo(b.produtoId, b.qtd);
 
         for (const Baixa &b : baixas) {
             QSqlQuery qe1(m_db);

@@ -45,6 +45,7 @@ ApplicationWindow {
         "caixa":      { t: qsTr("Caixa"),               s: qsTr("Abertura, sangria e fechamento do turno") },
         "produtos":   { t: qsTr("Produtos"),             s: qsTr("Cadastro, embalagens e preços") },
         "estoque":    { t: qsTr("Estoque"),              s: qsTr("Quantidades, custo médio e alertas") },
+        "vencimento": { t: qsTr("Vencimento"),           s: qsTr("O que está perto de virar prejuízo") },
         "compras":    { t: qsTr("Compras"),              s: qsTr("Fornecedores e entrada de mercadoria") },
         "clientes":   { t: qsTr("Clientes"),             s: qsTr("Cadastro e fiado") },
         "financeiro": { t: qsTr("Financeiro"),           s: qsTr("Contas a pagar e receber") },
@@ -195,6 +196,8 @@ ApplicationWindow {
                         conteudo.replace(produtosComp);
                     else if (rota === "estoque")
                         conteudo.replace(estoqueComp);
+                    else if (rota === "vencimento")
+                        conteudo.replace(vencimentoComp);
                     else if (rota === "pdv")
                         conteudo.replace(pdvComp);
                     else if (rota === "caixa")
@@ -240,6 +243,10 @@ ApplicationWindow {
     Component {
         id: estoqueComp
         EstoqueScreen {}
+    }
+    Component {
+        id: vencimentoComp
+        VencimentoScreen {}
     }
     Component {
         id: pdvComp

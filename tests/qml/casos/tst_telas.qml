@@ -19,6 +19,7 @@ TestCase {
     Component { id: cDashboard;  DashboardScreen  {} }
     Component { id: cProdutos;   ProdutosScreen   {} }
     Component { id: cEstoque;    EstoqueScreen    {} }
+    Component { id: cVencimento; VencimentoScreen {} }
     Component { id: cPdv;        PdvScreen        {} }
     Component { id: cCaixa;      CaixaScreen      {} }
     Component { id: cLogin;      LoginScreen      {} }
@@ -44,6 +45,7 @@ TestCase {
             { tag: "Dashboard",  comp: cDashboard  },
             { tag: "Produtos",   comp: cProdutos   },
             { tag: "Estoque",    comp: cEstoque    },
+            { tag: "Vencimento", comp: cVencimento },
             { tag: "PDV",        comp: cPdv        },
             { tag: "Caixa",      comp: cCaixa      },
             { tag: "Login",      comp: cLogin      },

@@ -20,6 +20,7 @@ Rectangle {
         { rota: "caixa",     titulo: "Caixa",     perm: "vende" },
         { rota: "produtos",  titulo: "Produtos",  perm: "consulta_produtos" },
         { rota: "estoque",   titulo: "Estoque" },
+        { rota: "vencimento", titulo: "Vencimento" },
         { rota: "vendas",    titulo: "Vendas" }
     ]
     readonly property var retaguarda: [

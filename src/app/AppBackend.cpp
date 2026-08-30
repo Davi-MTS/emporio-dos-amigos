@@ -21,6 +21,7 @@ AppBackend::AppBackend(QSqlDatabase db, QObject *parent)
     , m_db(std::move(db))
     , m_produtoRepo(m_db)
     , m_estoqueRepo(m_db)
+    , m_loteRepo(m_db)
     , m_caixaRepo(m_db)
     , m_vendaRepo(m_db)
     , m_usuarioRepo(m_db)
@@ -1136,7 +1137,8 @@ QVariantList AppBackend::embalagensDe(int produtoId)
 }
 
 bool AppBackend::registrarEntrada(int produtoId, int embalagemId, int qtdEmb,
-                                  const QString &custoTexto, const QString &observacao)
+                                  const QString &custoTexto, const QString &observacao,
+                                  const QString &validade, const QString &codigoLote)
 {
     if (!temPermissao(QStringLiteral("recebe_mercadoria"))) {
         m_erro = tr("Seu usuário não pode dar entrada de mercadoria.");
@@ -1170,10 +1172,62 @@ bool AppBackend::registrarEntrada(int produtoId, int embalagemId, int qtdEmb,
         m_erro = m_estoqueRepo.ultimoErro();
         return false;
     }
+
+    // Validade é opcional: a maioria dos produtos da distribuidora não vence em
+    // prazo curto. Informada, vira um lote e passa a ser cobrada na tela de
+    // Vencimento. Se o lote falhar, a entrada NÃO é desfeita — a mercadoria
+    // realmente entrou; o aviso vai para o log.
+    if (!validade.trimmed().isEmpty()) {
+        if (!m_loteRepo.registrar(produtoId, qtdBase, validade.trimmed(), codigoLote))
+            qWarning("Entrada gravada, mas o lote falhou: %s",
+                     qUtf8Printable(m_loteRepo.ultimoErro()));
+    }
+
     m_erro.clear();
     recarregarEstoque();
     recarregarProdutos();
     return true;
+}
+
+QVariantList AppBackend::lotes(int dias)
+{
+    QVariantList lista;
+    for (const Lote &l : m_loteRepo.listar(dias)) {
+        QVariantMap m;
+        m[QStringLiteral("id")] = l.id;
+        m[QStringLiteral("produtoId")] = l.produtoId;
+        m[QStringLiteral("produto")] = l.produtoNome;
+        m[QStringLiteral("unidade")] = l.unidadeBase;
+        m[QStringLiteral("codigo")] = l.codigo;
+        m[QStringLiteral("validade")] = l.validade;
+        m[QStringLiteral("quantidade")] = static_cast<qlonglong>(l.quantidade);
+        m[QStringLiteral("dias")] = l.diasParaVencer;
+        lista.push_back(m);
+    }
+    return lista;
+}
+
+QVariantMap AppBackend::resumoVencimento()
+{
+    const ResumoVencimento r = m_loteRepo.resumo();
+    QVariantMap m;
+    m[QStringLiteral("vencidos")] = r.vencidos;
+    m[QStringLiteral("venceEm7")] = r.venceEm7;
+    m[QStringLiteral("venceEm30")] = r.venceEm30;
+    m[QStringLiteral("quantidadeVencida")] = static_cast<qlonglong>(r.quantidadeVencida);
+    return m;
+}
+
+QVariantList AppBackend::divergenciasDeLote()
+{
+    QVariantList lista;
+    for (const auto &d : m_loteRepo.divergencias()) {
+        QVariantMap m;
+        m[QStringLiteral("produto")] = d.first;
+        m[QStringLiteral("diferenca")] = static_cast<qlonglong>(d.second);
+        lista.push_back(m);
+    }
+    return lista;
 }
 
 bool AppBackend::registrarInventario(int produtoId, int novaQtdBase, const QString &motivo)
@@ -1220,6 +1274,10 @@ bool AppBackend::registrarRetirada(int produtoId, int embalagemId, int qtdEmb,
         m_erro = m_estoqueRepo.ultimoErro();
         return false;
     }
+    // Quebra/consumo também tira de uma remessa: sem isto a tela de Vencimento
+    // continuaria cobrando mercadoria que não está mais na prateleira.
+    m_loteRepo.consumirFefo(produtoId, qtdBase);
+
     m_erro.clear();
     recarregarEstoque();
     recarregarProdutos();

@@ -183,6 +183,8 @@ Rectangle {
             qtdSpin.value = 1;
             custoField.text = "";
             obsField.text = "";
+            validadeField.text = "";
+            loteField.text = "";
             contagemSpin.value = atual.quantidade !== undefined ? atual.quantidade : 0;
             motivoField.text = "";
             retEmbCombo.currentIndex = 0;
@@ -191,6 +193,21 @@ Rectangle {
             tabs.currentIndex = 0;
             open();
         }
+
+        // dd/mm/aaaa -> ISO, que é como o banco compara datas.
+        function validadeIso() {
+            var t = validadeField.text.trim();
+            if (t.length === 0)
+                return "";
+            var m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+            if (!m)
+                return "";
+            var d = new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]));
+            if (isNaN(d.getTime()) || d.getMonth() !== parseInt(m[2]) - 1)
+                return "";   // 31/02 e afins
+            return Qt.formatDate(d, "yyyy-MM-dd");
+        }
+        function validadeOk() { return validadeIso().length > 0; }
 
         function _fatorSel() {
             var e = embalagens[embCombo.currentIndex];
@@ -301,6 +318,41 @@ Rectangle {
                               .arg(qtdSpin.value * movDialog._fatorSel())
                               .arg(movDialog.atual.unidadeBase !== undefined ? movDialog.atual.unidadeBase : "")
                     }
+                    // Validade por REMESSA: duas cargas do mesmo doce chegam com
+                    // datas diferentes, e uma data única no cadastro do produto
+                    // seria sobrescrita pela carga nova — a mercadoria velha
+                    // sairia do radar justo por ser a que precisa girar antes.
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Theme.spacingSm
+                        FormField {
+                            label: qsTr("Validade (opcional)")
+                            Layout.fillWidth: true
+                            AppTextField {
+                                id: validadeField
+                                width: parent.width
+                                placeholderText: qsTr("dd/mm/aaaa")
+                            }
+                        }
+                        FormField {
+                            label: qsTr("Lote (opcional)")
+                            Layout.preferredWidth: 130
+                            AppTextField { id: loteField; width: parent.width }
+                        }
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        color: validadeField.text.trim().length > 0 && !movDialog.validadeOk()
+                               ? Theme.danger : Theme.textMuted
+                        font.pixelSize: Theme.fontXs
+                        text: validadeField.text.trim().length === 0
+                              ? qsTr("Informe só para o que vence em prazo curto (doces, salgadinhos). Fica na aba Vencimento.")
+                              : (movDialog.validadeOk()
+                                 ? qsTr("Esta remessa entra com validade e passa a aparecer na aba Vencimento.")
+                                 : qsTr("Data inválida — use dd/mm/aaaa."))
+                    }
+
                     FormField {
                         label: qsTr("Observação (opcional)")
                         Layout.fillWidth: true
@@ -393,12 +445,18 @@ Rectangle {
                 AppButton {
                     kind: "accent"
                     text: qsTr("Confirmar")
+                    // Data escrita errada viraria entrada sem validade nenhuma,
+                    // em silêncio — melhor barrar o botão.
+                    enabled: tabs.currentIndex !== 0
+                             || validadeField.text.trim().length === 0
+                             || movDialog.validadeOk()
                     onClicked: {
                         var ok;
                         if (tabs.currentIndex === 0)
                             ok = tela.podeReceberMercadoria
                                  && App.registrarEntrada(movDialog.produtoId, embCombo.currentValue,
-                                                      qtdSpin.value, custoField.text, obsField.text);
+                                                      qtdSpin.value, custoField.text, obsField.text,
+                                                      movDialog.validadeIso(), loteField.text);
                         else if (tabs.currentIndex === 1)
                             ok = App.registrarInventario(movDialog.produtoId, contagemSpin.value, motivoField.text);
                         else

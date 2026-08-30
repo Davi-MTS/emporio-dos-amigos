@@ -5,6 +5,7 @@
 #include "domain/compras/CompraRepository.h"
 #include "domain/compras/FornecedorRepository.h"
 #include "domain/estoque/EstoqueRepository.h"
+#include "domain/lotes/LoteRepository.h"
 #include "domain/financeiro/FinanceiroRepository.h"
 #include "domain/produtos/ProdutoRepository.h"
 #include "domain/relatorios/RelatorioRepository.h"
@@ -103,10 +104,20 @@ public:
     // Saldo atual em estoque (unidade base). 0 se não houver linha. Usado pelo
     // PDV para avisar sobre venda com estoque insuficiente.
     Q_INVOKABLE qlonglong estoqueDisponivel(int produtoId);
+
+    // --- Validade (lotes) ---
+    // Lotes com saldo, do que vence primeiro. dias < 0 = todos.
+    Q_INVOKABLE QVariantList lotes(int dias = -1);
+    Q_INVOKABLE QVariantMap resumoVencimento();
+    // Produtos em que a soma dos lotes não bate com o estoque (entrada sem
+    // validade informada, ou ajuste de inventário).
+    Q_INVOKABLE QVariantList divergenciasDeLote();
     // qtdEmb embalagens de `embalagemId` (0 = unidade base). custoTexto vazio
     // mantém o custo médio atual.
     Q_INVOKABLE bool registrarEntrada(int produtoId, int embalagemId, int qtdEmb,
-                                      const QString &custoTexto, const QString &observacao);
+                                      const QString &custoTexto, const QString &observacao,
+                                      const QString &validade = QString(),
+                                      const QString &codigoLote = QString());
     Q_INVOKABLE bool registrarInventario(int produtoId, int novaQtdBase,
                                          const QString &motivo);
     // Retirada manual (perda/quebra/consumo): baixa qtdEmb embalagens do estoque.
@@ -270,6 +281,7 @@ private:
     QSqlDatabase m_db;
     ProdutoRepository m_produtoRepo;
     EstoqueRepository m_estoqueRepo;
+    LoteRepository m_loteRepo;
     CaixaRepository m_caixaRepo;
     VendaRepository m_vendaRepo;
     UsuarioRepository m_usuarioRepo;
