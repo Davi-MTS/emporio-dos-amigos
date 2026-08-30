@@ -789,6 +789,22 @@ QVariantList AppBackend::categorias()
     return lista;
 }
 
+QVariantList AppBackend::produtosParaOrigemDose(int excluirId)
+{
+    QVariantList lista;
+    for (const Produto &p : m_produtoRepo.listar()) {
+        if (p.composto || p.doseDeProdutoId > 0 || p.id == excluirId)
+            continue;   // dose de dose, ou de si mesmo, não faz sentido
+        QVariantMap m;
+        m[QStringLiteral("id")] = p.id;
+        m[QStringLiteral("nome")] = p.nome;
+        m[QStringLiteral("unidadeBase")] = p.unidadeBase;
+        m[QStringLiteral("estoque")] = static_cast<qlonglong>(p.quantidadeEstoque);
+        lista.push_back(m);
+    }
+    return lista;
+}
+
 int AppBackend::criarCategoria(const QString &nome)
 {
     if (!temPermissao(QStringLiteral("edita_produto"))) {
@@ -857,6 +873,10 @@ QVariantMap AppBackend::produto(int id)
     mapa[QStringLiteral("estoqueMinimo")] = p->estoqueMinimo;
     mapa[QStringLiteral("localizacao")] = p->localizacao;
     mapa[QStringLiteral("composto")] = p->composto;
+    mapa[QStringLiteral("doseDeProdutoId")] = p->doseDeProdutoId;
+    mapa[QStringLiteral("doseQuantidade")] = static_cast<qlonglong>(p->doseQuantidade);
+    mapa[QStringLiteral("doseOrigemNome")] = p->doseOrigemNome;
+    mapa[QStringLiteral("doseOrigemUnidade")] = p->doseOrigemUnidade;
 
     QVariantList emb;
     for (const Embalagem &e : p->embalagens)
@@ -886,6 +906,10 @@ QVariantMap AppBackend::novoProduto()
     mapa[QStringLiteral("estoqueMinimo")] = 0;
     mapa[QStringLiteral("localizacao")] = QString();
     mapa[QStringLiteral("composto")] = false;
+    mapa[QStringLiteral("doseDeProdutoId")] = 0;
+    mapa[QStringLiteral("doseQuantidade")] = 0;
+    mapa[QStringLiteral("doseOrigemNome")] = QString();
+    mapa[QStringLiteral("doseOrigemUnidade")] = QString();
     mapa[QStringLiteral("composicao")] = QVariantList{};
 
     // Já nasce com a embalagem base (fator 1) — praticidade: o comerciante só
@@ -918,6 +942,8 @@ bool AppBackend::salvarProduto(const QVariantMap &dados)
     p.estoqueMinimo = dados.value(QStringLiteral("estoqueMinimo")).toInt();
     p.localizacao = dados.value(QStringLiteral("localizacao")).toString();
     p.composto = dados.value(QStringLiteral("composto")).toBool();
+    p.doseDeProdutoId = dados.value(QStringLiteral("doseDeProdutoId")).toInt();
+    p.doseQuantidade = dados.value(QStringLiteral("doseQuantidade")).toLongLong();
 
     const QVariantList comp = dados.value(QStringLiteral("composicao")).toList();
     for (const QVariant &item : comp) {
@@ -996,6 +1022,13 @@ QVariantMap AppBackend::itemEstoque(int produtoId)
 
 qlonglong AppBackend::estoqueDisponivel(int produtoId)
 {
+    // Dose não tem estoque próprio: o que existe é o que a garrafa ainda dá.
+    // Ex.: 700 ml na garrafa, dose de 50 ml => 14 doses.
+    const auto p = m_produtoRepo.obter(produtoId);
+    if (p && p->doseDeProdutoId > 0 && p->doseQuantidade > 0) {
+        const qint64 naOrigem = m_estoqueRepo.item(p->doseDeProdutoId).quantidade;
+        return static_cast<qlonglong>(naOrigem / p->doseQuantidade);
+    }
     return static_cast<qlonglong>(m_estoqueRepo.item(produtoId).quantidade);
 }
 
@@ -1136,6 +1169,9 @@ static QVariantMap itemVendaMapa(const Produto &p, const Embalagem &e)
     m[QStringLiteral("produtoId")] = p.id;
     m[QStringLiteral("nome")] = p.nome;
     m[QStringLiteral("composto")] = p.composto;
+    m[QStringLiteral("doseDeProdutoId")] = p.doseDeProdutoId;
+    m[QStringLiteral("doseQuantidade")] = static_cast<qlonglong>(p.doseQuantidade);
+    m[QStringLiteral("doseOrigemNome")] = p.doseOrigemNome;
     m[QStringLiteral("unidadeBase")] = p.unidadeBase;
     m[QStringLiteral("embalagemId")] = e.id;
     m[QStringLiteral("embalagemNome")] = e.nome;
@@ -1200,6 +1236,19 @@ QVariantMap AppBackend::finalizarVenda(const QVariantMap &dados)
             ir.quantidade = ins.value(QStringLiteral("quantidade")).toLongLong();
             if (ir.produtoId > 0 && ir.quantidade > 0)
                 l.insumos.push_back(ir);
+        }
+
+        // Dose: a origem é sempre a mesma garrafa, então quem resolve é o
+        // backend — a tela vende a dose como qualquer outro produto, com um
+        // bipe, sem diálogo de escolha.
+        if (l.insumos.isEmpty()) {
+            const auto pr = m_produtoRepo.obter(l.produtoId);
+            if (pr && pr->doseDeProdutoId > 0 && pr->doseQuantidade > 0) {
+                InsumoResolvido ir;
+                ir.produtoId = pr->doseDeProdutoId;
+                ir.quantidade = pr->doseQuantidade;
+                l.insumos.push_back(ir);
+            }
         }
         itens.push_back(l);
     }

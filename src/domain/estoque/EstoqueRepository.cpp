@@ -20,7 +20,11 @@ QVector<ItemEstoque> EstoqueRepository::listar(const QString &filtro)
         "       COALESCE(e.quantidade_atual, 0), COALESCE(e.custo_medio_unitario, 0) "
         "FROM produtos p "
         "LEFT JOIN estoque e ON e.produto_id = p.id "
-        "WHERE p.ativo = 1 AND p.composto = 0 ");
+        // Composto e dose não têm estoque próprio (baixam insumo/garrafa):
+        // listá-los aqui mostraria saldo zero eterno e convidaria a "corrigir"
+        // um estoque que não existe.
+        "WHERE p.ativo = 1 AND p.composto = 0 "
+        "  AND COALESCE(p.dose_de_produto_id, 0) = 0 ");
     const QString f = filtro.trimmed();
     if (!f.isEmpty())
         sql += QStringLiteral("AND p.nome LIKE :like ");

@@ -155,14 +155,17 @@ ResultadoVenda VendaRepository::registrarVenda(int sessaoId, int clienteId,
 
         struct Baixa { int produtoId; qint64 qtd; };
         QVector<Baixa> baixas;
-        if (composto) {
-            // Os insumos já vêm resolvidos da venda (o produto específico foi
-            // escolhido na hora). Cada um baixa qtdBase * quantidade_da_receita.
-            if (l.insumos.isEmpty()) {
-                res.erro = QStringLiteral("Escolha os insumos do produto composto.");
-                m_db.rollback();
-                return res;
-            }
+        if (composto && l.insumos.isEmpty()) {
+            // Composto sem receita resolvida é erro: não dá para adivinhar qual
+            // produto sai do estoque.
+            res.erro = QStringLiteral("Escolha os insumos do produto composto.");
+            m_db.rollback();
+            return res;
+        }
+        if (!l.insumos.isEmpty()) {
+            // Vale para o composto (insumos escolhidos na hora) e para a DOSE,
+            // cuja origem é sempre a mesma garrafa e vem resolvida pelo backend.
+            // Cada um baixa qtdBase * quantidade da receita.
             for (const InsumoResolvido &ins : l.insumos)
                 baixas.push_back({ins.produtoId, qtdBase * ins.quantidade});
         } else {

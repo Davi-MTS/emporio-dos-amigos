@@ -23,10 +23,13 @@ QVector<Produto> ProdutoRepository::listar(const QString &filtro)
         "       COALESCE(e.quantidade_atual, 0) AS qtd, "
         "       (SELECT pe.preco_venda FROM produto_embalagens pe "
         "         WHERE pe.produto_id = p.id ORDER BY pe.fator_conversao ASC LIMIT 1) AS preco, "
-        "       p.composto "
+        "       p.composto, "
+        "       COALESCE(p.dose_de_produto_id, 0), COALESCE(p.dose_quantidade, 0), "
+        "       COALESCE(o.nome, \'\'), COALESCE(o.unidade_base, \'\') "
         "FROM produtos p "
         "LEFT JOIN categorias c ON c.id = p.categoria_id "
         "LEFT JOIN estoque e ON e.produto_id = p.id "
+        "LEFT JOIN produtos o ON o.id = p.dose_de_produto_id "
         "WHERE p.ativo = 1 ");
 
     const QString f = filtro.trimmed();
@@ -61,6 +64,10 @@ QVector<Produto> ProdutoRepository::listar(const QString &filtro)
         p.quantidadeEstoque = q.value(7).toLongLong();
         p.precoPrincipal = q.value(8).toLongLong();
         p.composto = q.value(9).toInt() != 0;
+        p.doseDeProdutoId = q.value(10).toInt();
+        p.doseQuantidade = q.value(11).toLongLong();
+        p.doseOrigemNome = q.value(12).toString();
+        p.doseOrigemUnidade = q.value(13).toString();
         produtos.push_back(p);
     }
     return produtos;
@@ -100,10 +107,13 @@ std::optional<Produto> ProdutoRepository::obter(int id)
     q.prepare(QStringLiteral(
         "SELECT p.id, p.nome, p.categoria_id, p.marca_id, p.fornecedor_id, "
         "       p.unidade_base, p.estoque_minimo, p.localizacao, p.taxa_manutencao, "
-        "       p.ativo, c.nome, COALESCE(e.quantidade_atual, 0), p.composto "
+        "       p.ativo, c.nome, COALESCE(e.quantidade_atual, 0), p.composto, "
+        "       COALESCE(p.dose_de_produto_id, 0), COALESCE(p.dose_quantidade, 0), "
+        "       COALESCE(o.nome, \'\'), COALESCE(o.unidade_base, \'\') "
         "FROM produtos p "
         "LEFT JOIN categorias c ON c.id = p.categoria_id "
         "LEFT JOIN estoque e ON e.produto_id = p.id "
+        "LEFT JOIN produtos o ON o.id = p.dose_de_produto_id "
         "WHERE p.id = :id"));
     q.bindValue(QStringLiteral(":id"), id);
     if (!q.exec()) {
@@ -127,6 +137,10 @@ std::optional<Produto> ProdutoRepository::obter(int id)
     p.categoriaNome = q.value(10).toString();
     p.quantidadeEstoque = q.value(11).toLongLong();
     p.composto = q.value(12).toInt() != 0;
+    p.doseDeProdutoId = q.value(13).toInt();
+    p.doseQuantidade = q.value(14).toLongLong();
+    p.doseOrigemNome = q.value(15).toString();
+    p.doseOrigemUnidade = q.value(16).toString();
     p.embalagens = carregarEmbalagens(p.id);
     p.composicao = carregarComposicao(p.id);
     return p;
@@ -221,13 +235,16 @@ bool ProdutoRepository::salvar(Produto &produto)
         q.prepare(QStringLiteral(
             "INSERT INTO produtos "
             "(nome, categoria_id, marca_id, fornecedor_id, unidade_base, "
-            " estoque_minimo, localizacao, taxa_manutencao, ativo, composto) "
-            "VALUES (:nome, :cat, :marca, :forn, :ub, :min, :loc, :taxa, 1, :composto)"));
+            " estoque_minimo, localizacao, taxa_manutencao, ativo, composto, "
+            " dose_de_produto_id, dose_quantidade) "
+            "VALUES (:nome, :cat, :marca, :forn, :ub, :min, :loc, :taxa, 1, :composto, "
+            "        :doseOrigem, :doseQtd)"));
     } else {
         q.prepare(QStringLiteral(
             "UPDATE produtos SET nome=:nome, categoria_id=:cat, marca_id=:marca, "
             " fornecedor_id=:forn, unidade_base=:ub, estoque_minimo=:min, "
-            " localizacao=:loc, taxa_manutencao=:taxa, composto=:composto WHERE id=:id"));
+            " localizacao=:loc, taxa_manutencao=:taxa, composto=:composto, "
+            " dose_de_produto_id=:doseOrigem, dose_quantidade=:doseQtd WHERE id=:id"));
         q.bindValue(QStringLiteral(":id"), produto.id);
     }
     q.bindValue(QStringLiteral(":nome"), produto.nome.trimmed());
@@ -239,6 +256,14 @@ bool ProdutoRepository::salvar(Produto &produto)
     q.bindValue(QStringLiteral(":loc"), produto.localizacao);
     q.bindValue(QStringLiteral(":taxa"), produto.taxaManutencao);
     q.bindValue(QStringLiteral(":composto"), produto.composto ? 1 : 0);
+    // Dose sem origem ou sem quantidade não é dose: grava NULL/0 e o produto
+    // volta a ser normal, em vez de virar um item que não baixa nada.
+    const bool ehDose = produto.doseDeProdutoId > 0 && produto.doseQuantidade > 0
+                        && produto.doseDeProdutoId != produto.id;
+    q.bindValue(QStringLiteral(":doseOrigem"),
+                ehDose ? QVariant(produto.doseDeProdutoId) : QVariant());
+    q.bindValue(QStringLiteral(":doseQtd"),
+                ehDose ? static_cast<qlonglong>(produto.doseQuantidade) : Q_INT64_C(0));
 
     if (!q.exec()) {
         m_erro = q.lastError().text();
@@ -249,8 +274,10 @@ bool ProdutoRepository::salvar(Produto &produto)
     if (produto.id == 0)
         produto.id = q.lastInsertId().toInt();
 
-    // Produto composto ("copão") não tem estoque próprio — só baixa insumos.
-    if (!produto.composto) {
+    // Composto ("copão") e dose não têm estoque próprio: o composto baixa os
+    // insumos e a dose baixa a garrafa de origem. Criar linha de estoque para
+    // eles daria dois saldos para a mesma mercadoria.
+    if (!produto.composto && !ehDose) {
         QSqlQuery est(m_db);
         est.prepare(QStringLiteral(
             "INSERT OR IGNORE INTO estoque (produto_id, quantidade_atual, custo_medio_unitario) "

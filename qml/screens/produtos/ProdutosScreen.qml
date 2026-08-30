@@ -13,6 +13,31 @@ Rectangle {
     // Produto em edição (QVariantMap vindo do backend) ou null.
     property var produtoAtual: null
     property var listaCategorias: App.categorias()
+    property var origensDose: []
+
+    function recarregarOrigens() {
+        origensDose = App.produtosParaOrigemDose(
+            tela.produtoAtual ? (tela.produtoAtual.id || 0) : 0);
+    }
+
+    // Diz, com os números do próprio produto, o que a dose vai fazer.
+    function explicarDose() {
+        var origem = null;
+        for (var i = 0; i < origensDose.length; i++) {
+            if (origensDose[i].id === doseOrigemCombo.currentValue) {
+                origem = origensDose[i];
+                break;
+            }
+        }
+        var qtd = parseInt(doseQtdField.text) || 0;
+        if (!origem || qtd <= 0)
+            return qsTr("Escolha o produto de origem e quanto cada venda consome dele.");
+        var cabem = Math.floor(origem.estoque / qtd);
+        return qsTr("Cada venda tira ") + qtd + " " + origem.unidadeBase
+               + qsTr(" de ") + origem.nome + qsTr(". Com ") + origem.estoque + " "
+               + origem.unidadeBase + qsTr(" em estoque, dá para ") + cabem
+               + qsTr(" vendas. Este produto não terá estoque próprio.");
+    }
     readonly property var unidades: ["unidade", "ml", "litro", "g", "kg"]
     readonly property bool podeEditar: {
         var p = (App.usuarioAtual && App.usuarioAtual.permissoes) ? App.usuarioAtual.permissoes : ({});
@@ -41,6 +66,22 @@ Rectangle {
         listaCategorias = App.categorias();
         if (selecionarId > 0)
             categoriaCombo.currentIndex = categoriaCombo.indexOfValue(selecionarId);
+    }
+
+    // Explica, em português e com exemplo, o que a unidade base significa na
+    // hora de dar entrada no estoque.
+    function explicarUnidade(u) {
+        if (u === "ml")
+            return qsTr("O estoque deste produto é contado em ML. Uma garrafa de 1 litro entra como 1000. Use quando for vender em dose.");
+        if (u === "litro")
+            return qsTr("O estoque é contado em LITROS. Meio litro não existe aqui — para vender dose, use ml.");
+        if (u === "g")
+            return qsTr("O estoque é contado em GRAMAS. Um pacote de 500 g entra como 500.");
+        if (u === "kg")
+            return qsTr("O estoque é contado em QUILOS. Para vender por grama, use g.");
+        if (u === "unidade")
+            return qsTr("O estoque é contado em UNIDADES (garrafas, latas, pacotes). É o caso da maioria dos produtos.");
+        return qsTr("O estoque deste produto é contado em \"") + u + qsTr("\".");
     }
 
     function abrirNovo() {
@@ -82,6 +123,12 @@ Rectangle {
         localField.text = produtoAtual.localizacao || "";
         categoriaCombo.currentIndex = categoriaCombo.indexOfValue(produtoAtual.categoriaId || 0);
         compostoCheck.checked = produtoAtual.composto || false;
+        doseCheck.checked = (produtoAtual.doseDeProdutoId || 0) > 0;
+        doseQtdField.text = (produtoAtual.doseQuantidade || 0) > 0
+                            ? ("" + produtoAtual.doseQuantidade) : "";
+        recarregarOrigens();
+        if (doseCheck.checked)
+            doseOrigemCombo.currentIndex = doseOrigemCombo.indexOfValue(produtoAtual.doseDeProdutoId);
         abasProduto.currentIndex = 0;   // sempre abre em "Dados"
     }
     function _carregarEmbalagens() {
@@ -108,7 +155,9 @@ Rectangle {
             unidadeBase: unidadeField.text,
             estoqueMinimo: minimoSpin.value,
             localizacao: localField.text,
-            composto: compostoCheck.checked,
+            composto: compostoCheck.checked && !doseCheck.checked,
+            doseDeProdutoId: doseCheck.checked ? (doseOrigemCombo.currentValue || 0) : 0,
+            doseQuantidade: doseCheck.checked ? (parseInt(doseQtdField.text) || 0) : 0,
             embalagens: [],
             composicao: []
         };
@@ -332,7 +381,7 @@ Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 40
                             Layout.bottomMargin: Theme.spacingXs
-                            options: [qsTr("Dados"), qsTr("Embalagens"), qsTr("Composição")]
+                            options: [qsTr("Dados"), qsTr("Embalagens"), qsTr("Dose / Receita")]
                         }
 
                         // ========================= SEÇÃO: DADOS =========================
@@ -418,6 +467,17 @@ Rectangle {
                             Item { Layout.fillWidth: true }
                         }
 
+                        // A unidade base decide como o estoque é CONTADO, e era
+                        // isso que confundia na hora de dar entrada. Aqui a
+                        // consequência aparece escrita, com exemplo.
+                        Text {
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            text: tela.explicarUnidade(unidadeField.text)
+                            color: Theme.textMuted
+                            font.pixelSize: Theme.fontXs
+                        }
+
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: Theme.spacingMd
@@ -452,7 +512,8 @@ Rectangle {
                         spacing: Theme.spacingMd
 
                         Text {
-                            text: qsTr("O estoque é sempre em unidade base. Fator = quantas unidades base a embalagem tem.")
+                            text: qsTr("Fator = quantos \"") + unidadeField.text
+                                  + qsTr("\" cabem nesta embalagem. Ex.: fardo de 12 latas = 12; garrafa de 1 litro contada em ml = 1000.")
                             color: Theme.textMuted
                             font.pixelSize: Theme.fontSm
                             wrapMode: Text.WordWrap
@@ -464,7 +525,7 @@ Rectangle {
                             Layout.fillWidth: true
                             spacing: Theme.spacingSm
                             Text { text: qsTr("Nome"); Layout.preferredWidth: 130; color: Theme.textMuted; font.pixelSize: Theme.fontSm }
-                            Text { text: qsTr("Fator"); Layout.preferredWidth: 96; color: Theme.textMuted; font.pixelSize: Theme.fontSm }
+                            Text { text: qsTr("Fator (") + unidadeField.text + ")"; Layout.preferredWidth: 96; elide: Text.ElideRight; color: Theme.textMuted; font.pixelSize: Theme.fontSm }
                             Text { text: qsTr("Cód. barras"); Layout.fillWidth: true; Layout.minimumWidth: 90; color: Theme.textMuted; font.pixelSize: Theme.fontSm }
                             Text { text: qsTr("Preço"); Layout.preferredWidth: 104; horizontalAlignment: Text.AlignRight; color: Theme.textMuted; font.pixelSize: Theme.fontSm }
                             Item { Layout.preferredWidth: 28 }
@@ -531,12 +592,80 @@ Rectangle {
                         Layout.fillWidth: true
                         spacing: Theme.spacingMd
 
+                        // ---- Dose: o caso simples e o mais comum ----
+                        // Vender dose pelo produto COMPOSTO obrigava a escolher a
+                        // bebida em cada venda, com diálogo. Para "dose de whisky"
+                        // a garrafa é sempre a mesma: aqui ela é apontada uma vez.
                         ToggleButton {
-                            id: compostoCheck
-                            text: qsTr("Produto composto (copão, drink, shot…)")
+                            id: doseCheck
+                            text: qsTr("É uma dose tirada de outro produto")
+                            onCheckedChanged: {
+                                if (checked) {
+                                    compostoCheck.checked = false;
+                                    tela.recarregarOrigens();
+                                }
+                            }
                         }
                         Text {
-                            visible: !compostoCheck.checked
+                            visible: !doseCheck.checked && !compostoCheck.checked
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            text: qsTr("Ative se este produto sai de dentro de outro — a dose que sai da garrafa, o copo tirado do barril. Ele vende com um bipe, mas quem baixa do estoque é o produto de origem.")
+                            color: Theme.textMuted
+                            font.pixelSize: Theme.fontSm
+                        }
+                        RowLayout {
+                            visible: doseCheck.checked
+                            Layout.fillWidth: true
+                            spacing: Theme.spacingSm
+                            FormField {
+                                label: qsTr("Sai de qual produto")
+                                Layout.fillWidth: true
+                                AppComboBox {
+                                    id: doseOrigemCombo
+                                    width: parent.width
+                                    model: tela.origensDose
+                                    textRole: "nome"
+                                    valueRole: "id"
+                                }
+                            }
+                            FormField {
+                                label: qsTr("Consome quanto")
+                                Layout.preferredWidth: 130
+                                AppTextField {
+                                    id: doseQtdField
+                                    width: parent.width
+                                    horizontalAlignment: Text.AlignRight
+                                    placeholderText: "50"
+                                    inputMethodHints: Qt.ImhDigitsOnly
+                                }
+                            }
+                        }
+                        Text {
+                            visible: doseCheck.checked
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            text: tela.explicarDose()
+                            color: Theme.text
+                            font.pixelSize: Theme.fontSm
+                            font.weight: Font.DemiBold
+                        }
+
+                        Rectangle {
+                            visible: !doseCheck.checked
+                            Layout.fillWidth: true
+                            implicitHeight: 1
+                            color: Theme.border
+                        }
+
+                        ToggleButton {
+                            id: compostoCheck
+                            visible: !doseCheck.checked
+                            text: qsTr("Produto composto (copão, drink, shot…)")
+                            onCheckedChanged: if (checked) doseCheck.checked = false
+                        }
+                        Text {
+                            visible: !compostoCheck.checked && !doseCheck.checked
                             text: qsTr("Ative se este produto for montado na hora a partir de outros (ex.: copão). "
                                        + "Produtos normais não precisam de composição.")
                             color: Theme.textMuted

@@ -44,11 +44,18 @@ struct Produto
     bool ativo = true;
     bool composto = false;      // "copão": vende baixando os insumos da composição
 
+    // Dose: produto que sai de outro (a garrafa). Não tem estoque próprio —
+    // o disponível vem da origem e a venda baixa a origem.
+    int doseDeProdutoId = 0;    // 0 = não é dose
+    qint64 doseQuantidade = 0;  // quanto consome, na unidade base da origem
+
     QVector<Embalagem> embalagens;
     QVector<Componente> composicao;   // insumos (só quando composto)
 
     // Campos derivados/juntados (preenchidos em consultas de listagem):
     QString categoriaNome;
+    QString doseOrigemNome;         // nome da garrafa, para listar
+    QString doseOrigemUnidade;      // unidade base da garrafa (ml, litro…)
     qint64 quantidadeEstoque = 0;   // unidade base
     qint64 precoPrincipal = 0;      // centavos: preço da embalagem de menor fator
 };

@@ -71,6 +71,9 @@ public:
     // --- Produtos ---
     Q_INVOKABLE void recarregarProdutos(const QString &filtro = QString());
     Q_INVOKABLE QVariantList categorias();
+    // Produtos que podem ser a ORIGEM de uma dose (a garrafa): ativos, não
+    // compostos e que não sejam eles próprios uma dose.
+    Q_INVOKABLE QVariantList produtosParaOrigemDose(int excluirId = 0);
     // Cria a categoria e devolve o id (0 em caso de erro). Exige edita_produto.
     Q_INVOKABLE int criarCategoria(const QString &nome);
     // Linhas da composição de um produto composto, com os produtos de cada

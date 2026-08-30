@@ -109,5 +109,6 @@ qt_add_resources(DistribuidoraCore "db_scripts"
         ${CMAKE_SOURCE_DIR}/db/migrations/0010_cancelar_venda.sql
         ${CMAKE_SOURCE_DIR}/db/migrations/0011_perfil_funcionario.sql
         ${CMAKE_SOURCE_DIR}/db/migrations/0012_conta_forma_pagamento.sql
+        ${CMAKE_SOURCE_DIR}/db/migrations/0013_produto_dose.sql
         ${CMAKE_SOURCE_DIR}/db/seed/0001_dados_iniciais.sql
 )
