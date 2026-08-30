@@ -156,6 +156,8 @@ public:
     Q_INVOKABLE void recarregarClientes(const QString &filtro = QString());
     Q_INVOKABLE QVariantList clientesLista();       // {id, nome, saldo, limite} p/ o PDV
     Q_INVOKABLE QVariantMap cliente(int id);
+    // Painel do fiado na tela de Clientes (era preciso ir ao Dashboard/Relatórios).
+    Q_INVOKABLE QVariantMap resumoFiado();
     Q_INVOKABLE QVariantMap novoCliente();
     Q_INVOKABLE bool salvarCliente(const QVariantMap &dados);
     Q_INVOKABLE bool inativarCliente(int id);

@@ -204,3 +204,80 @@ qint64 ClienteRepository::aplicarRecebimento(int clienteId, qint64 valor)
     }
     return aplicado;
 }
+
+ClienteRepository::ResumoFiado ClienteRepository::resumoFiado()
+{
+    ResumoFiado r;
+    QSqlQuery q(m_db);
+
+    // Uma consulta só: por cliente, quanto deve e quanto está vencido.
+    if (!q.exec(QStringLiteral(
+            "SELECT c.nome, c.limite_fiado, "
+            "       SUM(cr.valor) AS deve, "
+            "       SUM(CASE WHEN cr.vencimento IS NOT NULL "
+            "                 AND cr.vencimento < date('now','localtime') "
+            "                THEN cr.valor ELSE 0 END) AS vencido "
+            "FROM contas_receber cr "
+            "JOIN clientes c ON c.id = cr.cliente_id "
+            "WHERE cr.status = 'aberta' "
+            "GROUP BY cr.cliente_id "
+            "HAVING deve > 0 "
+            "ORDER BY deve DESC"))) {
+        m_erro = q.lastError().text();
+        return r;
+    }
+
+    while (q.next()) {
+        const QString nome = q.value(0).toString();
+        const qint64 limite = q.value(1).toLongLong();
+        const qint64 deve = q.value(2).toLongLong();
+        const qint64 vencido = q.value(3).toLongLong();
+
+        r.total += deve;
+        r.atrasado += vencido;
+        r.quantosDevem++;
+        if (vencido > 0)
+            r.quantosAtrasados++;
+        // Limite 0 quer dizer "sem limite combinado" — não conta como estouro.
+        if (limite > 0 && deve > limite)
+            r.acimaDoLimite++;
+        if (deve > r.maiorDevedorValor) {
+            r.maiorDevedorValor = deve;
+            r.maiorDevedorNome = nome;
+        }
+    }
+    m_erro.clear();
+    return r;
+}
+
+ClienteRepository::HistoricoFiado ClienteRepository::historicoFiado(int clienteId)
+{
+    HistoricoFiado h;
+
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral(
+        "SELECT MAX(v.data_hora), "
+        "       (SELECT MAX(pago_em) FROM contas_receber "
+        "         WHERE cliente_id = :c1 AND pago_em IS NOT NULL), "
+        "       (SELECT COUNT(*) FROM contas_receber "
+        "         WHERE cliente_id = :c2 AND status = 'aberta'), "
+        "       (SELECT MIN(vencimento) FROM contas_receber "
+        "         WHERE cliente_id = :c3 AND status = 'aberta' AND vencimento IS NOT NULL) "
+        "FROM contas_receber cr "
+        "LEFT JOIN vendas v ON v.id = cr.venda_id "
+        "WHERE cr.cliente_id = :c4"));
+    q.bindValue(QStringLiteral(":c1"), clienteId);
+    q.bindValue(QStringLiteral(":c2"), clienteId);
+    q.bindValue(QStringLiteral(":c3"), clienteId);
+    q.bindValue(QStringLiteral(":c4"), clienteId);
+    if (!q.exec() || !q.next()) {
+        m_erro = q.lastError().text();
+        return h;
+    }
+    h.ultimaCompra = q.value(0).toString();
+    h.ultimoPagamento = q.value(1).toString();
+    h.contasAbertas = q.value(2).toInt();
+    h.vencimentoMaisAntigo = q.value(3).toString();
+    m_erro.clear();
+    return h;
+}

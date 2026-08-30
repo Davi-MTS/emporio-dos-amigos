@@ -9,8 +9,18 @@ Rectangle {
     color: Theme.background
 
     property var clienteAtual: null
+    property var fiado: ({})
 
-    Component.onCompleted: App.recarregarClientes()
+    Component.onCompleted: carregar()
+    function carregar() {
+        App.recarregarClientes();
+        fiado = App.resumoFiado();
+    }
+    function fmtData(iso) {
+        if (!iso || iso.length === 0) return "—";
+        var d = new Date(iso);
+        return isNaN(d.getTime()) ? iso : Qt.formatDate(d, "dd/MM/yyyy");
+    }
 
     function abrirNovo() { clienteAtual = App.novoCliente(); _preencher(); erro.text = ""; }
     function abrirCliente(id) { clienteAtual = App.cliente(id); _preencher(); erro.text = ""; }
@@ -32,8 +42,48 @@ Rectangle {
             cpf: cpfField.text, endereco: endField.text, aniversario: anivField.text,
             observacoes: obsField.text, limite: lim < 0 ? 0 : lim
         };
-        if (App.salvarCliente(dados)) fechar();
+        if (App.salvarCliente(dados)) { carregar(); fechar(); }
         else erro.text = App.ultimoErro();
+    }
+
+    // Cartão pequeno do resumo. Em Flow para nunca estourar a largura da janela.
+    component FiadoCard: Rectangle {
+        property string rotulo: ""
+        property string valor: ""
+        property string nota: ""
+        property color cor: Theme.text
+        width: 210
+        height: 78
+        radius: Theme.radius
+        color: Theme.surface
+        border.color: Theme.border
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: Theme.spacingMd
+            spacing: 1
+            Text {
+                text: rotulo
+                color: Theme.textMuted
+                font.pixelSize: Theme.fontXs
+                font.weight: Font.DemiBold
+                font.capitalization: Font.AllUppercase
+                font.letterSpacing: 0.6
+            }
+            Text {
+                text: valor
+                color: cor
+                font.family: Theme.fontBase
+                font.pixelSize: Theme.fontLg
+                font.weight: Font.Bold
+            }
+            Text {
+                Layout.fillWidth: true
+                elide: Text.ElideRight
+                text: nota
+                color: Theme.textMuted
+                font.pixelSize: Theme.fontXs
+            }
+        }
     }
 
     RowLayout {
@@ -46,6 +96,40 @@ Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
             spacing: Theme.spacingMd
+
+            // O fiado é o dinheiro da loja que está na rua. Estava só no
+            // Dashboard e nos Relatórios — longe de onde se resolve, que é aqui.
+            Flow {
+                Layout.fillWidth: true
+                spacing: Theme.spacingSm
+
+                FiadoCard {
+                    rotulo: qsTr("Na rua")
+                    valor: App.formatarDinheiro(tela.fiado.total || 0)
+                    nota: (tela.fiado.quantosDevem || 0) + qsTr(" clientes devendo")
+                    cor: Theme.text
+                }
+                FiadoCard {
+                    rotulo: qsTr("Atrasado")
+                    valor: App.formatarDinheiro(tela.fiado.atrasado || 0)
+                    nota: (tela.fiado.quantosAtrasados || 0) + qsTr(" com conta vencida")
+                    cor: (tela.fiado.atrasado || 0) > 0 ? Theme.danger : Theme.success
+                }
+                FiadoCard {
+                    rotulo: qsTr("Maior devedor")
+                    valor: App.formatarDinheiro(tela.fiado.maiorDevedorValor || 0)
+                    nota: tela.fiado.maiorDevedorNome || qsTr("ninguém devendo")
+                    cor: Theme.text
+                }
+                FiadoCard {
+                    visible: (tela.fiado.acimaDoLimite || 0) > 0
+                    rotulo: qsTr("Acima do limite")
+                    valor: "" + (tela.fiado.acimaDoLimite || 0)
+                    nota: qsTr("passaram do combinado")
+                    cor: Theme.warning
+                }
+            }
+
             RowLayout {
                 Layout.fillWidth: true
                 spacing: Theme.spacingSm
@@ -56,6 +140,7 @@ Rectangle {
                     onTextChanged: App.recarregarClientes(text)
                 }
                 Item { Layout.fillWidth: true }
+                AppButton { kind: "ghost"; text: qsTr("↻"); implicitWidth: 40; onClicked: tela.carregar() }
                 AppButton { kind: "accent"; text: qsTr("＋ Novo cliente"); onClicked: tela.abrirNovo() }
             }
             Rectangle {
@@ -163,6 +248,59 @@ Rectangle {
                                 kind: "accent"
                                 text: qsTr("Receber pagamento")
                                 onClicked: receberDialog.abrir()
+                            }
+                        }
+
+                        // As três perguntas do balcão sobre um cliente fiado:
+                        // quanto ainda cabe, desde quando ele não paga, e se
+                        // tem conta vencida esperando.
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.topMargin: Theme.spacingXs
+                            spacing: 1
+                            visible: tela.clienteAtual && tela.clienteAtual.id > 0
+
+                            Text {
+                                Layout.fillWidth: true
+                                wrapMode: Text.WordWrap
+                                text: {
+                                    var d = tela.clienteAtual ? (tela.clienteAtual.limiteDisponivel !== undefined
+                                                                 ? tela.clienteAtual.limiteDisponivel : -1) : -1;
+                                    if (d < 0)
+                                        return qsTr("Sem limite de fiado definido.");
+                                    return d === 0
+                                        ? qsTr("Limite esgotado — não cabe mais fiado.")
+                                        : qsTr("Ainda cabe ") + App.formatarDinheiro(d) + qsTr(" no limite.");
+                                }
+                                color: {
+                                    var d = tela.clienteAtual ? (tela.clienteAtual.limiteDisponivel !== undefined
+                                                                 ? tela.clienteAtual.limiteDisponivel : -1) : -1;
+                                    return d === 0 ? Theme.danger : Theme.textMuted;
+                                }
+                                font.pixelSize: Theme.fontXs
+                                font.weight: Font.DemiBold
+                            }
+                            Text {
+                                Layout.fillWidth: true
+                                elide: Text.ElideRight
+                                text: qsTr("Última compra fiado: ")
+                                      + tela.fmtData(tela.clienteAtual ? tela.clienteAtual.ultimaCompraFiado : "")
+                                      + qsTr("  ·  Último pagamento: ")
+                                      + tela.fmtData(tela.clienteAtual ? tela.clienteAtual.ultimoPagamento : "")
+                                color: Theme.textMuted
+                                font.pixelSize: Theme.fontXs
+                            }
+                            Text {
+                                Layout.fillWidth: true
+                                wrapMode: Text.WordWrap
+                                visible: tela.clienteAtual
+                                         && (tela.clienteAtual.vencimentoMaisAntigo || "").length > 0
+                                text: qsTr("Conta mais antiga em aberto vence em ")
+                                      + tela.fmtData(tela.clienteAtual ? tela.clienteAtual.vencimentoMaisAntigo : "")
+                                      + "  ·  " + (tela.clienteAtual ? (tela.clienteAtual.contasAbertas || 0) : 0)
+                                      + qsTr(" conta(s) em aberto")
+                                color: Theme.textMuted
+                                font.pixelSize: Theme.fontXs
                             }
                         }
                     }
@@ -274,7 +412,7 @@ Rectangle {
                     onClicked: {
                         if (!tela.clienteAtual) return;
                         var r = App.receberDeCliente(tela.clienteAtual.id, rcpValor.text, formaCombo.currentValue);
-                        if (r.ok) { tela.clienteAtual = App.cliente(tela.clienteAtual.id); receberDialog.close(); }
+                        if (r.ok) { tela.carregar(); tela.clienteAtual = App.cliente(tela.clienteAtual.id); receberDialog.close(); }
                         else rcpErro.text = r.erro;
                     }
                 }

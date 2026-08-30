@@ -329,6 +329,33 @@ QVariantMap AppBackend::cliente(int id)
     m[QStringLiteral("observacoes")] = c->observacoes;
     m[QStringLiteral("limite")] = static_cast<qlonglong>(c->limiteFiado);
     m[QStringLiteral("saldo")] = static_cast<qlonglong>(c->saldoDevedor);
+
+    // Quanto ainda cabe no limite combinado — a pergunta do balcão é essa,
+    // não "qual o limite". Limite 0 = sem limite definido.
+    const qint64 disponivel = c->limiteFiado > 0
+                                  ? qMax(Q_INT64_C(0), c->limiteFiado - c->saldoDevedor)
+                                  : -1;
+    m[QStringLiteral("limiteDisponivel")] = static_cast<qlonglong>(disponivel);
+
+    const auto h = m_clienteRepo.historicoFiado(id);
+    m[QStringLiteral("ultimaCompraFiado")] = h.ultimaCompra;
+    m[QStringLiteral("ultimoPagamento")] = h.ultimoPagamento;
+    m[QStringLiteral("contasAbertas")] = h.contasAbertas;
+    m[QStringLiteral("vencimentoMaisAntigo")] = h.vencimentoMaisAntigo;
+    return m;
+}
+
+QVariantMap AppBackend::resumoFiado()
+{
+    const auto r = m_clienteRepo.resumoFiado();
+    QVariantMap m;
+    m[QStringLiteral("total")] = static_cast<qlonglong>(r.total);
+    m[QStringLiteral("atrasado")] = static_cast<qlonglong>(r.atrasado);
+    m[QStringLiteral("quantosDevem")] = r.quantosDevem;
+    m[QStringLiteral("quantosAtrasados")] = r.quantosAtrasados;
+    m[QStringLiteral("acimaDoLimite")] = r.acimaDoLimite;
+    m[QStringLiteral("maiorDevedorNome")] = r.maiorDevedorNome;
+    m[QStringLiteral("maiorDevedorValor")] = static_cast<qlonglong>(r.maiorDevedorValor);
     return m;
 }
 
