@@ -104,6 +104,52 @@ void AppBackend::logout()
     emit sessaoUsuarioChanged();
 }
 
+// Erros do SQLite chegavam crus na tela. Aqui viram frase de gente — e, quando
+// não são conhecidos, a mensagem diz o que fazer em vez de despejar jargão.
+static QString mensagemAmigavel(const QString &tecnico)
+{
+    if (tecnico.isEmpty())
+        return tecnico;
+
+    // Mensagem já escrita para humano (as do próprio sistema) passa direto.
+    if (!tecnico.contains(QStringLiteral("constraint failed"))
+        && !tecnico.contains(QStringLiteral("Unable to"))
+        && !tecnico.contains(QStringLiteral("database is locked"))
+        && !tecnico.contains(QStringLiteral("disk I/O")))
+        return tecnico;
+
+    if (tecnico.contains(QStringLiteral("UNIQUE constraint failed"))) {
+        if (tecnico.contains(QStringLiteral("codigo_barras")))
+            return AppBackend::tr("Este código de barras já está cadastrado em outro produto. "
+                                  "Bipe o produto na busca para encontrá-lo.");
+        if (tecnico.contains(QStringLiteral("categorias.nome")))
+            return AppBackend::tr("Já existe uma categoria com esse nome.");
+        if (tecnico.contains(QStringLiteral("usuarios.login")))
+            return AppBackend::tr("Já existe um usuário com esse login.");
+        return AppBackend::tr("Esse valor já está cadastrado em outro registro.");
+    }
+    if (tecnico.contains(QStringLiteral("FOREIGN KEY constraint failed")))
+        return AppBackend::tr("Não dá para fazer isso: este registro está ligado a outros "
+                              "(venda, compra ou movimentação de estoque).");
+    if (tecnico.contains(QStringLiteral("NOT NULL constraint failed")))
+        return AppBackend::tr("Falta preencher um campo obrigatório.");
+    if (tecnico.contains(QStringLiteral("database is locked")))
+        return AppBackend::tr("O banco está ocupado por um instante. Tente de novo.");
+    if (tecnico.contains(QStringLiteral("disk I/O")))
+        return AppBackend::tr("Não consegui gravar no disco. Verifique o espaço livre "
+                              "e se o antivírus não está bloqueando a pasta.");
+
+    return AppBackend::tr("Não foi possível concluir. Detalhe técnico no registro do sistema.");
+}
+
+QString AppBackend::ultimoErro() const
+{
+    const QString amigavel = mensagemAmigavel(m_erro);
+    if (amigavel != m_erro && !m_erro.isEmpty())
+        LogService::registrar(QStringLiteral("Erro técnico: %1").arg(m_erro));
+    return amigavel;
+}
+
 bool AppBackend::temPermissao(const QString &chave) const
 {
     const QVariantMap perms = m_usuarioAtual.value(QStringLiteral("permissoes")).toMap();
@@ -1288,10 +1334,21 @@ bool AppBackend::registrarRetirada(int produtoId, int embalagemId, int qtdEmb,
 
 bool AppBackend::abrirCaixa(const QString &valorAberturaTexto)
 {
+    // Campo vazio = abre sem troco, o que é legítimo. Mas texto que NÃO é um
+    // valor virava R$ 0,00 em silêncio: quem digitou "1OO" (letra O) abria o
+    // caixa zerado e só descobria no fechamento, com uma diferença de 100 reais
+    // que ninguém sabia explicar.
     qint64 valor = 0;
-    const auto v = Money::parse(valorAberturaTexto);
-    if (v)
+    const QString t = valorAberturaTexto.trimmed();
+    if (!t.isEmpty()) {
+        const auto v = Money::parse(t);
+        if (!v || *v < 0) {
+            m_erro = tr("Troco inicial inválido. Escreva só o valor, como 100,00 "
+                        "(ou deixe vazio para abrir sem troco).");
+            return false;
+        }
         valor = *v;
+    }
     const int id = m_caixaRepo.abrirSessao(valor, m_usuarioId);
     if (id <= 0) {
         m_erro = m_caixaRepo.ultimoErro();
@@ -1551,8 +1608,18 @@ bool AppBackend::registrarSuprimento(const QString &valorTexto, const QString &m
 
 QVariantMap AppBackend::fecharCaixa(const QString &dinheiroContadoTexto)
 {
+    // A tela já barra, mas o fechamento é a operação mais sensível do sistema:
+    // um valor ilegível NÃO pode virar "contei zero" por omissão.
     const auto v = Money::parse(dinheiroContadoTexto);
-    const qint64 contado = v ? *v : 0;
+    if (!v || *v < 0) {
+        QVariantMap erro;
+        erro[QStringLiteral("ok")] = false;
+        erro[QStringLiteral("erro")] = tr("Valor contado inválido. Escreva só o valor, "
+                                          "como 250,00.");
+        m_erro = erro.value(QStringLiteral("erro")).toString();
+        return erro;
+    }
+    const qint64 contado = *v;
     const ResultadoFechamento r = m_caixaRepo.fechar(m_sessaoId, contado, m_usuarioId);
 
     QVariantMap out;

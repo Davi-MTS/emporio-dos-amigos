@@ -1,5 +1,7 @@
 #include "utils/Money.h"
 
+
+
 #include <QChar>
 
 namespace Money {
@@ -36,16 +38,31 @@ QString format(qint64 centavos)
 
 std::optional<qint64> parse(const QString &texto)
 {
-    // Mantém apenas dígitos e separadores; descarta "R$", espaços etc.
-    QString limpo;
-    for (const QChar c : texto) {
-        if (c.isDigit() || c == QLatin1Char(',') || c == QLatin1Char('.')
-            || c == QLatin1Char('-')) {
-            limpo.append(c);
-        }
-    }
+    // Descarta o ruído LEGÍTIMO — o "R$" e os espaços — e mais nada.
+    //
+    // Antes, qualquer caractere fora do conjunto era simplesmente jogado fora.
+    // Isso parecia tolerante e era perigoso: "1OO" digitado com a letra O (erro
+    // de quem digita rápido olhando o teclado) virava "1", ou seja, R$ 1,00 no
+    // lugar de R$ 100,00 — sem um aviso sequer. Em abertura de caixa e em
+    // contagem de gaveta, isso vira diferença que ninguém consegue explicar.
+    QString limpo = texto.trimmed();
+    // Sem regex de proposito: escapar \$ em literal C++ e fonte de erro bobo.
+    if (limpo.startsWith(QLatin1String("R$"), Qt::CaseInsensitive))
+        limpo.remove(0, 2);
+    limpo.remove(QLatin1Char(' '));
+    limpo.remove(QChar(0x00A0));   // espaço não separável (vem de copiar/colar)
+
     if (limpo.isEmpty() || limpo == QLatin1String("-"))
         return std::nullopt;
+
+    // Daqui em diante, QUALQUER caractere estranho invalida a entrada inteira.
+    for (int i = 0; i < limpo.size(); ++i) {
+        const QChar c = limpo.at(i);
+        const bool aceito = c.isDigit() || c == QLatin1Char(',') || c == QLatin1Char('.')
+                            || (c == QLatin1Char('-') && i == 0);
+        if (!aceito)
+            return std::nullopt;
+    }
 
     const bool negativo = limpo.startsWith(QLatin1Char('-'));
     if (negativo)

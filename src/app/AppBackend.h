@@ -265,7 +265,12 @@ public:
     Q_INVOKABLE QString formatarValor(qlonglong centavos) const;         // "12,50"
     Q_INVOKABLE qlonglong parseDinheiro(const QString &texto) const;     // -1 se inválido
 
-    Q_INVOKABLE QString ultimoErro() const { return m_erro; }
+    // Traduz o erro técnico numa frase que o operador entende. Fica AQUI, na
+    // única porta de saída, em vez de nos ~80 lugares que atribuem m_erro: o
+    // texto cru do SQLite ("UNIQUE constraint failed: produto_embalagens.
+    // codigo_barras Unable to fetch row") chegava inteiro na tela do balcão.
+    // O texto original continua no log, para quem der suporte.
+    Q_INVOKABLE QString ultimoErro() const;
 
 signals:
     void versaoFotosChanged();

@@ -57,6 +57,8 @@ void TstMoney::parse_validos_data()
     QTest::newRow("uma_casa")    << QStringLiteral("12,5")      << qint64(1250);
     QTest::newRow("centavos")    << QStringLiteral("0,05")      << qint64(5);
     QTest::newRow("negativo")    << QStringLiteral("-12,50")    << qint64(-1250);
+    QTest::newRow("simbolo_colado") << QStringLiteral("R$100")   << qint64(10000);
+    QTest::newRow("espaco_sobrando") << QStringLiteral("  1.234,56  ") << qint64(123456);
 }
 
 void TstMoney::parse_validos()
@@ -76,6 +78,11 @@ void TstMoney::parse_invalidos_data()
     QTest::newRow("letras")      << QStringLiteral("abc");
     QTest::newRow("tres_casas")  << QStringLiteral("12,555");
     QTest::newRow("so_traco")    << QStringLiteral("-");
+    // O erro de digitação que motivou a correção: letra O no lugar do zero.
+    // Antes virava "1" em silêncio — R$ 1,00 no lugar de R$ 100,00.
+    QTest::newRow("letra_O_no_meio") << QStringLiteral("1OO");
+    QTest::newRow("letra_no_fim")    << QStringLiteral("12x");
+    QTest::newRow("moeda_errada")    << QStringLiteral("US$ 10");
 }
 
 void TstMoney::parse_invalidos()
