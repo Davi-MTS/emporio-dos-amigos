@@ -54,11 +54,12 @@ Rectangle {
         property string nota: ""
         property color cor: Theme.text
         width: 200
-        height: 78
+        height: Math.max(78, colCartao.implicitHeight + 2 * Theme.spacingMd)
         radius: Theme.radius
         color: Theme.surface
         border.color: Theme.border
         ColumnLayout {
+            id: colCartao
             anchors.fill: parent
             anchors.margins: Theme.spacingMd
             spacing: 1

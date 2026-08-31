@@ -75,6 +75,7 @@ TestCase {
         marcarAvisosComoFalha();
         var t = abrir(dados.comp, 1160, 700);
         verify(t.width > 0 && t.height > 0);
+        naoEspremeConteudo(t, dados.tag);
     }
 
     // Janela restaurada (960x620): foi neste tamanho que a categoria passou por
@@ -98,6 +99,30 @@ TestCase {
             at = at.parent;
         }
         return partes.join("  ⊂  ");
+    }
+
+    // Conteúdo espremido: um layout cuja altura NATURAL é maior que a altura que
+    // ele recebeu está com os filhos cortados. Foi assim que o "+ R$ 5,50" do
+    // composto ficou pela metade — o card tinha 64 px cravados e o texto novo
+    // não coube.
+    function naoEspremeConteudo(raiz, tag) {
+        var fila = [raiz];
+        while (fila.length > 0) {
+            var it = fila.shift();
+            for (var i = 0; i < it.children.length; i++) {
+                var f = it.children[i];
+                if (f.visible === false)
+                    continue;
+                var ehLayout = ("" + f).indexOf("Layout") >= 0;
+                if (ehLayout && f.height > 0 && f.implicitHeight > f.height + 1) {
+                    fail(tag + ": " + f + " precisa de " + Math.ceil(f.implicitHeight)
+                         + "px e recebeu " + Math.floor(f.height) + "px — conteúdo cortado
+  "
+                         + cadeia(f, raiz));
+                }
+                fila.push(f);
+            }
+        }
     }
 
     // Percorre a árvore procurando item visível que comece fora da direita da

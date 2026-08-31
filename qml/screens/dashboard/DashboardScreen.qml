@@ -46,7 +46,9 @@ Rectangle {
         // Quando `rota` está preenchida, o cartão vira um atalho clicável.
         property string rota: ""
         Layout.fillWidth: true
-        Layout.preferredHeight: 104
+        // Altura mínima de 104, mas cede para o conteúdo: com fonte maior ou
+        // rótulo em duas linhas, o texto de baixo era cortado.
+        Layout.preferredHeight: Math.max(104, colKpi.implicitHeight + 40)
         radius: Theme.radius
         color: areaKpi.containsMouse ? Theme.surfaceAlt : Theme.surface
         border.color: areaKpi.containsMouse && rota !== "" ? Theme.primary : Theme.border
@@ -61,6 +63,7 @@ Rectangle {
         }
 
         ColumnLayout {
+            id: colKpi
             anchors.fill: parent
             anchors.margins: 20
             spacing: 4

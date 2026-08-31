@@ -988,14 +988,21 @@ Rectangle {
                         required property var modelData
                         readonly property bool semProduto: compDlgRow.modelData.produtos.length === 0
                         Layout.fillWidth: true
-                        implicitHeight: 64
+                        // Altura pelo CONTEÚDO, não fixa: a linha do ajuste de
+                        // preço ("+ R$ 5,50") nasceu depois e ficava cortada
+                        // embaixo, porque o card tinha 64 px cravados.
+                        implicitHeight: Math.max(64, conteudoLinha.implicitHeight
+                                                     + 2 * Theme.spacingSm)
                         radius: Theme.radiusSm
                         color: Theme.surfaceAlt
                         border.width: 1
                         border.color: compDlgRow.semProduto ? Theme.danger : Theme.border
 
                         RowLayout {
+                            id: conteudoLinha
                             anchors.fill: parent
+                            anchors.topMargin: Theme.spacingSm
+                            anchors.bottomMargin: Theme.spacingSm
                             anchors.leftMargin: Theme.spacingMd
                             anchors.rightMargin: Theme.spacingMd
                             spacing: Theme.spacingMd
