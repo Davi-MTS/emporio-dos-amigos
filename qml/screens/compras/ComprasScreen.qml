@@ -170,6 +170,10 @@ Rectangle {
 
         function confirmar() {
             if (itensModel.count === 0) { erroCompra.text = qsTr("Adicione ao menos um item."); return; }
+            if (vencField.incompleto || notaDataField.incompleto) {
+                erroCompra.text = qsTr("Data inválida — use dd/mm/aaaa.");
+                return;
+            }
             var itens = [];
             for (var i = 0; i < itensModel.count; i++) {
                 var it = itensModel.get(i);
@@ -198,9 +202,9 @@ Rectangle {
             var r = App.registrarCompra({
                 fornecedorId: fornCombo.currentValue ? fornCombo.currentValue : 0,
                 gerarContaPagar: gerarConta.checked,
-                vencimento: vencField.text,
+                vencimento: vencField.iso,
                 numeroNota: notaField.text,
-                dataNota: notaDataField.text,
+                dataNota: notaDataField.iso,
                 itens: itens
             });
             if (r.ok) novaCompraDialog.close();
@@ -235,7 +239,7 @@ Rectangle {
                 FormField {
                     label: qsTr("Data da nota")
                     Layout.preferredWidth: 160
-                    AppTextField { id: notaDataField; width: parent.width; placeholderText: qsTr("AAAA-MM-DD") }
+                    AppDateField { id: notaDataField; width: parent.width }
                 }
             }
 
@@ -362,14 +366,10 @@ Rectangle {
                                 // e não no cadastro do produto, porque cada carga
                                 // vence numa data — a nota é o momento em que se
                                 // sabe qual é.
-                                AppTextField {
-                                    Layout.preferredWidth: 104
+                                AppDateField {
+                                    Layout.preferredWidth: 118
                                     text: compraRow.validadeTexto
                                     placeholderText: qsTr("validade")
-                                    horizontalAlignment: Text.AlignHCenter
-                                    color: text.trim().length === 0
-                                           || novaCompraDialog.validadeIso(text).length > 0
-                                           ? Theme.text : Theme.danger
                                     onTextChanged: itensModel.setProperty(compraRow.index,
                                                                           "validadeTexto", text)
                                 }
@@ -395,7 +395,7 @@ Rectangle {
                     label: qsTr("Vencimento")
                     visible: gerarConta.checked
                     Layout.preferredWidth: 150
-                    AppTextField { id: vencField; width: parent.width; placeholderText: qsTr("AAAA-MM-DD") }
+                    AppDateField { id: vencField; width: parent.width }
                 }
             }
 

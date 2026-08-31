@@ -1,4 +1,5 @@
 #include <QtTest>
+#include <QSqlQuery>
 #include <QTemporaryDir>
 
 #include "app/AppBackend.h"
@@ -24,6 +25,7 @@ private slots:
     void aberturaDeCaixaRecusaValorIlegivel();
     void fechamentoDeCaixaRecusaValorIlegivel();
     void mensagemDoProprioSistemaPassaIntacta();
+    void dataForaDoPadraoNaoEntraNoBanco();
 
 private:
     QTemporaryDir m_dir;
@@ -127,6 +129,36 @@ void TstMensagens::mensagemDoProprioSistemaPassaIntacta()
     u[QStringLiteral("perfilId")] = 2;
     QVERIFY(!m_app->salvarUsuario(u, QStringLiteral("senha12345")));
     QCOMPARE(m_app->ultimoErro(), QStringLiteral("Já existe um usuário com esse login."));
+}
+
+// Datas no banco sao SEMPRE ISO: e assim que o SQLite compara. Uma conta
+// gravada como "20260829" nunca aparecia como vencida, porque a comparacao e
+// textual e "20260829" e MAIOR que "2026-08-31". A conta vencia e ninguem via.
+void TstMensagens::dataForaDoPadraoNaoEntraNoBanco()
+{
+    // Formato colado, que era o que a tela deixava passar.
+    QVERIFY2(!m_app->criarDespesa(QStringLiteral("Aluguel"), QStringLiteral("100,00"),
+                                  QStringLiteral("20260829")),
+             "data colada nao pode entrar");
+    QVERIFY(m_app->ultimoErro().contains(QStringLiteral("dd/mm/aaaa")));
+
+    // Data que nao existe.
+    QVERIFY(!m_app->criarDespesa(QStringLiteral("Aluguel"), QStringLiteral("100,00"),
+                                 QStringLiteral("2026-02-31")));
+
+    // ISO de verdade passa, e vazio tambem (conta sem vencimento).
+    QVERIFY2(m_app->criarDespesa(QStringLiteral("Aluguel"), QStringLiteral("100,00"),
+                                 QStringLiteral("2026-08-29")),
+             qUtf8Printable(m_app->ultimoErro()));
+    QVERIFY(m_app->criarDespesa(QStringLiteral("Avulsa"), QStringLiteral("50,00"), QString()));
+
+    // E a conta vencida realmente aparece como vencida.
+    QSqlQuery q(m_db.connection());
+    QVERIFY(q.exec(QStringLiteral(
+        "SELECT COUNT(*) FROM contas_pagar WHERE status='aberta' "
+        "AND vencimento IS NOT NULL AND vencimento < date('now','localtime')")));
+    QVERIFY(q.next());
+    QCOMPARE(q.value(0).toInt(), 1);
 }
 
 QTEST_MAIN(TstMensagens)

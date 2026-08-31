@@ -32,6 +32,7 @@ qt_add_qml_module(distribuidora_ui
         components/AppIcon.qml
         components/AppButton.qml
         components/AppTextField.qml
+        components/AppDateField.qml
         components/AppComboBox.qml
         components/AppSpinBox.qml
         components/AppDialog.qml

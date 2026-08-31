@@ -1,6 +1,7 @@
 #include "app/AppBackend.h"
 
 #include <QBuffer>
+#include <QDate>
 #include <QImage>
 #include <QImageReader>
 
@@ -106,6 +107,18 @@ void AppBackend::logout()
 
 // Erros do SQLite chegavam crus na tela. Aqui viram frase de gente — e, quando
 // não são conhecidos, a mensagem diz o que fazer em vez de despejar jargão.
+// Datas no banco são SEMPRE ISO (yyyy-MM-dd) — é assim que o SQLite compara.
+// Uma conta gravada como "20260829" nunca aparecia como vencida, porque a
+// comparação é textual e "20260829" é maior que "2026-08-31". Vazio é legítimo
+// (conta sem vencimento); qualquer outra coisa é recusada.
+static bool dataIsoValidaOuVazia(const QString &texto)
+{
+    if (texto.trimmed().isEmpty())
+        return true;
+    const QDate d = QDate::fromString(texto.trimmed(), Qt::ISODate);
+    return d.isValid();
+}
+
 static QString mensagemAmigavel(const QString &tecnico)
 {
     if (tecnico.isEmpty())
@@ -326,6 +339,24 @@ QVariantMap AppBackend::registrarCompra(const QVariantMap &dados)
     const QString numeroNota = dados.value(QStringLiteral("numeroNota")).toString();
     const QString dataNota = dados.value(QStringLiteral("dataNota")).toString();
 
+    if (!dataIsoValidaOuVazia(vencimento) || !dataIsoValidaOuVazia(dataNota)) {
+        QVariantMap out;
+        out[QStringLiteral("ok")] = false;
+        out[QStringLiteral("erro")] = tr("Data inválida. Use o formato dd/mm/aaaa.");
+        m_erro = out.value(QStringLiteral("erro")).toString();
+        return out;
+    }
+    for (const ItemCompra &it : itens) {
+        if (!dataIsoValidaOuVazia(it.validade)) {
+            QVariantMap out;
+            out[QStringLiteral("ok")] = false;
+            out[QStringLiteral("erro")] = tr("Validade inválida em um dos itens. "
+                                             "Use o formato dd/mm/aaaa.");
+            m_erro = out.value(QStringLiteral("erro")).toString();
+            return out;
+        }
+    }
+
     const ResultadoCompra r = m_compraRepo.registrarCompra(
         fornecedorId, QStringLiteral("manual"), itens, gerarConta, vencimento, m_usuarioId,
         numeroNota, dataNota);
@@ -429,6 +460,10 @@ QVariantMap AppBackend::novoCliente()
 
 bool AppBackend::salvarCliente(const QVariantMap &dados)
 {
+    if (!dataIsoValidaOuVazia(dados.value(QStringLiteral("aniversario")).toString())) {
+        m_erro = tr("Aniversário inválido. Use o formato dd/mm/aaaa.");
+        return false;
+    }
     Cliente c;
     c.id = dados.value(QStringLiteral("id")).toInt();
     c.nome = dados.value(QStringLiteral("nome")).toString();
@@ -748,6 +783,10 @@ bool AppBackend::criarDespesa(const QString &descricao, const QString &valorText
     const auto v = Money::parse(valorTexto);
     if (!v) {
         m_erro = QStringLiteral("Valor inválido.");
+        return false;
+    }
+    if (!dataIsoValidaOuVazia(vencimento)) {
+        m_erro = tr("Vencimento inválido. Use o formato dd/mm/aaaa.");
         return false;
     }
     if (!m_financeiroRepo.criarDespesa(descricao, *v, vencimento)) {
@@ -1285,6 +1324,10 @@ bool AppBackend::registrarEntrada(int produtoId, int embalagemId, int qtdEmb,
     // prazo curto. Informada, vira um lote e passa a ser cobrada na tela de
     // Vencimento. Se o lote falhar, a entrada NÃO é desfeita — a mercadoria
     // realmente entrou; o aviso vai para o log.
+    if (!dataIsoValidaOuVazia(validade)) {
+        m_erro = tr("Validade inválida. Use o formato dd/mm/aaaa.");
+        return false;
+    }
     if (!validade.trimmed().isEmpty()) {
         if (!m_loteRepo.registrar(produtoId, qtdBase, validade.trimmed(), codigoLote))
             qWarning("Entrada gravada, mas o lote falhou: %s",

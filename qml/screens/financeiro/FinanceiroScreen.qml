@@ -230,7 +230,7 @@ Rectangle {
                 Layout.fillWidth: true
                 spacing: Theme.spacingMd
                 FormField { label: qsTr("Valor"); Layout.fillWidth: true; AppTextField { id: dValor; width: parent.width; horizontalAlignment: Text.AlignRight; placeholderText: "0,00" } }
-                FormField { label: qsTr("Vencimento"); Layout.fillWidth: true; AppTextField { id: dVenc; width: parent.width; placeholderText: qsTr("AAAA-MM-DD") } }
+                FormField { label: qsTr("Vencimento"); Layout.fillWidth: true; AppDateField { id: dVenc; width: parent.width } }
             }
             Label { id: dErro; visible: text.length > 0; color: Theme.danger; font.pixelSize: Theme.fontSm; Layout.fillWidth: true; wrapMode: Text.WordWrap }
             RowLayout {
@@ -238,7 +238,11 @@ Rectangle {
                 AppButton {
                     kind: "accent"; text: qsTr("Adicionar")
                     onClicked: {
-                        if (App.criarDespesa(dDesc.text, dValor.text, dVenc.text)) { tela.carregar(); despesaDialog.close(); }
+                        if (dVenc.incompleto) {
+                            dErro.text = qsTr("Vencimento inválido — use dd/mm/aaaa.");
+                        } else if (App.criarDespesa(dDesc.text, dValor.text, dVenc.iso)) {
+                            tela.carregar(); despesaDialog.close();
+                        }
                         else dErro.text = App.ultimoErro();
                     }
                 }

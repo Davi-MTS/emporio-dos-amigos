@@ -203,20 +203,6 @@ Rectangle {
             open();
         }
 
-        // dd/mm/aaaa -> ISO, que é como o banco compara datas.
-        function validadeIso() {
-            var t = validadeField.text.trim();
-            if (t.length === 0)
-                return "";
-            var m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
-            if (!m)
-                return "";
-            var d = new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]));
-            if (isNaN(d.getTime()) || d.getMonth() !== parseInt(m[2]) - 1)
-                return "";   // 31/02 e afins
-            return Qt.formatDate(d, "yyyy-MM-dd");
-        }
-        function validadeOk() { return validadeIso().length > 0; }
 
         function _fatorSel() {
             var e = embalagens[embCombo.currentIndex];
@@ -337,10 +323,9 @@ Rectangle {
                         FormField {
                             label: qsTr("Validade (opcional)")
                             Layout.fillWidth: true
-                            AppTextField {
+                            AppDateField {
                                 id: validadeField
                                 width: parent.width
-                                placeholderText: qsTr("dd/mm/aaaa")
                             }
                         }
                         FormField {
@@ -352,12 +337,12 @@ Rectangle {
                     Text {
                         Layout.fillWidth: true
                         wrapMode: Text.WordWrap
-                        color: validadeField.text.trim().length > 0 && !movDialog.validadeOk()
+                        color: validadeField.incompleto
                                ? Theme.danger : Theme.textMuted
                         font.pixelSize: Theme.fontXs
                         text: validadeField.text.trim().length === 0
                               ? qsTr("Informe só para o que vence em prazo curto (doces, salgadinhos). Fica na aba Vencimento.")
-                              : (movDialog.validadeOk()
+                              : ((validadeField.iso.length > 0)
                                  ? qsTr("Esta remessa entra com validade e passa a aparecer na aba Vencimento.")
                                  : qsTr("Data inválida — use dd/mm/aaaa."))
                     }
@@ -458,14 +443,14 @@ Rectangle {
                     // em silêncio — melhor barrar o botão.
                     enabled: tabs.currentIndex !== 0
                              || validadeField.text.trim().length === 0
-                             || movDialog.validadeOk()
+                             || (validadeField.iso.length > 0)
                     onClicked: {
                         var ok;
                         if (tabs.currentIndex === 0)
                             ok = tela.podeReceberMercadoria
                                  && App.registrarEntrada(movDialog.produtoId, embCombo.currentValue,
                                                       qtdSpin.value, custoField.text, obsField.text,
-                                                      movDialog.validadeIso(), loteField.text);
+                                                      validadeField.iso, loteField.text);
                         else if (tabs.currentIndex === 1)
                             ok = App.registrarInventario(movDialog.produtoId, contagemSpin.value, motivoField.text);
                         else

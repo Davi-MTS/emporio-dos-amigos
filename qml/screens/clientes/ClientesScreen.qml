@@ -31,7 +31,7 @@ Rectangle {
         telField.text = clienteAtual.telefone || "";
         cpfField.text = clienteAtual.cpf || "";
         endField.text = clienteAtual.endereco || "";
-        anivField.text = clienteAtual.aniversario || "";
+        anivField.definir(clienteAtual.aniversario || "");
         obsField.text = clienteAtual.observacoes || "";
         limiteField.text = App.formatarValor(clienteAtual.limite || 0);
     }
@@ -39,7 +39,7 @@ Rectangle {
         var lim = App.parseDinheiro(limiteField.text);
         var dados = {
             id: clienteAtual.id || 0, nome: nomeField.text, telefone: telField.text,
-            cpf: cpfField.text, endereco: endField.text, aniversario: anivField.text,
+            cpf: cpfField.text, endereco: endField.text, aniversario: anivField.iso,
             observacoes: obsField.text, limite: lim < 0 ? 0 : lim
         };
         if (App.salvarCliente(dados)) { carregar(); fechar(); }
@@ -291,7 +291,7 @@ Rectangle {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: Theme.spacingMd
-                            FormField { label: qsTr("Aniversário"); Layout.fillWidth: true; AppTextField { id: anivField; width: parent.width; placeholderText: qsTr("AAAA-MM-DD") } }
+                            FormField { label: qsTr("Aniversário"); Layout.fillWidth: true; AppDateField { id: anivField; width: parent.width } }
                             FormField { label: qsTr("Limite de fiado"); Layout.fillWidth: true; AppTextField { id: limiteField; width: parent.width; horizontalAlignment: Text.AlignRight; placeholderText: "0,00" } }
                         }
                         FormField { label: qsTr("Observações"); Layout.fillWidth: true; AppTextField { id: obsField; width: parent.width } }
