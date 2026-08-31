@@ -19,7 +19,11 @@ public:
     // Lista produtos ativos. `filtro` casa por nome OU código de barras.
     // Preenche categoriaNome, quantidadeEstoque e precoPrincipal (não carrega
     // a lista completa de embalagens — use obter() para isso).
-    QVector<Produto> listar(const QString &filtro = QString());
+    // apenasSemFoto liga o filtro da tela de fotos: mostra so quem ainda
+    // esta sem imagem, para dar para saber quando o trabalho acabou.
+    QVector<Produto> listar(const QString &filtro = QString(),
+                            bool apenasSemFoto = false);
+    int contarSemFoto();
 
     // Produto completo (com embalagens). id inexistente -> nullopt.
     std::optional<Produto> obter(int id);

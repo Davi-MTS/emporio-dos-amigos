@@ -25,6 +25,7 @@
 #include "models/UsuariosListModel.h"
 #include "models/VendasListModel.h"
 
+#include <QImage>
 #include <QObject>
 #include <QSqlDatabase>
 #include <QVariantList>
@@ -71,6 +72,11 @@ public:
 
     // --- Produtos ---
     Q_INVOKABLE void recarregarProdutos(const QString &filtro = QString());
+    // Filtro "so os que ainda nao tem foto". Fica LIGADO ate ser desligado,
+    // inclusive nas recargas internas: ao atribuir uma foto o produto sai da
+    // lista sozinho, que e o retorno que se quer ver.
+    Q_INVOKABLE void mostrarApenasSemFoto(bool apenas, const QString &filtro = QString());
+    Q_INVOKABLE int contarProdutosSemFoto();
     Q_INVOKABLE QVariantList categorias();
     // Produtos que podem ser a ORIGEM de uma dose (a garrafa): ativos, não
     // compostos e que não sejam eles próprios uma dose.
@@ -99,6 +105,9 @@ public:
     // maior 320 px, JPEG) — o banco inteiro sai da loja no backup do Telegram.
     // { ok, erro, bytes }. Exige edita_produto.
     Q_INVOKABLE QVariantMap definirFotoProduto(int produtoId, const QString &caminhoArquivo);
+    // Mesma coisa, com a imagem que estiver na area de transferencia (Ctrl+V):
+    // serve para produto cuja foto se pega da internet em vez de fotografar.
+    Q_INVOKABLE QVariantMap colarFotoProduto(int produtoId);
     Q_INVOKABLE bool removerFotoProduto(int produtoId);
     Q_INVOKABLE bool produtoTemFoto(int produtoId);
     // Muda a cada foto gravada: as telas põem isto na URL para o Qt não
@@ -295,6 +304,9 @@ signals:
 
 private:
     void _definirUsuarioAtual(const Usuario &u);
+    // Miolo comum de definirFotoProduto e colarFotoProduto: reduz, converte
+    // para JPEG e grava. Recebe a imagem ja lida.
+    QVariantMap _gravarFoto(int produtoId, const QImage &original);
 
     QSqlDatabase m_db;
     ProdutoRepository m_produtoRepo;
@@ -324,6 +336,7 @@ private:
     int m_usuarioId = 0;
     int m_sessaoId = 0;
     int m_versaoFotos = 1;
+    bool m_apenasSemFoto = false;
     // Financeiro: por padrão a lista traz só o que está em aberto (é o que
     // importa no dia). Ligado, mostra também o que já foi pago — é como se
     // acha uma conta lançada por engano para estornar.

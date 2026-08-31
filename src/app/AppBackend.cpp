@@ -1,6 +1,8 @@
 #include "app/AppBackend.h"
 
 #include <QBuffer>
+#include <QClipboard>
+#include <QGuiApplication>
 #include <QDate>
 #include <QImage>
 #include <QImageReader>
@@ -888,7 +890,18 @@ QVariantList AppBackend::relatorioProdutosParados(int dias)
 
 void AppBackend::recarregarProdutos(const QString &filtro)
 {
-    m_produtosModel->setProdutos(m_produtoRepo.listar(filtro));
+    m_produtosModel->setProdutos(m_produtoRepo.listar(filtro, m_apenasSemFoto));
+}
+
+void AppBackend::mostrarApenasSemFoto(bool apenas, const QString &filtro)
+{
+    m_apenasSemFoto = apenas;
+    recarregarProdutos(filtro);
+}
+
+int AppBackend::contarProdutosSemFoto()
+{
+    return m_produtoRepo.contarSemFoto();
 }
 
 QVariantList AppBackend::categorias()
@@ -1192,9 +1205,54 @@ QVariantMap AppBackend::definirFotoProduto(int produtoId, const QString &caminho
     leitor.setAutoTransform(true);   // respeita a rotação da foto do celular
     const QImage original = leitor.read();
     if (original.isNull()) {
-        out[QStringLiteral("erro")] = tr("Não consegui ler a imagem (%1).").arg(leitor.errorString());
+        // O iPhone grava HEIC por padrão e o Qt daqui não abre esse formato
+        // (não existe plugin heif no pacote). Sem esta mensagem o dono só via
+        // "não consegui ler" e não tinha como adivinhar o que fazer.
+        const QString ext = QFileInfo(caminhoArquivo).suffix().toLower();
+        if (ext == QLatin1String("heic") || ext == QLatin1String("heif")) {
+            out[QStringLiteral("erro")] =
+                tr("Foto de iPhone no formato HEIC, que o sistema não abre. "
+                   "No celular: Ajustes → Câmera → Formatos → Mais Compatível. "
+                   "As fotos novas já saem em JPEG.");
+        } else {
+            out[QStringLiteral("erro")] =
+                tr("Não consegui ler a imagem (%1).").arg(leitor.errorString());
+        }
         return out;
     }
+
+    return _gravarFoto(produtoId, original);
+}
+
+QVariantMap AppBackend::colarFotoProduto(int produtoId)
+{
+    QVariantMap out;
+    out[QStringLiteral("ok")] = false;
+
+    if (!temPermissao(QStringLiteral("edita_produto"))) {
+        out[QStringLiteral("erro")] = tr("Seu usuário não pode alterar produtos.");
+        return out;
+    }
+    if (produtoId <= 0) {
+        out[QStringLiteral("erro")] = tr("Salve o produto antes de adicionar a foto.");
+        return out;
+    }
+
+    const QClipboard *area =
+        QGuiApplication::instance() ? QGuiApplication::clipboard() : nullptr;
+    const QImage original = area ? area->image() : QImage();
+    if (original.isNull()) {
+        out[QStringLiteral("erro")] = tr("Não há nenhuma imagem copiada. "
+                                         "Copie a imagem (Ctrl+C) e tente de novo.");
+        return out;
+    }
+    return _gravarFoto(produtoId, original);
+}
+
+QVariantMap AppBackend::_gravarFoto(int produtoId, const QImage &original)
+{
+    QVariantMap out;
+    out[QStringLiteral("ok")] = false;
 
     // Reduz antes de gravar: a foto é só para reconhecer o produto na tela, e
     // o banco inteiro viaja no backup. 320 px no lado maior resolve os dois.

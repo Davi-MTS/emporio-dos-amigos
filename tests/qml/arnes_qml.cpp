@@ -13,6 +13,7 @@
 
 #include <QtQuickTest>
 
+#include <QImage>
 #include <QQmlContext>
 #include <QQmlEngine>
 #include <QQuickStyle>
@@ -58,6 +59,24 @@ public Q_SLOTS:
                               QStringLiteral("teste"),
                               QStringLiteral("teste1234"));
         m_backend->login(QStringLiteral("teste"), QStringLiteral("teste1234"));
+
+        criarFotosDeTeste();
+    }
+
+    // A fila de fotos precisa de arquivos de imagem DE VERDADE no disco: ela
+    // lê o arquivo, reduz e grava. Três PNGs pequenos bastam.
+    void criarFotosDeTeste()
+    {
+        for (int n = 1; n <= 3; ++n) {
+            QImage img(60, 40, QImage::Format_RGB32);
+            img.fill(QRgb(0x00204060u + static_cast<uint>(n) * 0x101010u));
+            const QString caminho =
+                m_pasta->filePath(QStringLiteral("foto%1.png").arg(n));
+            const bool salvou = img.save(caminho, "PNG");
+            Q_ASSERT(salvou);
+            Q_UNUSED(salvou)
+            m_fotos.push_back(QUrl::fromLocalFile(caminho).toString());
+        }
     }
 
     void qmlEngineAvailable(QQmlEngine *engine)
@@ -67,6 +86,8 @@ public Q_SLOTS:
         engine->rootContext()->setContextProperty(QStringLiteral("App"), m_backend.data());
         engine->addImageProvider(QString::fromLatin1(ProdutoFotoProvider::nome()),
                                  new ProdutoFotoProvider(m_db->connection()));
+        // Caminhos das imagens de teste, para o caso da fila de fotos.
+        engine->rootContext()->setContextProperty(QStringLiteral("FotosDeTeste"), m_fotos);
     }
 
     void cleanupTestCase()
@@ -80,6 +101,7 @@ private:
     QScopedPointer<QTemporaryDir> m_pasta;
     QScopedPointer<Database> m_db;
     QScopedPointer<AppBackend> m_backend;
+    QVariantList m_fotos;
 };
 
 QUICK_TEST_MAIN_WITH_SETUP(telas, ArnesTelas)

@@ -21,8 +21,11 @@ class TstFotoProduto : public QObject
 private slots:
     void initTestCase();
     void fotoGrandeEReduzidaAoGravar();
+    void listaEnxergaQuemTemFoto();
+    void filtroSemFotoEContagem();
     void removerApagaAFoto();
     void arquivoInvalidoNaoQuebra();
+    void heicExplicaOQueFazer();
 
 private:
     QTemporaryDir m_dir;
@@ -102,6 +105,53 @@ void TstFotoProduto::fotoGrandeEReduzidaAoGravar()
     QVERIFY(m_app->produtoTemFoto(m_produtoId));
 }
 
+// A foto existia no banco e NAO aparecia na lista: as duas consultas do
+// repositorio liam uma coluna a mais do que selecionavam (value(14) numa
+// consulta de 14 colunas, value(17) numa de 17), entao `temFoto` era sempre
+// false. Como o editor pergunta ao banco por outro caminho, a foto aparecia
+// la dentro e em nenhum outro lugar -- o tipo de defeito que so aparece
+// quando alguem finalmente cadastra a primeira foto.
+void TstFotoProduto::listaEnxergaQuemTemFoto()
+{
+    QVERIFY(m_app->produtoTemFoto(m_produtoId));
+
+    bool achou = false;
+    for (const Produto &p : prod().listar(QStringLiteral("Produto com foto"))) {
+        if (p.id != m_produtoId)
+            continue;
+        achou = true;
+        QVERIFY2(p.temFoto, "listar() nao enxergou a foto");
+    }
+    QVERIFY(achou);
+
+    const auto um = prod().obter(m_produtoId);
+    QVERIFY(um.has_value());
+    QVERIFY2(um->temFoto, "obter() nao enxergou a foto");
+
+    // E o caminho que a fila de fotos usa para marcar "ja tem foto".
+    const QVariantList achados = m_app->buscarProdutosPorNome(QStringLiteral("Produto com"));
+    QVERIFY(!achados.isEmpty());
+    QCOMPARE(achados.first().toMap().value(QStringLiteral("temFoto")).toBool(), true);
+}
+
+// O contador e o filtro sao o que diz ao dono quando o trabalho acabou.
+void TstFotoProduto::filtroSemFotoEContagem()
+{
+    QVariantMap outro = m_app->novoProduto();
+    outro[QStringLiteral("nome")] = QStringLiteral("Ainda sem foto");
+    outro[QStringLiteral("categoriaId")] =
+        m_app->categorias().first().toMap().value(QStringLiteral("id")).toInt();
+    QVERIFY2(m_app->salvarProduto(outro), qUtf8Printable(m_app->ultimoErro()));
+
+    const int semFoto = m_app->contarProdutosSemFoto();
+    QVERIFY(semFoto >= 1);
+
+    const auto lista = prod().listar(QString(), /*apenasSemFoto=*/true);
+    QCOMPARE(lista.size(), semFoto);
+    for (const Produto &p : lista)
+        QVERIFY2(p.id != m_produtoId, "quem tem foto nao pode entrar no filtro");
+}
+
 void TstFotoProduto::removerApagaAFoto()
 {
     QVERIFY(m_app->produtoTemFoto(m_produtoId));
@@ -123,6 +173,24 @@ void TstFotoProduto::arquivoInvalidoNaoQuebra()
     QCOMPARE(r.value(QStringLiteral("ok")).toBool(), false);
     QVERIFY(!r.value(QStringLiteral("erro")).toString().isEmpty());
     QVERIFY(!m_app->produtoTemFoto(m_produtoId));
+}
+
+// O iPhone grava HEIC por padrao e este Qt nao tem plugin para isso. O erro
+// generico ("nao consegui ler") nao dava ao dono nenhuma pista do que fazer,
+// e ele ficaria tentando as mesmas fotos de novo.
+void TstFotoProduto::heicExplicaOQueFazer()
+{
+    const QString heic = m_dir.filePath(QStringLiteral("foto.heic"));
+    {
+        QFile f(heic);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("nao importa o conteudo: o Qt nao abre este formato de todo jeito");
+    }
+    const QVariantMap r = m_app->definirFotoProduto(m_produtoId, heic);
+    QCOMPARE(r.value(QStringLiteral("ok")).toBool(), false);
+    const QString erro = r.value(QStringLiteral("erro")).toString();
+    QVERIFY2(erro.contains(QStringLiteral("Mais Compat")),
+             qPrintable(QStringLiteral("erro sem a saida pratica: ") + erro));
 }
 
 QTEST_MAIN(TstFotoProduto)

@@ -12,7 +12,7 @@ ProdutoRepository::ProdutoRepository(QSqlDatabase db)
 {
 }
 
-QVector<Produto> ProdutoRepository::listar(const QString &filtro)
+QVector<Produto> ProdutoRepository::listar(const QString &filtro, bool apenasSemFoto)
 {
     QVector<Produto> produtos;
 
@@ -25,12 +25,21 @@ QVector<Produto> ProdutoRepository::listar(const QString &filtro)
         "         WHERE pe.produto_id = p.id ORDER BY pe.fator_conversao ASC LIMIT 1) AS preco, "
         "       p.composto, "
         "       COALESCE(p.dose_de_produto_id, 0), COALESCE(p.dose_quantidade, 0), "
-        "       COALESCE(o.nome, \'\'), COALESCE(o.unidade_base, \'\') "
+        "       COALESCE(o.nome, \'\'), COALESCE(o.unidade_base, \'\'), "
+        // A coluna nunca era selecionada: o codigo lia value(14) numa consulta
+        // de 14 colunas (0..13) -- sempre invalido, sempre false. Com isso a
+        // miniatura nao aparecia em NENHUM lugar que usa listar() (lista de
+        // produtos, sugestoes do PDV, carrinho); so dentro do editor, que
+        // pergunta ao banco por outro caminho.
+        "       (p.foto IS NOT NULL AND length(p.foto) > 0) AS tem_foto "
         "FROM produtos p "
         "LEFT JOIN categorias c ON c.id = p.categoria_id "
         "LEFT JOIN estoque e ON e.produto_id = p.id "
         "LEFT JOIN produtos o ON o.id = p.dose_de_produto_id "
         "WHERE p.ativo = 1 ");
+
+    if (apenasSemFoto)
+        sql += QStringLiteral("AND (p.foto IS NULL OR length(p.foto) = 0) ");
 
     const QString f = filtro.trimmed();
     if (!f.isEmpty()) {
@@ -74,6 +83,18 @@ QVector<Produto> ProdutoRepository::listar(const QString &filtro)
     return produtos;
 }
 
+int ProdutoRepository::contarSemFoto()
+{
+    QSqlQuery q(m_db);
+    if (!q.exec(QStringLiteral("SELECT COUNT(*) FROM produtos "
+                               "WHERE ativo = 1 AND (foto IS NULL OR length(foto) = 0)"))
+        || !q.next()) {
+        m_erro = q.lastError().text();
+        return 0;
+    }
+    return q.value(0).toInt();
+}
+
 QVector<Embalagem> ProdutoRepository::carregarEmbalagens(int produtoId)
 {
     QVector<Embalagem> lista;
@@ -110,7 +131,9 @@ std::optional<Produto> ProdutoRepository::obter(int id)
         "       p.unidade_base, p.estoque_minimo, p.localizacao, p.taxa_manutencao, "
         "       p.ativo, c.nome, COALESCE(e.quantidade_atual, 0), p.composto, "
         "       COALESCE(p.dose_de_produto_id, 0), COALESCE(p.dose_quantidade, 0), "
-        "       COALESCE(o.nome, \'\'), COALESCE(o.unidade_base, \'\') "
+        "       COALESCE(o.nome, \'\'), COALESCE(o.unidade_base, \'\'), "
+        // Mesmo defeito do listar(): lia value(17) numa consulta de 17 colunas.
+        "       (p.foto IS NOT NULL AND length(p.foto) > 0) AS tem_foto "
         "FROM produtos p "
         "LEFT JOIN categorias c ON c.id = p.categoria_id "
         "LEFT JOIN estoque e ON e.produto_id = p.id "

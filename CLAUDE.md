@@ -16,8 +16,8 @@ na sidebar). Ver `docs/design-ui.md` e `docs/mockup-ui.html`.
 | | |
 | --- | --- |
 | Telas | Dashboard, PDV, **Caixa**, Produtos, Estoque, **Vencimento**, Vendas, Compras, Clientes, Financeiro, Relatórios, Usuários, Backup |
-| Testes | **21 executáveis** no CTest, todos verdes (20 de regra + `tst_qml`, com 56 casos de interface) |
-| Migrations | **0001–0015** aplicadas |
+| Testes | **23 executáveis** no CTest, todos verdes (22 de regra + `tst_qml`, com 70 casos de interface) |
+| Migrations | **0001–0016** aplicadas |
 | Entrega | `deploy/empacotar.ps1` → pasta autossuficiente + zip (~26 MB), sem console |
 | Repositório | `github.com/Davi-MTS/emporio-dos-amigos` (público; pacote pronto versionado em `deploy/pacote/`) |
 
@@ -660,6 +660,69 @@ uma foi commitada e testada separadamente.
 
 **Testes novos:** `tst_estorno`, `tst_dose`, `tst_foto_produto`, `tst_lotes`,
 mais Caixa e Vencimento no `tst_telas`. **21 executáveis, 56 casos de QML.**
+
+### Fotos em lote — a fila de atribuição (feito)
+
+Pôr foto em produto existia desde a migration `0014`, mas só de um jeito: abrir
+o produto no cadastro, achar o botão, navegar até a pasta, escolher um arquivo,
+fechar. Para os ~200 produtos da loja era inviável, e por isso **nenhum produto
+tinha foto**.
+
+O gargalo nunca foi escolher o arquivo — é dizer a QUAL produto ele pertence.
+Então o desenho separa **transporte** de **atribuição**:
+
+- **Transporte:** `FileDialog` com seleção múltipla, `FolderDialog` +
+  `FolderListModel` (pasta inteira de uma vez) e `DropArea` (arrastar do
+  Explorer). As três somam à mesma fila, em vez de trocá-la.
+- **Atribuição:** `qml/screens/produtos/FotosEmLoteDialog.qml` — a foto aparece
+  grande e um campo único recebe o **código de barras** (o leitor digita e dá
+  Enter: `buscarProdutoPorCodigo`, atribui e anda) ou **o nome**
+  (`buscarProdutosPorNome`, até 8 candidatos). Atribuiu → grava → anda → limpa o
+  campo → devolve o foco. Botão "Fotos em lote" no cabeçalho de Produtos.
+
+Detalhes que não são enfeite:
+- Candidato que **já tem foto** vem marcado, e substituir pede confirmação: sem
+  isso dá para sobrescrever a foto certa de um produto sem perceber.
+- **Desfazer** remove a foto recém-atribuída e volta uma casa. Depois de uma
+  SUBSTITUIÇÃO ele fica **desligado** — devolver a foto antiga exigiria tê-la
+  guardado, e não guardamos; melhor desligado do que mentindo.
+- Filtro **"Sem foto (n)"** na lista de Produtos (`mostrarApenasSemFoto`,
+  `contarProdutosSemFoto`): a lista vira a lista do que falta e encurta sozinha.
+  O flag é do backend e vale para o model inteiro, então a tela o **desliga no
+  `Component.onDestruction`** — senão a próxima visita esconderia produtos sem
+  nada na tela explicando por quê.
+- **"Colar imagem"** (`colarFotoProduto`, via `QClipboard`) no editor do
+  produto: muita foto se pega da internet, e copiar/colar é mais rápido do que
+  salvar arquivo e procurar na pasta.
+
+**BUG REAL, achado ao auditar antes de construir:** `temFoto` era **sempre
+false**. `ProdutoRepository::listar` lia `value(14)` numa consulta de 14 colunas
+(0..13) e `obter` lia `value(17)` numa de 17 — nenhuma das duas selecionava a
+coluna `foto`. Como o editor pergunta ao banco por outro caminho
+(`produtoTemFoto`), a foto aparecia lá dentro **e em nenhum outro lugar**:
+lista de produtos, sugestões do PDV e carrinho mostravam a inicial do nome para
+sempre. Só não tinha incomodado ninguém porque nenhum produto tinha foto ainda.
+Coberto por `tst_foto_produto::listaEnxergaQuemTemFoto` (verificado: falha com a
+consulta antiga, passa com a nova).
+
+**Formatos:** o filtro do seletor oferecia `*.webp`, que este Qt não abre. Os
+plugins do pacote são só `qgif/qico/qjpeg/qsvg`; medido em execução, o que entra
+é `bmp gif ico jpeg jpg png ppm svg xbm xpm` — **sem webp, sem tiff, sem heic**.
+O filtro passou a listar só o que funciona, e arquivo `.heic`/`.heif` agora
+recebe a saída prática ("Ajustes → Câmera → Formatos → Mais Compatível") em vez
+do erro genérico.
+
+**Regressão pega pelo `tst_telas`:** com o filtro e o botão novos, a barra de
+Produtos passou a ter quatro controles e na janela restaurada o último começava
+19 px fora da tela. Virou `Flow` (mesma correção do Financeiro).
+
+**Fora do escopo por decisão do dono:** receber as fotos pelo Telegram (o bot já
+existe e converteria HEIC sozinho) e girar a foto antes de atribuir.
+
+**Testes novos:** `tests/qml/casos/tst_fotos.qml` (14 casos: a fila anda, pular
+não grava, desfazer volta, bipe atribui direto, "já tem foto" avisa, o botão da
+tela abre a fila, cabe em 760×560) e quatro casos em `tst_foto_produto`.
+**23 executáveis, 70 casos de QML.**
 
 **Regressão pega pelos testes de tela:** a linha de filtros nova do Financeiro
 não cabia na janela restaurada e empurrava a lista 79 px para fora — virou

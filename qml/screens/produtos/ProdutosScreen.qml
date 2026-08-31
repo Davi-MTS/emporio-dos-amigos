@@ -16,9 +16,22 @@ Rectangle {
     property var listaCategorias: App.categorias()
     property var origensDose: []
     property bool temFoto: false
+    // Quantos produtos ainda não têm foto (rótulo do filtro).
+    property bool apenasSemFoto: false
+    property int semFoto: 0
+    function recontarSemFoto() { semFoto = App.contarProdutosSemFoto(); }
+    // Para o arnês de testes: o diálogo vive no overlay da janela, fora do
+    // alcance de um findChild a partir da tela.
+    function filaDeFotosAberta() { return fotosLote.opened; }
     // A unidade base virou propriedade da tela: era um campo de texto ao lado
     // dos botõezinhos, e os dois faziam a mesma coisa. Ficaram só os botões.
     property string unidadeBase: "unidade"
+
+    Component.onCompleted: recontarSemFoto()
+    // O filtro "sem foto" mora no backend e vale para o model inteiro: sair da
+    // tela sem desligá-lo deixaria a lista de produtos escondendo coisa na
+    // próxima visita, sem nada na tela explicando por quê.
+    Component.onDestruction: App.mostrarApenasSemFoto(false, "")
 
     // Produtos que podem ocupar uma linha da receita (para escolher o padrão).
     function produtosDaCategoria(catId) {
@@ -253,18 +266,39 @@ Rectangle {
             Layout.fillHeight: true
             spacing: Theme.spacingMd
 
-            RowLayout {
+            // Flow, e não RowLayout: com o filtro e o botão de fotos a barra
+            // passou a ter quatro controles, e na janela restaurada o último
+            // começava 19 px fora da tela. Aqui eles descem uma linha.
+            Flow {
+                id: barraProdutos
                 Layout.fillWidth: true
                 spacing: Theme.spacingSm
 
                 AppTextField {
                     id: buscaField
-                    Layout.fillWidth: true
-                    Layout.maximumWidth: 420
+                    width: Math.min(420, barraProdutos.width)
                     placeholderText: qsTr("Buscar por nome ou código de barras…")
                     onTextChanged: App.recarregarProdutos(text)
                 }
-                Item { Layout.fillWidth: true }
+                // Filtro de trabalho: com ele ligado a lista vira a lista do que
+                // ainda falta fotografar, e vai encurtando sozinha.
+                ToggleButton {
+                    objectName: "filtroSemFoto"
+                    text: qsTr("Sem foto (%1)").arg(tela.semFoto)
+                    visible: tela.podeEditar
+                    checked: tela.apenasSemFoto
+                    onClicked: {
+                        tela.apenasSemFoto = !tela.apenasSemFoto;
+                        App.mostrarApenasSemFoto(tela.apenasSemFoto, buscaField.text);
+                    }
+                }
+                AppButton {
+                    objectName: "botaoFotosLote"
+                    kind: "default"
+                    text: qsTr("Fotos em lote")
+                    enabled: tela.podeEditar
+                    onClicked: { fotosLote.reiniciar(); fotosLote.open(); }
+                }
                 AppButton {
                     kind: "accent"
                     text: qsTr("＋ Novo produto")
@@ -515,14 +549,35 @@ Rectangle {
                                                  && (tela.produtoAtual.id || 0) > 0
                                         onClicked: fotoDialog.open()
                                     }
+                                    // Muito produto tem foto pronta na internet:
+                                    // copiar a imagem e colar aqui é mais rápido
+                                    // do que salvar arquivo e procurar na pasta.
+                                    AppButton {
+                                        kind: "default"
+                                        text: qsTr("Colar imagem")
+                                        enabled: tela.podeEditar && tela.produtoAtual
+                                                 && (tela.produtoAtual.id || 0) > 0
+                                        onClicked: {
+                                            var r = App.colarFotoProduto(tela.produtoAtual.id);
+                                            if (r.ok) {
+                                                tela.temFoto = true;
+                                                tela.recontarSemFoto();
+                                                erroLabel.text = "";
+                                            } else {
+                                                erroLabel.text = r.erro;
+                                            }
+                                        }
+                                    }
                                     AppButton {
                                         kind: "ghost"
                                         text: qsTr("Remover")
                                         visible: tela.temFoto
                                         enabled: tela.podeEditar
                                         onClicked: {
-                                            if (App.removerFotoProduto(tela.produtoAtual.id))
+                                            if (App.removerFotoProduto(tela.produtoAtual.id)) {
                                                 tela.temFoto = false;
+                                                tela.recontarSemFoto();
+                                            }
                                             else
                                                 erroLabel.text = App.ultimoErro();
                                         }
@@ -993,16 +1048,39 @@ Rectangle {
         }
     }
 
+    FotosEmLoteDialog {
+        id: fotosLote
+        parent: Overlay.overlay
+        onPrecisaRecarregar: {
+            App.recarregarProdutos(buscaField.text);
+            tela.recontarSemFoto();
+        }
+        onClosed: {
+            tela.recontarSemFoto();
+            // "Ver quem ainda falta" já deixa a lista pronta no estado certo.
+            if (verFaltantes) {
+                tela.apenasSemFoto = true;
+                buscaField.text = "";
+                App.mostrarApenasSemFoto(true, "");
+            }
+        }
+    }
+
     FileDialog {
         id: fotoDialog
         title: qsTr("Escolha a foto do produto")
-        nameFilters: [qsTr("Imagens (*.png *.jpg *.jpeg *.bmp *.webp)"), qsTr("Todos os arquivos (*)")]
+        // Só o que o Qt deste pacote realmente abre. O filtro oferecia .webp,
+        // que não tem plugin aqui: escolher um dava "não consegui ler a imagem"
+        // sem o dono ter como saber por quê.
+        nameFilters: [qsTr("Imagens (*.png *.jpg *.jpeg *.bmp *.gif)"),
+                      qsTr("Todos os arquivos (*)")]
         onAccepted: {
             var caminho = decodeURIComponent(
                 fotoDialog.selectedFile.toString().replace(/^file:\/{2,3}/, ""));
             var r = App.definirFotoProduto(tela.produtoAtual.id, caminho);
             if (r.ok) {
                 tela.temFoto = true;
+                tela.recontarSemFoto();
                 erroLabel.text = "";
             } else {
                 erroLabel.text = r.erro;

@@ -44,6 +44,7 @@ qt_add_qml_module(distribuidora_ui
         components/FormField.qml
         screens/dashboard/DashboardScreen.qml
         screens/produtos/ProdutosScreen.qml
+        screens/produtos/FotosEmLoteDialog.qml
         screens/estoque/EstoqueScreen.qml
         screens/vencimento/VencimentoScreen.qml
         screens/pdv/PdvScreen.qml
