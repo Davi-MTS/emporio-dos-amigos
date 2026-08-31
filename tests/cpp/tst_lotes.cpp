@@ -9,6 +9,7 @@
 #include "database/MigrationRunner.h"
 #include "domain/estoque/EstoqueRepository.h"
 #include "domain/lotes/LoteRepository.h"
+#include "domain/compras/CompraRepository.h"
 #include "domain/produtos/ProdutoRepository.h"
 
 // Validade por remessa. O que precisa estar certo:
@@ -30,6 +31,7 @@ private slots:
     void loteZeradoSomeDaLista();
     void resumoSeparaVencidoDeAVencer();
     void entradaSemValidadeApareceComoDivergencia();
+    void compraComValidadeCriaLote();
 
 private:
     QTemporaryDir m_dir;
@@ -176,6 +178,44 @@ void TstLotes::entradaSemValidadeApareceComoDivergencia()
     QCOMPARE(div.size(), 1);
     QCOMPARE(div.at(0).first, QStringLiteral("Chocolate Teste"));
     QCOMPARE(div.at(0).second, qint64(7));   // 7 unidades fora do controle de validade
+}
+
+// A mercadoria costuma entrar pela COMPRA, não pela tela de estoque. Se a
+// validade da nota não virar lote ali, o controle de vencimento fica vazio
+// justamente no caminho que a loja usa todo dia.
+void TstLotes::compraComValidadeCriaLote()
+{
+    const qint64 antes = lotes().totalEmLotes(m_produtoId);
+
+    QVariantMap item;
+    item[QStringLiteral("produtoId")] = m_produtoId;
+    item[QStringLiteral("embalagemId")] = m_embalagemId;
+    item[QStringLiteral("fator")] = 1;
+    item[QStringLiteral("qtd")] = 24;
+    item[QStringLiteral("custo")] = 250;
+    item[QStringLiteral("validade")] = emDias(45);
+    item[QStringLiteral("lote")] = QStringLiteral("NF-777");
+
+    QVariantMap compra;
+    compra[QStringLiteral("fornecedorId")] = 0;
+    compra[QStringLiteral("gerarContaPagar")] = false;
+    compra[QStringLiteral("itens")] = QVariantList{item};
+
+    const QVariantMap r = m_app->registrarCompra(compra);
+    QVERIFY2(r.value(QStringLiteral("ok")).toBool(),
+             qUtf8Printable(r.value(QStringLiteral("erro")).toString()));
+
+    QCOMPARE(lotes().totalEmLotes(m_produtoId), antes + 24);
+
+    bool achou = false;
+    for (const Lote &l : lotes().listar(-1)) {
+        if (l.codigo == QStringLiteral("NF-777")) {
+            achou = true;
+            QCOMPARE(l.quantidade, qint64(24));
+            QVERIFY(l.diasParaVencer > 40);
+        }
+    }
+    QVERIFY2(achou, "o lote da compra nao apareceu no controle de vencimento");
 }
 
 QTEST_MAIN(TstLotes)

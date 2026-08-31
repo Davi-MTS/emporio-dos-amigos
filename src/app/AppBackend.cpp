@@ -315,6 +315,8 @@ QVariantMap AppBackend::registrarCompra(const QVariantMap &dados)
         it.fator = im.value(QStringLiteral("fator"), 1).toInt();
         it.qtdEmbalagem = im.value(QStringLiteral("qtd")).toLongLong();
         it.custoUnitEmbalagem = im.value(QStringLiteral("custo")).toLongLong();
+        it.validade = im.value(QStringLiteral("validade")).toString();
+        it.codigoLote = im.value(QStringLiteral("lote")).toString();
         itens.push_back(it);
     }
 

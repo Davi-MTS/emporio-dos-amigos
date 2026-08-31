@@ -258,8 +258,6 @@ Rectangle {
                                        itens: itens, pagamentos: pags });
         if (res.ok) {
             sucessoDialog.troco = res.troco;
-            sucessoDialog.vendaId = res.vendaId;
-            sucessoDialog.erro = "";
             sucessoDialog.open();
             limparVenda();
         } else {
@@ -774,12 +772,6 @@ Rectangle {
         width: 440
         padding: Theme.spacingLg
         property int troco: 0
-        property int vendaId: 0
-        property string erro: ""
-        readonly property bool podeCancelar: {
-            var p = (App.usuarioAtual && App.usuarioAtual.permissoes) ? App.usuarioAtual.permissoes : ({});
-            return p.tudo === true || p.pode_cancelar_venda === true;
-        }
         title: qsTr("Venda concluída")
         contentItem: ColumnLayout {
             spacing: Theme.spacingMd
@@ -792,48 +784,31 @@ Rectangle {
                 font.pixelSize: Theme.fontLg
                 font.weight: Font.DemiBold
             }
+            // Só aparece quando há troco. "Pagamento exato, sem troco" era uma
+            // frase grande para dizer que não havia nada a fazer.
             Text {
+                visible: sucessoDialog.troco > 0
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.WordWrap
-                text: sucessoDialog.troco > 0
-                      ? qsTr("Troco a devolver: ") + App.formatarDinheiro(sucessoDialog.troco)
-                      : qsTr("Pagamento exato, sem troco.")
-                color: sucessoDialog.troco > 0 ? Theme.primary : Theme.text
+                text: qsTr("Troco: ") + App.formatarDinheiro(sucessoDialog.troco)
+                color: Theme.primary
                 font.pixelSize: Theme.fontXxl
                 font.weight: Font.Bold
             }
-            Label {
-                visible: sucessoDialog.erro.length > 0
-                Layout.fillWidth: true
-                wrapMode: Text.WordWrap
-                horizontalAlignment: Text.AlignHCenter
-                text: sucessoDialog.erro
-                color: Theme.danger
-                font.pixelSize: Theme.fontSm
-            }
-            // O erro aparece agora, com a venda ainda na cabeça de quem digitou.
-            // Mandar procurar na aba Vendas era o caminho que ninguém achava.
+            // Cancelar venda vive só na aba Vendas: no PDV, um botão vermelho
+            // ao lado do "próxima venda" é um clique errado esperando acontecer,
+            // com a fila andando.
             RowLayout {
                 Layout.fillWidth: true
                 Layout.topMargin: Theme.spacingSm
-                spacing: Theme.spacingSm
-                AppButton {
-                    visible: sucessoDialog.podeCancelar && sucessoDialog.vendaId > 0
-                    kind: "perigo"
-                    text: qsTr("Errei — cancelar esta venda")
-                    onClicked: {
-                        var r = App.cancelarVenda(sucessoDialog.vendaId, qsTr("Cancelada logo após a venda"));
-                        if (r.ok) sucessoDialog.close();
-                        else sucessoDialog.erro = r.erro;
-                    }
-                }
                 Item { Layout.fillWidth: true }
                 AppButton {
                     kind: "accent"
                     text: qsTr("Próxima venda")
                     onClicked: sucessoDialog.close()
                 }
+                Item { Layout.fillWidth: true }
             }
         }
         onClosed: scanField.forceActiveFocus()

@@ -1,5 +1,7 @@
 #include "domain/compras/CompraRepository.h"
 
+#include "domain/lotes/LoteRepository.h"
+
 #include <utility>
 
 #include <QSqlError>
@@ -116,6 +118,18 @@ ResultadoCompra CompraRepository::registrarCompra(int fornecedorId,
             res.erro = m_estoque.ultimoErro();
             m_db.rollback();
             return res;
+        }
+
+        // Validade da remessa, quando informada na nota. Vai na MESMA transação
+        // da compra: mercadoria que entrou sem o lote correspondente sairia do
+        // controle de vencimento sem ninguém notar.
+        if (!it.validade.trimmed().isEmpty()) {
+            LoteRepository lotes(m_db);
+            if (!lotes.registrar(it.produtoId, qtdBase, it.validade.trimmed(), it.codigoLote)) {
+                res.erro = lotes.ultimoErro();
+                m_db.rollback();
+                return res;
+            }
         }
     }
 

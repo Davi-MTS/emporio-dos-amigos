@@ -11,6 +11,8 @@ struct ItemCompra
     int fator = 1;
     qint64 qtdEmbalagem = 0;         // quantas embalagens
     qint64 custoUnitEmbalagem = 0;   // centavos por embalagem
+    QString validade;                // ISO date; vazio = produto que não vence
+    QString codigoLote;              // opcional, o que vem impresso na caixa
 };
 
 struct ResultadoCompra

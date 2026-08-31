@@ -109,7 +109,7 @@ Rectangle {
         property var fornecedores: []
         property int totalCompra: 0
 
-        ListModel { id: itensModel }   // produtoId, nome, embList, embId, fator, qtd, custoTexto
+        ListModel { id: itensModel }   // produtoId, nome, embList, embId, fator, qtd, custoTexto, validadeTexto
         ListModel { id: sugCompra }
 
         function abrir() {
@@ -150,10 +150,24 @@ Rectangle {
             itensModel.append({
                 produtoId: item.produtoId, nome: item.nome,
                 embListJson: JSON.stringify(embs), embId: item.embalagemId, fator: item.fator,
-                qtd: 1, custoTexto: custoIni
+                qtd: 1, custoTexto: custoIni, validadeTexto: ""
             });
             recomputar();
         }
+        // dd/mm/aaaa -> ISO. Devolve vazio quando não dá para entender.
+        function validadeIso(texto) {
+            var t = ("" + texto).trim();
+            if (t.length === 0)
+                return "";
+            var m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+            if (!m)
+                return "";
+            var d = new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]));
+            if (isNaN(d.getTime()) || d.getMonth() !== parseInt(m[2]) - 1)
+                return "";
+            return Qt.formatDate(d, "yyyy-MM-dd");
+        }
+
         function confirmar() {
             if (itensModel.count === 0) { erroCompra.text = qsTr("Adicione ao menos um item."); return; }
             var itens = [];
@@ -166,8 +180,20 @@ Rectangle {
                     erroCompra.text = qsTr("Informe o custo de cada item — falta em: ") + it.nome;
                     return;
                 }
+                // Validade é opcional, mas se foi escrita tem que estar legível:
+                // uma data que o sistema não entende viraria mercadoria sem
+                // controle de vencimento, em silêncio.
+                var validade = "";
+                if (it.validadeTexto && it.validadeTexto.trim().length > 0) {
+                    validade = novaCompraDialog.validadeIso(it.validadeTexto);
+                    if (validade.length === 0) {
+                        erroCompra.text = qsTr("Validade inválida em: ") + it.nome
+                                        + qsTr(" — use dd/mm/aaaa.");
+                        return;
+                    }
+                }
                 itens.push({ produtoId: it.produtoId, embalagemId: it.embId, fator: it.fator,
-                             qtd: it.qtd, custo: c });
+                             qtd: it.qtd, custo: c, validade: validade });
             }
             var r = App.registrarCompra({
                 fornecedorId: fornCombo.currentValue ? fornCombo.currentValue : 0,
@@ -302,6 +328,7 @@ Rectangle {
                                 required property int embId
                                 required property int qtd
                                 required property string custoTexto
+                                required property string validadeTexto
                                 readonly property var embList: JSON.parse(compraRow.embListJson && compraRow.embListJson.length ? compraRow.embListJson : "[]")
                                 Layout.fillWidth: true
                                 spacing: Theme.spacingSm
@@ -330,6 +357,21 @@ Rectangle {
                                     Layout.preferredWidth: 120
                                     from: 1; to: 100000; value: compraRow.qtd
                                     onValueModified: { itensModel.setProperty(compraRow.index, "qtd", value); novaCompraDialog.recomputar(); }
+                                }
+                                // Validade da remessa que está chegando. Fica aqui,
+                                // e não no cadastro do produto, porque cada carga
+                                // vence numa data — a nota é o momento em que se
+                                // sabe qual é.
+                                AppTextField {
+                                    Layout.preferredWidth: 104
+                                    text: compraRow.validadeTexto
+                                    placeholderText: qsTr("validade")
+                                    horizontalAlignment: Text.AlignHCenter
+                                    color: text.trim().length === 0
+                                           || novaCompraDialog.validadeIso(text).length > 0
+                                           ? Theme.text : Theme.danger
+                                    onTextChanged: itensModel.setProperty(compraRow.index,
+                                                                          "validadeTexto", text)
                                 }
                                 AppTextField {
                                     Layout.preferredWidth: 112

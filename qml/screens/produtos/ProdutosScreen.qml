@@ -350,19 +350,33 @@ Rectangle {
                                     }
                                 }
                                 Text { visible: tela.mostrarCategoria; Layout.preferredWidth: tela.colCat; text: linha.categoria; elide: Text.ElideRight; color: Theme.textMuted; font.pixelSize: Theme.fontMd }
-                                Text { visible: tela.mostrarEstoque; Layout.preferredWidth: tela.colEst; text: linha.composto ? "—" : linha.estoque; horizontalAlignment: Text.AlignRight; color: Theme.text; font.pixelSize: Theme.fontMd }
+                                Text { visible: tela.mostrarEstoque; Layout.preferredWidth: tela.colEst; text: (linha.composto || linha.doseOrigem.length > 0) ? "—" : linha.estoque; horizontalAlignment: Text.AlignRight; color: Theme.text; font.pixelSize: Theme.fontMd }
                                 Text { visible: tela.mostrarPreco; Layout.preferredWidth: tela.colPreco; text: App.formatarDinheiro(linha.preco); horizontalAlignment: Text.AlignRight; color: Theme.text; font.pixelSize: Theme.fontMd }
                                 Item {
                                     visible: tela.mostrarStatus
                                     Layout.preferredWidth: tela.colStatus
                                     implicitHeight: 22
-                                    StatusBadge { visible: !linha.composto; status: linha.status; anchors.verticalCenter: parent.verticalCenter }
+                                    // Dose não tem estoque próprio (sai da garrafa), igual ao
+                                    // composto. Mostrar "0 / Zerado" fazia o shot parecer
+                                    // mercadoria em falta quando a garrafa estava cheia.
+                                    StatusBadge {
+                                        visible: !linha.composto && linha.doseOrigem.length === 0
+                                        status: linha.status
+                                        anchors.verticalCenter: parent.verticalCenter
+                                    }
                                     Rectangle {
-                                        visible: linha.composto
+                                        visible: linha.composto || linha.doseOrigem.length > 0
                                         anchors.verticalCenter: parent.verticalCenter
                                         implicitWidth: cTxt.implicitWidth + 16; implicitHeight: 22; radius: 6
                                         color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.15)
-                                        Text { id: cTxt; anchors.centerIn: parent; text: qsTr("Composto"); color: Theme.primary; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold }
+                                        Text {
+                                            id: cTxt
+                                            anchors.centerIn: parent
+                                            text: linha.composto ? qsTr("Composto") : qsTr("Dose")
+                                            color: Theme.primary
+                                            font.pixelSize: Theme.fontSm
+                                            font.weight: Font.DemiBold
+                                        }
                                     }
                                 }
                             }

@@ -128,7 +128,10 @@ QVector<ProdutoParado> RelatorioRepository::produtosParados(int dias)
     if (q.exec(QStringLiteral(
             "SELECT p.nome, COALESCE(e.quantidade_atual,0) FROM produtos p "
             "LEFT JOIN estoque e ON e.produto_id=p.id "
-            "WHERE p.ativo=1 AND p.id NOT IN ("
+            // Composto e dose não têm estoque próprio: listá-los como "parado"
+            // é ruído, porque o saldo deles é sempre zero por definição.
+            "WHERE p.ativo=1 AND p.composto=0 AND COALESCE(p.dose_de_produto_id,0)=0 "
+            "  AND p.id NOT IN ("
             "  SELECT DISTINCT vi.produto_id FROM venda_itens vi "
             "  JOIN vendas v ON v.id=vi.venda_id "
             "  WHERE v.status='concluida' AND %1) "
