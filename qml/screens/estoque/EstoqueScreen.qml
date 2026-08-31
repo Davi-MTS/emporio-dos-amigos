@@ -16,7 +16,7 @@ Rectangle {
 
     readonly property int colLoc: 150
     readonly property int colQtd: 96
-    readonly property int colMin: 84
+    readonly property int colMin: 108
     readonly property int colCusto: 116
     readonly property int colStatus: 96
 
@@ -142,7 +142,16 @@ Rectangle {
                             }
                             Text { Layout.preferredWidth: tela.colLoc; text: linha.localizacao; elide: Text.ElideRight; color: Theme.textMuted; font.pixelSize: Theme.fontMd }
                             Text { Layout.preferredWidth: tela.colQtd; text: linha.quantidade + " " + linha.unidadeBase; horizontalAlignment: Text.AlignRight; color: Theme.text; font.pixelSize: Theme.fontMd }
-                            Text { Layout.preferredWidth: tela.colMin; text: linha.minimo; horizontalAlignment: Text.AlignRight; color: Theme.textMuted; font.pixelSize: Theme.fontMd }
+                            // Com a unidade junto, igual à "Qtd atual". Um "5" solo ao lado de
+                            // "600 ml" se lê como 5 garrafas — e são 5 ml.
+                            Text {
+                                Layout.preferredWidth: tela.colMin
+                                text: linha.minimo > 0 ? (linha.minimo + " " + linha.unidadeBase) : "—"
+                                horizontalAlignment: Text.AlignRight
+                                elide: Text.ElideRight
+                                color: Theme.textMuted
+                                font.pixelSize: Theme.fontMd
+                            }
                             Text { Layout.preferredWidth: tela.colCusto; text: App.formatarDinheiro(linha.custoMedio); horizontalAlignment: Text.AlignRight; color: Theme.text; font.pixelSize: Theme.fontMd }
                             Item {
                                 Layout.preferredWidth: tela.colStatus

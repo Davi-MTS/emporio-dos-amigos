@@ -64,15 +64,39 @@ Rectangle {
     readonly property int colStatus: 92
 
     ListModel { id: embModel }
+
+    // Opções do estoque mínimo: a UNIDADE BASE em primeiro, depois as embalagens
+    // maiores. Sem a unidade base na lista, um mínimo de 5 ml num produto cuja
+    // única embalagem é a garrafa aparecia como "5 Garrafa" — e salvar de novo
+    // transformaria 5 ml em 3750 ml sem ninguém pedir.
+    ListModel { id: minimoOpcoes }
+
+    function _montarOpcoesMinimo() {
+        minimoOpcoes.clear();
+        minimoOpcoes.append({ nome: unidadeBase, fator: 1 });
+        for (var i = 0; i < embModel.count; i++) {
+            var e = embModel.get(i);
+            if ((e.fator || 1) > 1)
+                minimoOpcoes.append({ nome: e.nome, fator: e.fator });
+        }
+    }
     ListModel { id: compModel }   // composição do copão (insumoId, insumoNome, quantidade)
 
     // Recarrega a lista de categorias e deixa selecionada a que acabou de nascer.
     // Fator da embalagem escolhida no campo de estoque mínimo.
+    // Acesso ao seletor do mínimo de fora da tela (usado pelos testes, que não
+    // enxergam os ids internos do formulário).
+    function opcoesMinimo() { return minimoOpcoes.count; }
+    function definirMinimo(quantidade, indiceOpcao) {
+        minimoEmbCombo.currentIndex = indiceOpcao;
+        minimoSpin.value = quantidade;
+    }
+
     function fatorMinimo() {
         var i = minimoEmbCombo.currentIndex;
-        if (i < 0 || i >= embModel.count)
+        if (i < 0 || i >= minimoOpcoes.count)
             return 1;
-        var f = embModel.get(i).fator;
+        var f = minimoOpcoes.get(i).fator;
         return f > 0 ? f : 1;
     }
 
@@ -89,11 +113,12 @@ Rectangle {
     // O mínimo é guardado em unidade base. Ao abrir, escolhe a MAIOR embalagem
     // em que ele cabe exato — 2000 ml volta como "2 Garrafa 1 L", não "2000 ml".
     function preencherMinimo() {
+        _montarOpcoesMinimo();
         var min = produtoAtual ? (produtoAtual.estoqueMinimo || 0) : 0;
-        var idx = 0;
+        var idx = 0;      // 0 é sempre a unidade base, então sempre há resposta certa
         var fator = 1;
-        for (var i = 0; i < embModel.count; i++) {
-            var f = embModel.get(i).fator || 1;
+        for (var i = 0; i < minimoOpcoes.count; i++) {
+            var f = minimoOpcoes.get(i).fator || 1;
             if (f > 0 && min % f === 0 && f >= fator) { fator = f; idx = i; }
         }
         minimoEmbCombo.currentIndex = idx;
@@ -583,7 +608,10 @@ Rectangle {
                                         MouseArea {
                                             anchors.fill: parent
                                             cursorShape: Qt.PointingHandCursor
-                                            onClicked: tela.unidadeBase = modelData
+                                            onClicked: {
+                                                tela.unidadeBase = modelData;
+                                                tela._montarOpcoesMinimo();
+                                            }
                                         }
                                     }
                                 }
@@ -623,7 +651,7 @@ Rectangle {
                                         id: minimoEmbCombo
                                         Layout.fillWidth: true
                                         Layout.minimumWidth: 0
-                                        model: embModel
+                                        model: minimoOpcoes
                                         textRole: "nome"
                                     }
                                 }
