@@ -98,6 +98,31 @@ TestCase {
                tela.explicarMinimo());
     }
 
+    // O defeito que apareceu em uso: abrir o produto, NAO tocar em nada e salvar
+    // multiplicava o minimo de novo (3750 ml viravam 2.812.500), porque
+    // _preencherCampos escrevia o valor cru por cima da conversao feita por
+    // preencherMinimo. Abrir e salvar tem que ser inofensivo.
+    function test_abrir_e_salvar_sem_mexer_nao_muda_o_minimo() {
+        var tela = abrirTela();
+        tela.abrirProduto(idGarrafa);
+        wait(0);
+
+        // 2000 ml com garrafa de 1 L: o campo mostra 2, nao 2000.
+        compare(tela.fatorMinimo(), 1000);
+        verify(tela.explicarMinimo().indexOf("2000") >= 0, tela.explicarMinimo());
+
+        tela.salvar();
+        compare(App.produto(idGarrafa).estoqueMinimo, 2000,
+                "salvar sem mexer alterou o mínimo");
+
+        // E de novo, para garantir que não acumula a cada abertura.
+        var t2 = abrirTela();
+        t2.abrirProduto(idGarrafa);
+        wait(0);
+        t2.salvar();
+        compare(App.produto(idGarrafa).estoqueMinimo, 2000);
+    }
+
     // A unidade base virou propriedade da tela (o campo de texto saiu): trocar
     // pelos botões tem que continuar mudando o que é salvo.
     function test_unidade_base_e_propriedade_da_tela() {

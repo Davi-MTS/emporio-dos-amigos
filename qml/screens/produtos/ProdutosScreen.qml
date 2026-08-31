@@ -125,17 +125,17 @@ Rectangle {
     function abrirNovo() {
         produtoAtual = App.novoProduto();
         _carregarEmbalagens();
-        preencherMinimo();
         _carregarComposicao();
         _preencherCampos();
+        preencherMinimo();   // por último: nada pode sobrescrever a conversão
         erroLabel.text = "";
     }
     function abrirProduto(id) {
         produtoAtual = App.produto(id);
         _carregarEmbalagens();
-        preencherMinimo();
         _carregarComposicao();
         _preencherCampos();
+        preencherMinimo();   // por último: nada pode sobrescrever a conversão
         erroLabel.text = "";
     }
     function _carregarComposicao() {
@@ -159,7 +159,10 @@ Rectangle {
             return;
         nomeField.text = produtoAtual.nome || "";
         unidadeBase = produtoAtual.unidadeBase || "unidade";
-        minimoSpin.value = produtoAtual.estoqueMinimo || 0;
+        // O mínimo NÃO é preenchido aqui: quem faz é preencherMinimo(), que
+        // converte de unidade base para a embalagem escolhida. Escrever o
+        // valor cru aqui desfazia a conversão e a próxima gravação
+        // multiplicava tudo de novo (3750 virava 2.812.500).
         localField.text = produtoAtual.localizacao || "";
         categoriaCombo.currentIndex = categoriaCombo.indexOfValue(produtoAtual.categoriaId || 0);
         compostoCheck.checked = produtoAtual.composto || false;
