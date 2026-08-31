@@ -16,6 +16,9 @@ Rectangle {
     property var listaCategorias: App.categorias()
     property var origensDose: []
     property bool temFoto: false
+    // A unidade base virou propriedade da tela: era um campo de texto ao lado
+    // dos botõezinhos, e os dois faziam a mesma coisa. Ficaram só os botões.
+    property string unidadeBase: "unidade"
 
     function recarregarOrigens() {
         origensDose = App.produtosParaOrigemDose(
@@ -64,6 +67,39 @@ Rectangle {
     ListModel { id: compModel }   // composição do copão (insumoId, insumoNome, quantidade)
 
     // Recarrega a lista de categorias e deixa selecionada a que acabou de nascer.
+    // Fator da embalagem escolhida no campo de estoque mínimo.
+    function fatorMinimo() {
+        var i = minimoEmbCombo.currentIndex;
+        if (i < 0 || i >= embModel.count)
+            return 1;
+        var f = embModel.get(i).fator;
+        return f > 0 ? f : 1;
+    }
+
+    // Diz, em unidade base, o que o mínimo digitado significa. Sem isto,
+    // "2 caixas" some no banco como "24" e ninguém liga uma coisa à outra.
+    function explicarMinimo() {
+        var base = minimoSpin.value * fatorMinimo();
+        if (base <= 0)
+            return qsTr("Sem aviso de estoque baixo para este produto.");
+        return qsTr("Avisa quando sobrar menos de ") + base + " " + unidadeBase
+               + qsTr(" no estoque.");
+    }
+
+    // O mínimo é guardado em unidade base. Ao abrir, escolhe a MAIOR embalagem
+    // em que ele cabe exato — 2000 ml volta como "2 Garrafa 1 L", não "2000 ml".
+    function preencherMinimo() {
+        var min = produtoAtual ? (produtoAtual.estoqueMinimo || 0) : 0;
+        var idx = 0;
+        var fator = 1;
+        for (var i = 0; i < embModel.count; i++) {
+            var f = embModel.get(i).fator || 1;
+            if (f > 0 && min % f === 0 && f >= fator) { fator = f; idx = i; }
+        }
+        minimoEmbCombo.currentIndex = idx;
+        minimoSpin.value = fator > 0 ? Math.floor(min / fator) : min;
+    }
+
     function recarregarCategorias(selecionarId) {
         listaCategorias = App.categorias();
         if (selecionarId > 0)
@@ -89,6 +125,7 @@ Rectangle {
     function abrirNovo() {
         produtoAtual = App.novoProduto();
         _carregarEmbalagens();
+        preencherMinimo();
         _carregarComposicao();
         _preencherCampos();
         erroLabel.text = "";
@@ -96,6 +133,7 @@ Rectangle {
     function abrirProduto(id) {
         produtoAtual = App.produto(id);
         _carregarEmbalagens();
+        preencherMinimo();
         _carregarComposicao();
         _preencherCampos();
         erroLabel.text = "";
@@ -120,7 +158,7 @@ Rectangle {
         if (!produtoAtual)
             return;
         nomeField.text = produtoAtual.nome || "";
-        unidadeField.text = produtoAtual.unidadeBase || "unidade";
+        unidadeBase = produtoAtual.unidadeBase || "unidade";
         minimoSpin.value = produtoAtual.estoqueMinimo || 0;
         localField.text = produtoAtual.localizacao || "";
         categoriaCombo.currentIndex = categoriaCombo.indexOfValue(produtoAtual.categoriaId || 0);
@@ -155,8 +193,8 @@ Rectangle {
             id: produtoAtual.id || 0,
             nome: nomeField.text,
             categoriaId: categoriaCombo.currentValue ? categoriaCombo.currentValue : 0,
-            unidadeBase: unidadeField.text,
-            estoqueMinimo: minimoSpin.value,
+            unidadeBase: tela.unidadeBase,
+            estoqueMinimo: minimoSpin.value * tela.fatorMinimo(),
             localizacao: localField.text,
             composto: compostoCheck.checked && !doseCheck.checked,
             doseDeProdutoId: doseCheck.checked ? (doseOrigemCombo.currentValue || 0) : 0,
@@ -474,71 +512,68 @@ Rectangle {
                             }
                         }
 
-                        RowLayout {
+                        // Categoria ocupa a linha inteira: espremida ao lado de
+                        // outro campo, o nome da categoria não cabia.
+                        FormField {
+                            label: qsTr("Categoria")
                             Layout.fillWidth: true
-                            spacing: Theme.spacingMd
-                            FormField {
-                                label: qsTr("Categoria")
-                                Layout.fillWidth: true
-                                RowLayout {
-                                    width: parent.width
-                                    spacing: Theme.spacingSm
-                                    AppComboBox {
-                                        id: categoriaCombo
-                                        Layout.fillWidth: true
-                                        model: tela.listaCategorias
-                                        textRole: "nome"
-                                        valueRole: "id"
-                                    }
-                                    // Antes só dava para usar as 12 categorias do seed: se
-                                    // chegasse um produto que não se encaixa, o cadastro
-                                    // parava até alguém mexer no banco.
-                                    AppButton {
-                                        kind: "ghost"
-                                        text: "＋"
-                                        implicitWidth: 40
-                                        enabled: tela.podeEditar
-                                        onClicked: novaCategoriaDialog.abrir()
-                                    }
+                            RowLayout {
+                                width: parent.width
+                                spacing: Theme.spacingSm
+                                AppComboBox {
+                                    id: categoriaCombo
+                                    Layout.fillWidth: true
+                                    Layout.minimumWidth: 0
+                                    model: tela.listaCategorias
+                                    textRole: "nome"
+                                    valueRole: "id"
                                 }
-                            }
-                            FormField {
-                                label: qsTr("Unidade base")
-                                Layout.preferredWidth: 150
-                                AppTextField {
-                                    id: unidadeField
-                                    width: parent.width
-                                    text: tela.produtoAtual ? (tela.produtoAtual.unidadeBase || "unidade") : "unidade"
+                                // Antes só dava para usar as 12 categorias do seed: se
+                                // chegasse um produto que não se encaixa, o cadastro
+                                // parava até alguém mexer no banco.
+                                AppButton {
+                                    kind: "default"
+                                    text: qsTr("＋ Nova")
+                                    enabled: tela.podeEditar
+                                    onClicked: novaCategoriaDialog.abrir()
                                 }
                             }
                         }
 
-                        // Atalhos de unidade base (o campo aceita qualquer outra digitada).
-                        RowLayout {
+                        // Unidade base: só os botões. O campo de texto ao lado
+                        // fazia a mesma coisa e só duplicava a decisão.
+                        FormField {
+                            label: qsTr("Unidade base")
                             Layout.fillWidth: true
-                            spacing: 6
-                            Text { text: qsTr("Unidade:"); color: Theme.textMuted; font.pixelSize: Theme.fontXs }
-                            Repeater {
-                                model: ["unidade", "ml", "litro", "g", "kg"]
-                                delegate: Rectangle {
-                                    required property string modelData
-                                    radius: 6
-                                    implicitHeight: 24
-                                    implicitWidth: chipTxt.implicitWidth + 16
-                                    color: unidadeField.text === modelData ? Theme.accentSoft : Theme.surfaceAlt
-                                    border.color: unidadeField.text === modelData ? Theme.primary : Theme.border
-                                    Text {
-                                        id: chipTxt
-                                        anchors.centerIn: parent
-                                        text: modelData
-                                        color: unidadeField.text === modelData ? Theme.primary : Theme.textMuted
-                                        font.pixelSize: Theme.fontSm
-                                        font.weight: Font.DemiBold
+                            Flow {
+                                width: parent.width
+                                spacing: 6
+                                Repeater {
+                                    model: ["unidade", "ml", "litro", "g", "kg"]
+                                    delegate: Rectangle {
+                                        required property string modelData
+                                        radius: 6
+                                        height: 32
+                                        width: chipTxt.implicitWidth + 26
+                                        color: tela.unidadeBase === modelData ? Theme.accentSoft : Theme.surfaceAlt
+                                        border.width: 1
+                                        border.color: tela.unidadeBase === modelData ? Theme.primary : Theme.border
+                                        Text {
+                                            id: chipTxt
+                                            anchors.centerIn: parent
+                                            text: modelData
+                                            color: tela.unidadeBase === modelData ? Theme.primary : Theme.textMuted
+                                            font.pixelSize: Theme.fontMd
+                                            font.weight: Font.DemiBold
+                                        }
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: tela.unidadeBase = modelData
+                                        }
                                     }
-                                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: unidadeField.text = modelData }
                                 }
                             }
-                            Item { Layout.fillWidth: true }
                         }
 
                         // A unidade base decide como o estoque é CONTADO, e era
@@ -547,7 +582,7 @@ Rectangle {
                         Text {
                             Layout.fillWidth: true
                             wrapMode: Text.WordWrap
-                            text: tela.explicarUnidade(unidadeField.text)
+                            text: tela.explicarUnidade(tela.unidadeBase)
                             color: Theme.textMuted
                             font.pixelSize: Theme.fontXs
                         }
@@ -555,14 +590,28 @@ Rectangle {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: Theme.spacingMd
+                            // O mínimo é guardado em unidade base, mas ninguém
+                            // pensa "avise quando faltar 2000 ml" — pensa "avise
+                            // quando sobrar menos de 2 garrafas". Aqui se digita
+                            // por embalagem e o sistema converte.
                             FormField {
                                 label: qsTr("Estoque mínimo")
-                                Layout.preferredWidth: 150
-                                AppSpinBox {
-                                    id: minimoSpin
+                                Layout.fillWidth: true
+                                RowLayout {
                                     width: parent.width
-                                    from: 0; to: 1000000
-                                    value: tela.produtoAtual ? (tela.produtoAtual.estoqueMinimo || 0) : 0
+                                    spacing: Theme.spacingSm
+                                    AppSpinBox {
+                                        id: minimoSpin
+                                        Layout.preferredWidth: 120
+                                        from: 0; to: 1000000
+                                    }
+                                    AppComboBox {
+                                        id: minimoEmbCombo
+                                        Layout.fillWidth: true
+                                        Layout.minimumWidth: 0
+                                        model: embModel
+                                        textRole: "nome"
+                                    }
                                 }
                             }
                             FormField {
@@ -577,6 +626,14 @@ Rectangle {
                             }
                         }
 
+                        Text {
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            text: tela.explicarMinimo()
+                            color: Theme.textMuted
+                            font.pixelSize: Theme.fontXs
+                        }
+
                         } // fim SEÇÃO: DADOS
 
                         // ====================== SEÇÃO: EMBALAGENS ======================
@@ -586,7 +643,7 @@ Rectangle {
                         spacing: Theme.spacingMd
 
                         Text {
-                            text: qsTr("Fator = quantos \"") + unidadeField.text
+                            text: qsTr("Fator = quantos \"") + tela.unidadeBase
                                   + qsTr("\" cabem nesta embalagem. Ex.: fardo de 12 latas = 12; garrafa de 1 litro contada em ml = 1000.")
                             color: Theme.textMuted
                             font.pixelSize: Theme.fontSm
@@ -599,7 +656,7 @@ Rectangle {
                             Layout.fillWidth: true
                             spacing: Theme.spacingSm
                             Text { text: qsTr("Nome"); Layout.preferredWidth: 130; color: Theme.textMuted; font.pixelSize: Theme.fontSm }
-                            Text { text: qsTr("Fator (") + unidadeField.text + ")"; Layout.preferredWidth: 96; elide: Text.ElideRight; color: Theme.textMuted; font.pixelSize: Theme.fontSm }
+                            Text { text: qsTr("Fator (") + tela.unidadeBase + ")"; Layout.preferredWidth: 96; elide: Text.ElideRight; color: Theme.textMuted; font.pixelSize: Theme.fontSm }
                             Text { text: qsTr("Cód. barras"); Layout.fillWidth: true; Layout.minimumWidth: 90; color: Theme.textMuted; font.pixelSize: Theme.fontSm }
                             Text { text: qsTr("Preço"); Layout.preferredWidth: 104; horizontalAlignment: Text.AlignRight; color: Theme.textMuted; font.pixelSize: Theme.fontSm }
                             Item { Layout.preferredWidth: 28 }

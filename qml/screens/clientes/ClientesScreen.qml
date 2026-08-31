@@ -46,46 +46,6 @@ Rectangle {
         else erro.text = App.ultimoErro();
     }
 
-    // Cartão pequeno do resumo. Em Flow para nunca estourar a largura da janela.
-    component FiadoCard: Rectangle {
-        property string rotulo: ""
-        property string valor: ""
-        property string nota: ""
-        property color cor: Theme.text
-        width: 210
-        height: 78
-        radius: Theme.radius
-        color: Theme.surface
-        border.color: Theme.border
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: Theme.spacingMd
-            spacing: 1
-            Text {
-                text: rotulo
-                color: Theme.textMuted
-                font.pixelSize: Theme.fontXs
-                font.weight: Font.DemiBold
-                font.capitalization: Font.AllUppercase
-                font.letterSpacing: 0.6
-            }
-            Text {
-                text: valor
-                color: cor
-                font.family: Theme.fontBase
-                font.pixelSize: Theme.fontLg
-                font.weight: Font.Bold
-            }
-            Text {
-                Layout.fillWidth: true
-                elide: Text.ElideRight
-                text: nota
-                color: Theme.textMuted
-                font.pixelSize: Theme.fontXs
-            }
-        }
-    }
-
     RowLayout {
         anchors.fill: parent
         anchors.margins: Theme.spacingLg
@@ -97,36 +57,45 @@ Rectangle {
             Layout.fillHeight: true
             spacing: Theme.spacingMd
 
-            // O fiado é o dinheiro da loja que está na rua. Estava só no
-            // Dashboard e nos Relatórios — longe de onde se resolve, que é aqui.
-            Flow {
+            // O fiado é o dinheiro da loja que está na rua, e agora mora só
+            // aqui — saiu do Dashboard. Um número, o que falta receber, com a
+            // quantidade de clientes para dar tamanho a ele.
+            Rectangle {
                 Layout.fillWidth: true
-                spacing: Theme.spacingSm
+                radius: Theme.radius
+                color: Theme.surface
+                border.color: Theme.border
+                implicitHeight: fiadoCol.implicitHeight + 2 * Theme.spacingMd
 
-                FiadoCard {
-                    rotulo: qsTr("Na rua")
-                    valor: App.formatarDinheiro(tela.fiado.total || 0)
-                    nota: (tela.fiado.quantosDevem || 0) + qsTr(" clientes devendo")
-                    cor: Theme.text
-                }
-                FiadoCard {
-                    rotulo: qsTr("Atrasado")
-                    valor: App.formatarDinheiro(tela.fiado.atrasado || 0)
-                    nota: (tela.fiado.quantosAtrasados || 0) + qsTr(" com conta vencida")
-                    cor: (tela.fiado.atrasado || 0) > 0 ? Theme.danger : Theme.success
-                }
-                FiadoCard {
-                    rotulo: qsTr("Maior devedor")
-                    valor: App.formatarDinheiro(tela.fiado.maiorDevedorValor || 0)
-                    nota: tela.fiado.maiorDevedorNome || qsTr("ninguém devendo")
-                    cor: Theme.text
-                }
-                FiadoCard {
-                    visible: (tela.fiado.acimaDoLimite || 0) > 0
-                    rotulo: qsTr("Acima do limite")
-                    valor: "" + (tela.fiado.acimaDoLimite || 0)
-                    nota: qsTr("passaram do combinado")
-                    cor: Theme.warning
+                ColumnLayout {
+                    id: fiadoCol
+                    anchors.fill: parent
+                    anchors.margins: Theme.spacingMd
+                    spacing: 1
+                    Text {
+                        text: qsTr("A receber (fiado)")
+                        color: Theme.textMuted
+                        font.pixelSize: Theme.fontXs
+                        font.weight: Font.DemiBold
+                        font.capitalization: Font.AllUppercase
+                        font.letterSpacing: 0.6
+                    }
+                    Text {
+                        text: App.formatarDinheiro(tela.fiado.total || 0)
+                        color: Theme.text
+                        font.family: Theme.fontDisplay
+                        font.pixelSize: Theme.fontXxl
+                        font.weight: Font.Bold
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        elide: Text.ElideRight
+                        text: (tela.fiado.quantosDevem || 0) === 0
+                              ? qsTr("Ninguém devendo.")
+                              : (tela.fiado.quantosDevem || 0) + qsTr(" cliente(s) com conta em aberto")
+                        color: Theme.textMuted
+                        font.pixelSize: Theme.fontSm
+                    }
                 }
             }
 

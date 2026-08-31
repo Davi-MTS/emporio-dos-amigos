@@ -95,7 +95,6 @@ Rectangle {
             spacing: Theme.spacingMd
             KpiCard { rotulo: qsTr("Vendas hoje"); valor: App.formatarDinheiro(tela.kpis.vendasHoje || 0); corValor: Theme.success; nota: (tela.kpis.numVendasHoje || 0) + qsTr(" vendas") }
             KpiCard { rotulo: qsTr("Ticket médio"); valor: App.formatarDinheiro(tela.kpis.ticketMedio || 0) }
-            KpiCard { rotulo: qsTr("A receber (fiado)"); valor: App.formatarDinheiro(tela.kpis.aReceber || 0); nota: qsTr("abrir Clientes"); rota: "clientes" }
             KpiCard { rotulo: qsTr("Produtos em falta"); valor: "" + (tela.kpis.produtosEmFalta || 0); corValor: (tela.kpis.produtosEmFalta || 0) > 0 ? Theme.danger : Theme.text; nota: qsTr("abrir o Estoque"); rota: "estoque" }
         }
 
@@ -152,21 +151,13 @@ Rectangle {
                     anchors.fill: parent
                     anchors.margins: 18
                     spacing: Theme.spacingMd
-                    ColumnLayout {
-                        spacing: 2
-                        Text { text: qsTr("A receber"); color: Theme.textMuted; font.pixelSize: Theme.fontXs; font.capitalization: Font.AllUppercase; font.letterSpacing: 0.6 }
-                        Text { text: App.formatarDinheiro(tela.fin.aReceber || 0); color: Theme.success; font.pixelSize: Theme.fontXl; font.weight: Font.Bold }
-                    }
+                    // O fiado saiu daqui de propósito: ele vive na aba
+                    // Clientes, que é onde se resolve. "Saldo previsto" foi
+                    // junto — sem o a receber, ele seria um número enganoso.
                     ColumnLayout {
                         spacing: 2
                         Text { text: qsTr("A pagar"); color: Theme.textMuted; font.pixelSize: Theme.fontXs; font.capitalization: Font.AllUppercase; font.letterSpacing: 0.6 }
                         Text { text: App.formatarDinheiro(tela.fin.aPagar || 0); color: Theme.danger; font.pixelSize: Theme.fontXl; font.weight: Font.Bold }
-                    }
-                    Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Theme.border }
-                    ColumnLayout {
-                        spacing: 2
-                        Text { text: qsTr("Saldo previsto"); color: Theme.textMuted; font.pixelSize: Theme.fontXs; font.capitalization: Font.AllUppercase; font.letterSpacing: 0.6 }
-                        Text { text: App.formatarDinheiro(tela.fin.saldo || 0); color: (tela.fin.saldo || 0) >= 0 ? Theme.text : Theme.danger; font.pixelSize: Theme.fontXl; font.weight: Font.Bold }
                     }
                     Item { Layout.fillHeight: true }
                 }
