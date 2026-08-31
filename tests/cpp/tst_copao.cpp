@@ -28,6 +28,7 @@ private slots:
     void trocaDeDestiladoUsaSoOQueAReceitaConsome();
     void semPadraoDefinidoNaoAjustaNada();
     void funcionarioNaoPodeMudarOPrecoDoCopao();
+    void vendaCanceladaNaoDeixaCustoNoLucro();
 
 private:
     QTemporaryDir m_dir;
@@ -344,6 +345,59 @@ void TstCopao::funcionarioNaoPodeMudarOPrecoDoCopao()
     const QVariantMap dono = vender(2000);
     QVERIFY2(dono.value(QStringLiteral("ok")).toBool(),
              qUtf8Printable(dono.value(QStringLiteral("erro")).toString()));
+}
+
+// Venda cancelada nao pode deixar so o custo para tras. A receita ja filtrava
+// por status='concluida'; o custo, nao - entao uma venda cancelada zerava a
+// receita e mantinha o custo, e o lucro do dia aparecia NEGATIVO. Foi assim que
+// a loja viu "-R$ 7,50" com uma unica venda, cancelada, no dia.
+void TstCopao::vendaCanceladaNaoDeixaCustoNoLucro()
+{
+    QVERIFY(m_app->login(QStringLiteral("dono"), QStringLiteral("dono12345")));
+    if (!m_app->caixaAberto())
+        QVERIFY(m_app->abrirCaixa(QStringLiteral("100,00")));
+
+    // Da entrada com custo, para haver custo a contabilizar.
+    const auto emb = prod().obter(m_extraPower)->embalagens.first();
+    QVERIFY2(m_app->registrarEntrada(m_extraPower, emb.id, 10, QStringLiteral("30,00"),
+                                     QStringLiteral("carga")),
+             qUtf8Printable(m_app->ultimoErro()));
+
+    const qlonglong lucroAntes = m_app->relatorioFaturamento(0)
+                                     .value(QStringLiteral("lucro")).toLongLong();
+
+    QVariantMap item;
+    item[QStringLiteral("produtoId")] = m_extraPower;
+    item[QStringLiteral("embalagemId")] = emb.id;
+    item[QStringLiteral("fator")] = 1;
+    item[QStringLiteral("qtd")] = 1;
+    item[QStringLiteral("precoUnit")] = 550;
+    item[QStringLiteral("desconto")] = 0;
+    QVariantMap pag;
+    pag[QStringLiteral("forma")] = QStringLiteral("dinheiro");
+    pag[QStringLiteral("valor")] = 550;
+    QVariantMap venda;
+    venda[QStringLiteral("desconto")] = 0;
+    venda[QStringLiteral("clienteId")] = 0;
+    venda[QStringLiteral("itens")] = QVariantList{item};
+    venda[QStringLiteral("pagamentos")] = QVariantList{pag};
+
+    const QVariantMap r = m_app->finalizarVenda(venda);
+    QVERIFY2(r.value(QStringLiteral("ok")).toBool(),
+             qUtf8Printable(r.value(QStringLiteral("erro")).toString()));
+
+    // Cancelada: o lucro tem que VOLTAR exatamente ao que era. Antes da correcao
+    // ficava 300 centavos MENOR (o custo do item vendido continuava contando,
+    // enquanto a receita sumia) - e com poucas vendas no dia isso deixava o
+    // numero negativo.
+    const QVariantMap canc = m_app->cancelarVenda(r.value(QStringLiteral("vendaId")).toInt(),
+                                                  QStringLiteral("teste"));
+    QVERIFY2(canc.value(QStringLiteral("ok")).toBool(),
+             qUtf8Printable(canc.value(QStringLiteral("erro")).toString()));
+
+    const qlonglong lucroDepois = m_app->relatorioFaturamento(0)
+                                      .value(QStringLiteral("lucro")).toLongLong();
+    QCOMPARE(lucroDepois, lucroAntes);
 }
 
 QTEST_MAIN(TstCopao)

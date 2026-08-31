@@ -72,12 +72,19 @@ FaturamentoResumo RelatorioRepository::faturamento(int dias)
     const QString filtroMov = filtroPeriodo(dias, QStringLiteral("m.data"));
     // custo_unit e custo_medio_unitario estão em MILÉSIMOS de centavo; ÷1000 no
     // total traz de volta para centavos.
+    // O JOIN com vendas NÃO é decorativo: sem ele, uma venda CANCELADA entrava só
+    // com o custo (a receita já filtrava por 'concluida') e o lucro do dia
+    // aparecia negativo — foi exatamente o que apareceu na loja como -R$ 7,50.
+    // A origem da movimentação é "venda:<id>", daí o SUBSTR a partir do 7º
+    // caractere.
     if (q.exec(QStringLiteral(
             "SELECT COALESCE(SUM(-m.quantidade * "
             "        COALESCE(m.custo_unit, e.custo_medio_unitario)),0) / 1000 "
             "FROM movimentacoes_estoque m "
             "JOIN estoque e ON e.produto_id = m.produto_id "
-            "WHERE m.tipo = 'saida_venda' AND %1").arg(filtroMov))
+            "JOIN vendas v ON v.id = CAST(SUBSTR(m.origem, 7) AS INTEGER) "
+            "WHERE m.tipo = 'saida_venda' AND m.origem LIKE 'venda:%' "
+            "  AND v.status = 'concluida' AND %1").arg(filtroMov))
         && q.next())
         r.custo = q.value(0).toLongLong();
 
