@@ -1,8 +1,8 @@
 ﻿Emporio dos Amigos - pacote pronto para rodar
 =======================================
 
-Gerado em : 31/08/2026 01:35
-Commit    : 3418233
+Gerado em : 31/08/2026 02:07
+Commit    : 47f0ce0
 Arvore    : limpo
 
 Este executavel foi compilado a partir do commit acima. Se voce alterou o
