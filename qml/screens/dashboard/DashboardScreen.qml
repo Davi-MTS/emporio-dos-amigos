@@ -7,6 +7,14 @@ Rectangle {
     id: tela
     color: Theme.background
 
+    // Lucro é número de dono. O Dashboard é a única tela que todo mundo vê, então
+    // o cartão respeita a MESMA chave que esconde a aba Relatórios — senão o
+    // funcionário passaria a ver pela porta da frente o que ali está trancado.
+    readonly property bool veRelatorios: {
+        var p = (App.usuarioAtual && App.usuarioAtual.permissoes) ? App.usuarioAtual.permissoes : ({});
+        return p.tudo === true || p.ve_relatorios === true;
+    }
+
     readonly property bool veFinanceiro: {
         var p = (App.usuarioAtual && App.usuarioAtual.permissoes) ? App.usuarioAtual.permissoes : ({});
         return p.tudo === true || p.ve_financeiro === true;
@@ -15,12 +23,16 @@ Rectangle {
     property var kpis: ({})
     property var maisVendidos: []
     property var fin: ({})
+    property var hoje: ({})
 
     Component.onCompleted: carregar()
     function carregar() {
         kpis = App.dashboard();
         maisVendidos = App.relatorioMaisVendidos(7, 5);
         fin = App.resumoFinanceiro();
+        // Mesma conta que a aba Relatórios usa no período "Hoje" — assim os dois
+        // lugares nunca mostram lucros diferentes para o mesmo dia.
+        hoje = veRelatorios ? App.relatorioFaturamento(0) : ({});
     }
 
     // Pedido de navegação para quem hospeda a tela (Main.qml).
@@ -94,6 +106,14 @@ Rectangle {
             Layout.fillWidth: true
             spacing: Theme.spacingMd
             KpiCard { rotulo: qsTr("Vendas hoje"); valor: App.formatarDinheiro(tela.kpis.vendasHoje || 0); corValor: Theme.success; nota: (tela.kpis.numVendasHoje || 0) + qsTr(" vendas") }
+            KpiCard {
+                visible: tela.veRelatorios
+                rotulo: qsTr("Lucro estimado hoje")
+                valor: App.formatarDinheiro(tela.hoje.lucro || 0)
+                corValor: (tela.hoje.lucro || 0) >= 0 ? Theme.success : Theme.danger
+                nota: qsTr("venda menos o custo")
+                rota: "relatorios"
+            }
             KpiCard { rotulo: qsTr("Ticket médio"); valor: App.formatarDinheiro(tela.kpis.ticketMedio || 0) }
             KpiCard { rotulo: qsTr("Produtos em falta"); valor: "" + (tela.kpis.produtosEmFalta || 0); corValor: (tela.kpis.produtosEmFalta || 0) > 0 ? Theme.danger : Theme.text; nota: qsTr("abrir o Estoque"); rota: "estoque" }
         }

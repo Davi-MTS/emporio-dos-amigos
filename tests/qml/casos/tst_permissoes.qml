@@ -19,6 +19,7 @@ TestCase {
     Component { id: cProdutos; ProdutosScreen {} }
     Component { id: cEstoque;  EstoqueScreen  {} }
     Component { id: cSidebar;  Sidebar        {} }
+    Component { id: cDashboard; DashboardScreen {} }
 
     readonly property string loginFunc: "func.teste"
     readonly property string senhaFunc: "func12345"
@@ -125,6 +126,35 @@ TestCase {
         verify(!bar.temPerm("ve_relatorios"),      "Relatórios não pode aparecer");
         verify(!bar.temPerm("ve_financeiro"),      "Compras/Financeiro não podem aparecer");
         verify(!bar.temPerm("gerencia_usuarios"),  "Usuários/Backup não podem aparecer");
+    }
+
+    // O Dashboard é a única tela que TODO mundo vê. O cartão de lucro entrou nela,
+    // então tem que respeitar a mesma trava que esconde a aba Relatórios — senão
+    // o funcionário passaria a ver pela porta da frente o que ali está trancado.
+    function test_funcionario_nao_ve_lucro_no_dashboard() {
+        entrarComoFuncionario();
+
+        var dash = createTemporaryObject(cDashboard, palco, { width: 1060, height: 700 });
+        verify(dash !== null, cDashboard.errorString());
+        wait(0);
+
+        compare(dash.veRelatorios, false, "funcionário não pode ver lucro");
+        compare(dash.veFinanceiro, false, "nem o painel financeiro");
+
+        // E o número nem chega a ser consultado quando não pode ser mostrado.
+        compare(dash.hoje.lucro, undefined, "o lucro não deveria nem ter sido buscado");
+    }
+
+    function test_admin_ve_lucro_no_dashboard() {
+        App.logout();
+        verify(App.login("teste", "teste1234"));
+
+        var dash = createTemporaryObject(cDashboard, palco, { width: 1060, height: 700 });
+        verify(dash !== null, cDashboard.errorString());
+        wait(0);
+
+        compare(dash.veRelatorios, true);
+        verify(dash.hoje.lucro !== undefined, "o admin tem que receber o lucro");
     }
 
     // O administrador continua passando por tudo (chave "tudo").
