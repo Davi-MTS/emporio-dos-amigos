@@ -907,14 +907,51 @@ Rectangle {
             item = { produtoId: it.produtoId, nome: it.nome, embalagemId: it.embalagemId,
                      embalagemNome: it.embalagemNome, fator: it.fator, preco: it.preco };
             linhas = ls;
+            // Começa na composição PADRÃO. Antes pegava o primeiro produto da
+            // categoria, que era arbitrário — e o preço saía errado por tabela.
             var s = [];
-            for (var i = 0; i < ls.length; i++)
-                s.push(ls[i].produtos.length > 0 ? ls[i].produtos[0].id : 0);
+            for (var i = 0; i < ls.length; i++) {
+                var padrao = ls[i].produtoPadraoId || 0;
+                if (padrao <= 0 && ls[i].produtos.length > 0)
+                    padrao = ls[i].produtos[0].id;
+                s.push(padrao);
+            }
             selecoes = s;
-            precoComposto.text = App.formatarValor(it.preco || 0);
+            precoManual = false;
+            recalcularPreco();
             erroComposto.text = "";
             open();
         }
+        // Preço calculado pelo backend (fonte única da regra). Só vira "manual"
+        // quando alguém com permissão de desconto escreve por cima.
+        property bool precoManual: false
+        property int precoCalculado: 0
+
+        // Diferença que a escolha atual desta linha provoca no preço, já vinda
+        // pronta do backend junto com a lista de opções.
+        function diferencaDaLinha(i) {
+            if (i < 0 || i >= linhas.length) return 0;
+            var opcoes = linhas[i].produtos || [];
+            for (var k = 0; k < opcoes.length; k++) {
+                if (opcoes[k].id === selecoes[i])
+                    return opcoes[k].diferenca || 0;
+            }
+            return 0;
+        }
+
+        function recalcularPreco() {
+            if (!item) return;
+            precoCalculado = App.precoCompostoMontado(item.produtoId, selecoes);
+            if (!precoManual)
+                precoComposto.text = App.formatarValor(precoCalculado);
+        }
+        onSelecoesChanged: recalcularPreco()
+
+        readonly property bool podeAlterarPreco: {
+            var p = (App.usuarioAtual && App.usuarioAtual.permissoes) ? App.usuarioAtual.permissoes : ({});
+            return p.tudo === true || p.pode_dar_desconto === true;
+        }
+
         readonly property bool tudoEscolhido: {
             if (linhas.length === 0) return false;
             for (var i = 0; i < linhas.length; i++) {
@@ -932,7 +969,7 @@ Rectangle {
             width: rolComposto.availableWidth
             spacing: Theme.spacingMd
             Text {
-                text: qsTr("Monte o pedido escolhendo o produto de cada categoria.")
+                text: qsTr("Já vem montado do jeito padrão. Trocar um item ajusta o preço pela diferença.")
                 color: Theme.textMuted
                 font.pixelSize: Theme.fontSm
                 Layout.fillWidth: true
@@ -1004,18 +1041,64 @@ Rectangle {
                                     font.weight: Font.DemiBold
                                     elide: Text.ElideRight
                                 }
+                                // Linha travada (a bebida do copão) não se troca:
+                                // existe um copão para cada destilado, então trocar
+                                // aqui seria vender outra coisa com o nome errado.
+                                RowLayout {
+                                    visible: !compDlgRow.semProduto && compDlgRow.modelData.travada === true
+                                    Layout.fillWidth: true
+                                    spacing: Theme.spacingSm
+                                    Text {
+                                        Layout.fillWidth: true
+                                        Layout.minimumWidth: 0
+                                        elide: Text.ElideRight
+                                        text: compDlgRow.modelData.produtoPadraoNome
+                                        color: Theme.text
+                                        font.pixelSize: Theme.fontMd
+                                    }
+                                    Rectangle {
+                                        implicitWidth: fixTxt.implicitWidth + 14
+                                        implicitHeight: 20
+                                        radius: 6
+                                        color: Theme.surface
+                                        border.color: Theme.border
+                                        Text {
+                                            id: fixTxt
+                                            anchors.centerIn: parent
+                                            text: qsTr("fixo")
+                                            color: Theme.textMuted
+                                            font.pixelSize: Theme.fontXs
+                                            font.weight: Font.DemiBold
+                                        }
+                                    }
+                                }
+
                                 AppComboBox {
-                                    visible: !compDlgRow.semProduto
+                                    visible: !compDlgRow.semProduto && compDlgRow.modelData.travada !== true
                                     Layout.fillWidth: true
                                     model: compDlgRow.modelData.produtos
                                     textRole: "nome"
                                     valueRole: "id"
-                                    Component.onCompleted: currentIndex = 0
+                                    Component.onCompleted: currentIndex = indexOfValue(compostoDialog.selecoes[compDlgRow.index])
                                     onActivated: {
                                         var s = compostoDialog.selecoes.slice();
                                         s[compDlgRow.index] = currentValue;
                                         compostoDialog.selecoes = s;
                                     }
+                                }
+
+                                // Quanto esta troca mexeu no preço.
+                                Text {
+                                    visible: compostoDialog.diferencaDaLinha(compDlgRow.index) !== 0
+                                    Layout.fillWidth: true
+                                    text: {
+                                        var d = compostoDialog.diferencaDaLinha(compDlgRow.index);
+                                        return (d > 0 ? "+ " : "− ") + App.formatarDinheiro(Math.abs(d));
+                                    }
+                                    color: compostoDialog.diferencaDaLinha(compDlgRow.index) > 0
+                                           ? Theme.warning : Theme.success
+                                    font.pixelSize: Theme.fontXs
+                                    font.weight: Font.DemiBold
                                 }
                                 Text {
                                     visible: compDlgRow.semProduto
@@ -1048,13 +1131,28 @@ Rectangle {
                         Layout.fillWidth: true
                         spacing: 0
                         Text { text: qsTr("Preço do copão"); color: Theme.text; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold }
-                        Text { text: qsTr("Valor cobrado nesta venda"); color: Theme.textMuted; font.pixelSize: Theme.fontXs }
+                        Text {
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            text: compostoDialog.precoManual
+                                  ? qsTr("Alterado à mão — o calculado era ")
+                                    + App.formatarDinheiro(compostoDialog.precoCalculado)
+                                  : (compostoDialog.podeAlterarPreco
+                                     ? qsTr("Calculado pela composição escolhida")
+                                     : qsTr("Calculado pela composição escolhida (só o responsável altera)"))
+                            color: Theme.textMuted
+                            font.pixelSize: Theme.fontXs
+                        }
                     }
                     AppTextField {
                         id: precoComposto
                         Layout.preferredWidth: 150
                         horizontalAlignment: Text.AlignRight
                         placeholderText: "0,00"
+                        // Alterar o preço calculado é desconto: exige a mesma
+                        // permissão. Antes o campo era livre para qualquer um.
+                        readOnly: !compostoDialog.podeAlterarPreco
+                        onTextEdited: compostoDialog.precoManual = true
                     }
                 }
             }

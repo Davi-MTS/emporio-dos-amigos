@@ -35,6 +35,7 @@ distribuidora_add_test(tst_dose                   cpp/tst_dose.cpp)
 distribuidora_add_test(tst_foto_produto           cpp/tst_foto_produto.cpp)
 distribuidora_add_test(tst_lotes                  cpp/tst_lotes.cpp)
 distribuidora_add_test(tst_mensagens              cpp/tst_mensagens.cpp)
+distribuidora_add_test(tst_copao                  cpp/tst_copao.cpp)
 
 # -----------------------------------------------------------------------------
 # Testes de INTERFACE (Qt Quick Test)

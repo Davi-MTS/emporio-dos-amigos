@@ -153,8 +153,12 @@ QVector<Componente> ProdutoRepository::carregarComposicao(int produtoId)
     QVector<Componente> lista;
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral(
-        "SELECT pc.categoria_id, pc.quantidade, pc.unidade, c.nome "
-        "FROM produto_composicao pc JOIN categorias c ON c.id = pc.categoria_id "
+        "SELECT pc.categoria_id, pc.quantidade, pc.unidade, c.nome, "
+        "       COALESCE(pc.produto_padrao_id, 0), COALESCE(pp.nome, ''), "
+        "       COALESCE(pc.travada, 0) "
+        "FROM produto_composicao pc "
+        "JOIN categorias c ON c.id = pc.categoria_id "
+        "LEFT JOIN produtos pp ON pp.id = pc.produto_padrao_id "
         "WHERE pc.produto_composto_id = :pid ORDER BY c.nome COLLATE NOCASE"));
     q.bindValue(QStringLiteral(":pid"), produtoId);
     if (!q.exec()) {
@@ -167,6 +171,9 @@ QVector<Componente> ProdutoRepository::carregarComposicao(int produtoId)
         c.quantidade = q.value(1).toInt();
         c.unidade = q.value(2).toString();
         c.categoriaNome = q.value(3).toString();
+        c.produtoPadraoId = q.value(4).toInt();
+        c.produtoPadraoNome = q.value(5).toString();
+        c.travada = q.value(6).toInt() != 0;
         lista.push_back(c);
     }
     return lista;
@@ -190,12 +197,16 @@ bool ProdutoRepository::salvarComposicao(Produto &produto)
             continue;
         QSqlQuery q(m_db);
         q.prepare(QStringLiteral(
-            "INSERT INTO produto_composicao (produto_composto_id, categoria_id, unidade, quantidade) "
-            "VALUES (:comp, :cat, :un, :qtd)"));
+            "INSERT INTO produto_composicao (produto_composto_id, categoria_id, unidade, "
+            " quantidade, produto_padrao_id, travada) "
+            "VALUES (:comp, :cat, :un, :qtd, :padrao, :travada)"));
         q.bindValue(QStringLiteral(":comp"), produto.id);
         q.bindValue(QStringLiteral(":cat"), c.categoriaId);
         q.bindValue(QStringLiteral(":un"), c.unidade);
         q.bindValue(QStringLiteral(":qtd"), c.quantidade);
+        q.bindValue(QStringLiteral(":padrao"),
+                    c.produtoPadraoId > 0 ? QVariant(c.produtoPadraoId) : QVariant());
+        q.bindValue(QStringLiteral(":travada"), c.travada ? 1 : 0);
         if (!q.exec()) {
             m_erro = q.lastError().text();
             return false;
@@ -207,17 +218,51 @@ bool ProdutoRepository::salvarComposicao(Produto &produto)
 QVector<QPair<int, QString>> ProdutoRepository::produtosDaCategoria(int categoriaId)
 {
     QVector<QPair<int, QString>> lista;
+    for (const CandidatoInsumo &c : candidatosDaCategoria(categoriaId))
+        lista.push_back({c.id, c.nome});
+    return lista;
+}
+
+QVector<CandidatoInsumo> ProdutoRepository::candidatosDaCategoria(int categoriaId)
+{
+    QVector<CandidatoInsumo> lista;
     QSqlQuery q(m_db);
+    // O preço por UNIDADE BASE é o que permite comparar coisas diferentes: uma
+    // lata de energético (fator 1) com uma garrafa de 750 ml. Sem dividir pelo
+    // fator, trocar o destilado somaria o preço da garrafa inteira no copão.
     q.prepare(QStringLiteral(
-        "SELECT id, nome FROM produtos "
-        "WHERE ativo = 1 AND composto = 0 AND categoria_id = :cat "
-        "ORDER BY nome COLLATE NOCASE"));
+        "SELECT p.id, p.nome, "
+        "       (SELECT CAST(pe.preco_venda AS REAL) / MAX(pe.fator_conversao, 1) "
+        "          FROM produto_embalagens pe WHERE pe.produto_id = p.id "
+        "         ORDER BY pe.fator_conversao ASC LIMIT 1) "
+        "FROM produtos p "
+        "WHERE p.ativo = 1 AND p.composto = 0 AND COALESCE(p.dose_de_produto_id,0) = 0 "
+        "  AND p.categoria_id = :cat "
+        "ORDER BY p.nome COLLATE NOCASE"));
     q.bindValue(QStringLiteral(":cat"), categoriaId);
     if (q.exec()) {
-        while (q.next())
-            lista.push_back({q.value(0).toInt(), q.value(1).toString()});
+        while (q.next()) {
+            CandidatoInsumo c;
+            c.id = q.value(0).toInt();
+            c.nome = q.value(1).toString();
+            c.precoPorUnidadeBase = q.value(2).toDouble();
+            lista.push_back(c);
+        }
     }
     return lista;
+}
+
+double ProdutoRepository::precoPorUnidadeBase(int produtoId)
+{
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral(
+        "SELECT CAST(preco_venda AS REAL) / MAX(fator_conversao, 1) "
+        "FROM produto_embalagens WHERE produto_id = :pid "
+        "ORDER BY fator_conversao ASC LIMIT 1"));
+    q.bindValue(QStringLiteral(":pid"), produtoId);
+    if (q.exec() && q.next())
+        return q.value(0).toDouble();
+    return 0.0;
 }
 
 bool ProdutoRepository::salvar(Produto &produto)

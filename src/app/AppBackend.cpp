@@ -873,6 +873,18 @@ int AppBackend::criarCategoria(const QString &nome)
     return id;
 }
 
+QVariantList AppBackend::produtosDaCategoria(int categoriaId)
+{
+    QVariantList lista;
+    for (const CandidatoInsumo &c : m_produtoRepo.candidatosDaCategoria(categoriaId)) {
+        QVariantMap m;
+        m[QStringLiteral("id")] = c.id;
+        m[QStringLiteral("nome")] = c.nome;
+        lista.push_back(m);
+    }
+    return lista;
+}
+
 QVariantList AppBackend::composicaoParaVenda(int produtoId)
 {
     QVariantList lista;
@@ -886,18 +898,61 @@ QVariantList AppBackend::composicaoParaVenda(int produtoId)
         linha[QStringLiteral("unidade")] = c.unidade;
         linha[QStringLiteral("quantidade")] = c.quantidade;
 
+        linha[QStringLiteral("produtoPadraoId")] = c.produtoPadraoId;
+        linha[QStringLiteral("produtoPadraoNome")] = c.produtoPadraoNome;
+        linha[QStringLiteral("travada")] = c.travada;
+
         QVariantList produtos;
-        const auto ps = m_produtoRepo.produtosDaCategoria(c.categoriaId);
+        const auto ps = m_produtoRepo.candidatosDaCategoria(c.categoriaId);
+        const double precoPadrao = c.produtoPadraoId > 0
+                                       ? m_produtoRepo.precoPorUnidadeBase(c.produtoPadraoId)
+                                       : 0.0;
         for (const auto &pr : ps) {
             QVariantMap m;
-            m[QStringLiteral("id")] = pr.first;
-            m[QStringLiteral("nome")] = pr.second;
+            m[QStringLiteral("id")] = pr.id;
+            m[QStringLiteral("nome")] = pr.nome;
+            // Quanto este item muda no preço do copão, já pronto para a tela
+            // mostrar "+ R$ 5,00" ao lado da opção.
+            const qint64 dif = c.produtoPadraoId > 0
+                                   ? static_cast<qint64>(qRound((pr.precoPorUnidadeBase - precoPadrao)
+                                                                * c.quantidade))
+                                   : 0;
+            m[QStringLiteral("diferenca")] = static_cast<qlonglong>(dif);
             produtos.push_back(m);
         }
         linha[QStringLiteral("produtos")] = produtos;
         lista.push_back(linha);
     }
     return lista;
+}
+
+qlonglong AppBackend::precoCompostoMontado(int produtoId, const QVariantList &escolhas)
+{
+    const auto p = m_produtoRepo.obter(produtoId);
+    if (!p || p->embalagens.isEmpty())
+        return 0;
+
+    // Preço cadastrado do copão: vale para a composição padrão.
+    qint64 preco = p->embalagens.first().precoVenda;
+
+    const auto &linhas = p->composicao;
+    for (int i = 0; i < linhas.size() && i < escolhas.size(); ++i) {
+        const Componente &c = linhas.at(i);
+        const int escolhido = escolhas.at(i).toInt();
+        if (c.produtoPadraoId <= 0 || escolhido <= 0 || escolhido == c.produtoPadraoId)
+            continue;   // sem padrão definido, ou não trocou: nada a ajustar
+
+        // Diferença na escala por unidade base — é o que permite comparar uma
+        // lata com uma garrafa de 750 ml — multiplicada pelo que a receita usa.
+        const double porUnidadeEscolhido = m_produtoRepo.precoPorUnidadeBase(escolhido);
+        const double porUnidadePadrao = m_produtoRepo.precoPorUnidadeBase(c.produtoPadraoId);
+        preco += static_cast<qint64>(qRound((porUnidadeEscolhido - porUnidadePadrao)
+                                            * c.quantidade));
+    }
+
+    // Troca por algo mais barato reduz o preço, mas nunca a ponto de a loja
+    // pagar para vender.
+    return static_cast<qlonglong>(qMax(Q_INT64_C(0), preco));
 }
 
 static QVariantMap embalagemParaMapa(const Embalagem &e)
@@ -943,6 +998,9 @@ QVariantMap AppBackend::produto(int id)
         m[QStringLiteral("categoriaNome")] = c.categoriaNome;
         m[QStringLiteral("unidade")] = c.unidade;
         m[QStringLiteral("quantidade")] = c.quantidade;
+        m[QStringLiteral("produtoPadraoId")] = c.produtoPadraoId;
+        m[QStringLiteral("produtoPadraoNome")] = c.produtoPadraoNome;
+        m[QStringLiteral("travada")] = c.travada;
         comp.push_back(m);
     }
     mapa[QStringLiteral("composicao")] = comp;
@@ -1005,6 +1063,8 @@ bool AppBackend::salvarProduto(const QVariantMap &dados)
         c.categoriaId = cm.value(QStringLiteral("categoriaId")).toInt();
         c.unidade = cm.value(QStringLiteral("unidade"), QStringLiteral("unidade")).toString();
         c.quantidade = cm.value(QStringLiteral("quantidade"), 1).toInt();
+        c.produtoPadraoId = cm.value(QStringLiteral("produtoPadraoId")).toInt();
+        c.travada = cm.value(QStringLiteral("travada")).toBool();
         if (c.categoriaId > 0 && c.quantidade > 0)
             p.composicao.push_back(c);
     }
@@ -1466,6 +1526,35 @@ QVariantMap AppBackend::finalizarVenda(const QVariantMap &dados)
 
     const qint64 desconto = dados.value(QStringLiteral("desconto")).toLongLong();
     const int clienteId = dados.value(QStringLiteral("clienteId")).toInt();
+
+    // Preço de composto alterado à mão é desconto (ou acréscimo) por decisão de
+    // quem está no balcão. O campo era livre para qualquer um: dava para vender
+    // o copão de R$ 30,00 por R$ 20,00 sem deixar rastro nenhum.
+    if (!temPermissao(QStringLiteral("pode_dar_desconto"))) {
+        for (const LinhaVenda &l : itens) {
+            if (l.insumos.isEmpty())
+                continue;
+            const auto pr = m_produtoRepo.obter(l.produtoId);
+            if (!pr || !pr->composto)
+                continue;   // dose não é montada pelo operador
+
+            QVariantList escolhas;
+            for (const InsumoResolvido &ins : l.insumos)
+                escolhas.push_back(ins.produtoId);
+
+            const qint64 calculado = precoCompostoMontado(l.produtoId, escolhas);
+            if (calculado > 0 && l.precoUnit != calculado) {
+                QVariantMap out;
+                out[QStringLiteral("ok")] = false;
+                out[QStringLiteral("erro")] = tr("O preço de \"%1\" foi alterado (calculado: %2). "
+                                                 "Seu usuário não pode mudar preço. "
+                                                 "Chame o responsável.")
+                                                  .arg(pr->nome, Money::format(calculado));
+                m_erro = out.value(QStringLiteral("erro")).toString();
+                return out;
+            }
+        }
+    }
 
     // Desconto é dinheiro saindo do caixa por decisão de quem está no balcão.
     // Sem a permissão, a venda não passa — em vez de passar com o desconto

@@ -80,7 +80,16 @@ public:
     // Linhas da composição de um produto composto, com os produtos de cada
     // categoria para escolha na venda: [{categoriaId, categoriaNome, unidade,
     // quantidade, produtos:[{id,nome}]}].
+    // Produtos de uma categoria, para escolher o padrão de uma linha da receita.
+    Q_INVOKABLE QVariantList produtosDaCategoria(int categoriaId);
+
     Q_INVOKABLE QVariantList composicaoParaVenda(int produtoId);
+
+    // Preço do composto com os itens escolhidos. O preço cadastrado vale para a
+    // composição PADRÃO; cada troca soma (ou desconta) a diferença entre o
+    // escolhido e o padrão, na escala por unidade base × quantidade da linha.
+    // `escolhas` = lista de produtoId, na ordem das linhas de composicaoParaVenda.
+    Q_INVOKABLE qlonglong precoCompostoMontado(int produtoId, const QVariantList &escolhas);
     Q_INVOKABLE QVariantMap produto(int id);       // completo, com embalagens
     Q_INVOKABLE QVariantMap novoProduto();         // modelo em branco p/ o formulário
     Q_INVOKABLE bool salvarProduto(const QVariantMap &dados);

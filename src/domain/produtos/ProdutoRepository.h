@@ -53,6 +53,11 @@ public:
     // o insumo específico na hora da venda.
     QVector<QPair<int, QString>> produtosDaCategoria(int categoriaId);
 
+    // Candidatos a insumo de uma categoria, com o preço por UNIDADE BASE — é
+    // essa escala que permite comparar uma lata com uma garrafa de 750 ml.
+    QVector<CandidatoInsumo> candidatosDaCategoria(int categoriaId);
+    double precoPorUnidadeBase(int produtoId);
+
     QString ultimoErro() const { return m_erro; }
 
 private:

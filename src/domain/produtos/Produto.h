@@ -22,12 +22,27 @@ struct Embalagem
 // Uma linha da receita de um produto composto (copão, drink, shot, dose...).
 // Refere uma CATEGORIA (ex.: Destilados, Gelo) + unidade + quantidade. O produto
 // específico é escolhido na hora da venda quando a categoria tem variações.
+// Produto que pode entrar numa linha da receita, já com o preço na escala que
+// permite comparar (por unidade base).
+struct CandidatoInsumo
+{
+    int id = 0;
+    QString nome;
+    double precoPorUnidadeBase = 0.0;   // centavos por unidade base
+};
+
 struct Componente
 {
     int categoriaId = 0;
     QString categoriaNome;      // preenchido em consultas (para exibição)
     QString unidade = QStringLiteral("unidade");  // ml | unidade | g | litro...
     int quantidade = 1;         // por 1 unidade do composto (ex.: 50 = 50 ml)
+
+    // Item que vem por padrão nesta linha. O preço cadastrado do composto vale
+    // para a combinação padrão; trocar ajusta pela diferença (ver 0016).
+    int produtoPadraoId = 0;
+    QString produtoPadraoNome;  // preenchido em consultas
+    bool travada = false;       // linha que não se troca na venda (o destilado)
 };
 
 struct Produto

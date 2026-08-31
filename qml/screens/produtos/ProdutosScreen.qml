@@ -20,6 +20,13 @@ Rectangle {
     // dos botõezinhos, e os dois faziam a mesma coisa. Ficaram só os botões.
     property string unidadeBase: "unidade"
 
+    // Produtos que podem ocupar uma linha da receita (para escolher o padrão).
+    function produtosDaCategoria(catId) {
+        if (!catId || catId <= 0)
+            return [];
+        return App.produtosDaCategoria(catId);
+    }
+
     function recarregarOrigens() {
         origensDose = App.produtosParaOrigemDose(
             tela.produtoAtual ? (tela.produtoAtual.id || 0) : 0);
@@ -146,7 +153,9 @@ Rectangle {
             var c = lista[i];
             compModel.append({ categoriaId: c.categoriaId || 0,
                                unidade: c.unidade || "unidade",
-                               quantidade: c.quantidade || 1 });
+                               quantidade: c.quantidade || 1,
+                               produtoPadraoId: c.produtoPadraoId || 0,
+                               travada: c.travada === true });
         }
     }
     function fecharEditor() {
@@ -209,7 +218,10 @@ Rectangle {
             for (var c = 0; c < compModel.count; c++) {
                 var ci = compModel.get(c);
                 if (ci.categoriaId > 0)
-                    dados.composicao.push({ categoriaId: ci.categoriaId, unidade: ci.unidade, quantidade: ci.quantidade });
+                    dados.composicao.push({ categoriaId: ci.categoriaId, unidade: ci.unidade,
+                                            quantidade: ci.quantidade,
+                                            produtoPadraoId: ci.produtoPadraoId || 0,
+                                            travada: ci.travada === true });
             }
         }
         for (var i = 0; i < embModel.count; i++) {
@@ -823,8 +835,10 @@ Rectangle {
                         }
                         Text {
                             visible: compostoCheck.checked
-                            text: qsTr("A receita é por CATEGORIA (ex.: Destilados em ml, Gelo em unidade). "
-                                       + "Na venda, você escolhe qual produto de cada categoria (qual bebida, qual gelo). "
+                            text: qsTr("A receita é por CATEGORIA, e cada linha tem o item que VEM POR PADRÃO. "
+                                       + "O preço cadastrado do produto vale para essa combinação: trocar um item na "
+                                       + "venda soma (ou desconta) a diferença de preço entre ele e o padrão. "
+                                       + "Marque \"não troca\" na linha da bebida, já que existe um copão para cada uma. "
                                        + "O composto não tem estoque próprio.")
                             color: Theme.textMuted
                             font.pixelSize: Theme.fontSm
@@ -842,43 +856,86 @@ Rectangle {
                         }
                         Repeater {
                             model: compModel
-                            delegate: RowLayout {
+                            delegate: ColumnLayout {
                                 id: compRow
                                 required property int index
                                 required property int categoriaId
                                 required property int quantidade
                                 required property string unidade
+                                required property int produtoPadraoId
+                                required property bool travada
                                 visible: compostoCheck.checked
                                 Layout.fillWidth: true
-                                spacing: Theme.spacingSm
-                                AppComboBox {
+                                spacing: 4
+
+                                RowLayout {
                                     Layout.fillWidth: true
-                                    model: tela.listaCategorias
-                                    textRole: "nome"
-                                    valueRole: "id"
-                                    Component.onCompleted: currentIndex = indexOfValue(compRow.categoriaId)
-                                    // 'index' aqui é o parâmetro do sinal (item do combo); use compRow.index.
-                                    onActivated: compModel.setProperty(compRow.index, "categoriaId", currentValue)
+                                    spacing: Theme.spacingSm
+                                    AppComboBox {
+                                        Layout.fillWidth: true
+                                        Layout.minimumWidth: 0
+                                        model: tela.listaCategorias
+                                        textRole: "nome"
+                                        valueRole: "id"
+                                        Component.onCompleted: currentIndex = indexOfValue(compRow.categoriaId)
+                                        // 'index' aqui é o parâmetro do sinal (item do combo); use compRow.index.
+                                        onActivated: {
+                                            compModel.setProperty(compRow.index, "categoriaId", currentValue);
+                                            // Trocar a categoria invalida o padrão anterior.
+                                            compModel.setProperty(compRow.index, "produtoPadraoId", 0);
+                                        }
+                                    }
+                                    AppSpinBox {
+                                        Layout.preferredWidth: 110
+                                        from: 1; to: 1000000; value: compRow.quantidade
+                                        onValueModified: compModel.setProperty(compRow.index, "quantidade", value)
+                                    }
+                                    AppComboBox {
+                                        Layout.preferredWidth: 110
+                                        model: tela.unidades
+                                        Component.onCompleted: currentIndex = tela.unidades.indexOf(compRow.unidade)
+                                        onActivated: compModel.setProperty(compRow.index, "unidade", currentText)
+                                    }
+                                    ToolButton { text: "✕"; onClicked: compModel.remove(compRow.index) }
                                 }
-                                AppSpinBox {
-                                    Layout.preferredWidth: 110
-                                    from: 1; to: 1000000; value: compRow.quantidade
-                                    onValueModified: compModel.setProperty(compRow.index, "quantidade", value)
+
+                                // Qual item vem por padrão nesta linha. O preço do
+                                // copão vale para os padrões; trocar na venda ajusta
+                                // pela diferença.
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    Layout.leftMargin: Theme.spacingSm
+                                    Layout.bottomMargin: Theme.spacingXs
+                                    spacing: Theme.spacingSm
+                                    Text {
+                                        text: qsTr("vem com")
+                                        color: Theme.textMuted
+                                        font.pixelSize: Theme.fontXs
+                                    }
+                                    AppComboBox {
+                                        id: padraoCombo
+                                        Layout.fillWidth: true
+                                        Layout.minimumWidth: 0
+                                        model: tela.produtosDaCategoria(compRow.categoriaId)
+                                        textRole: "nome"
+                                        valueRole: "id"
+                                        Component.onCompleted: currentIndex = indexOfValue(compRow.produtoPadraoId)
+                                        onModelChanged: currentIndex = indexOfValue(compRow.produtoPadraoId)
+                                        onActivated: compModel.setProperty(compRow.index, "produtoPadraoId", currentValue)
+                                    }
+                                    ToggleButton {
+                                        text: qsTr("não troca")
+                                        checked: compRow.travada
+                                        onClicked: compModel.setProperty(compRow.index, "travada", !compRow.travada)
+                                    }
                                 }
-                                AppComboBox {
-                                    Layout.preferredWidth: 120
-                                    model: tela.unidades
-                                    Component.onCompleted: currentIndex = tela.unidades.indexOf(compRow.unidade)
-                                    onActivated: compModel.setProperty(compRow.index, "unidade", currentText)
-                                }
-                                ToolButton { text: "✕"; onClicked: compModel.remove(compRow.index) }
                             }
                         }
                         AppButton {
                             visible: compostoCheck.checked
                             kind: "ghost"
                             text: qsTr("＋ Adicionar categoria")
-                            onClicked: compModel.append({ categoriaId: 0, unidade: "unidade", quantidade: 1 })
+                            onClicked: compModel.append({ categoriaId: 0, unidade: "unidade", quantidade: 1, produtoPadraoId: 0, travada: false })
                         }
 
                         } // fim SEÇÃO: COMPOSIÇÃO
