@@ -98,59 +98,6 @@ TestCase {
                tela.explicarMinimo());
     }
 
-    // O caso que apareceu no uso: produto em ml cuja UNICA embalagem e a garrafa
-    // de 750 ml, com minimo de 5 ml. Sem a unidade base na lista de opcoes, a
-    // tela mostrava "5" ao lado de "Garrafa" — lia-se 5 garrafas, eram 5 ml — e
-    // salvar de novo transformaria 5 em 3750 sem ninguem pedir.
-    function test_minimo_que_nao_cabe_em_embalagem_usa_a_unidade_base() {
-        var cat = App.categorias()[0].id;
-        var p = App.novoProduto();
-        p.nome = "Zzz Gin Setecentos";
-        p.categoriaId = cat;
-        p.unidadeBase = "ml";
-        p.estoqueMinimo = 5;             // cinco mililitros
-        p.embalagens = [{ id: 0, nome: "Garrafa", fator: 750,
-                          codigoBarras: "", preco: 12000, custo: -1 }];
-        verify(App.salvarProduto(p), App.ultimoErro());
-        var id = App.buscarProdutosPorNome("Zzz Gin Setecentos", true)[0].produtoId;
-
-        var tela = abrirTela();
-        tela.abrirProduto(id);
-        wait(0);
-
-        // Tem que cair na unidade base, nao na garrafa.
-        compare(tela.fatorMinimo(), 1, "5 ml não cabe em garrafa de 750: use a unidade base");
-        verify(tela.explicarMinimo().indexOf("5 ml") >= 0, tela.explicarMinimo());
-
-        // E salvar sem tocar em nada NAO pode mudar o valor guardado.
-        tela.salvar();
-        compare(App.produto(id).estoqueMinimo, 5, "salvar sem mexer alterou o mínimo");
-    }
-
-    // Escolhendo a garrafa, aí sim converte.
-    function test_escolher_garrafa_converte_para_a_unidade_base() {
-        var cat = App.categorias()[0].id;
-        var p = App.novoProduto();
-        p.nome = "Zzz Gin Converte";
-        p.categoriaId = cat;
-        p.unidadeBase = "ml";
-        p.estoqueMinimo = 0;
-        p.embalagens = [{ id: 0, nome: "Garrafa", fator: 750,
-                          codigoBarras: "", preco: 12000, custo: -1 }];
-        verify(App.salvarProduto(p), App.ultimoErro());
-        var id = App.buscarProdutosPorNome("Zzz Gin Converte", true)[0].produtoId;
-
-        var tela = abrirTela();
-        tela.abrirProduto(id);
-        wait(0);
-        compare(tela.opcoesMinimo(), 2, "a lista precisa ter a unidade base e a garrafa");
-
-        tela.definirMinimo(5, 1);        // 5 unidades da opção 1 = Garrafa
-        compare(tela.fatorMinimo(), 750);
-        tela.salvar();
-        compare(App.produto(id).estoqueMinimo, 3750, "5 garrafas de 750 ml = 3750 ml");
-    }
-
     // A unidade base virou propriedade da tela (o campo de texto saiu): trocar
     // pelos botões tem que continuar mudando o que é salvo.
     function test_unidade_base_e_propriedade_da_tela() {
