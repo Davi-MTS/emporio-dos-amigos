@@ -20,7 +20,8 @@ QVector<ContaPagar> FinanceiroRepository::contasPagar(bool apenasAbertas)
         "  cp.valor, cp.vencimento, cp.status, COALESCE(f.nome, '—'), "
         "  CASE WHEN cp.status='aberta' AND cp.vencimento IS NOT NULL "
         "       AND cp.vencimento < date('now','localtime') THEN 1 ELSE 0 END, "
-        "  COALESCE(cp.pago_em, ''), COALESCE(cp.forma_pagamento, '') "
+        "  COALESCE(cp.pago_em, ''), COALESCE(cp.forma_pagamento, ''), "
+        "  (cp.compra_id IS NULL) "
         "FROM contas_pagar cp "
         "LEFT JOIN compras c ON c.id = cp.compra_id "
         "LEFT JOIN fornecedores f ON f.id = c.fornecedor_id ");
@@ -44,6 +45,7 @@ QVector<ContaPagar> FinanceiroRepository::contasPagar(bool apenasAbertas)
         c.vencida = q.value(6).toInt() != 0;
         c.pagoEm = q.value(7).toString();
         c.formaPagamento = q.value(8).toString();
+        c.avulsa = q.value(9).toInt() != 0;
         lista.push_back(c);
     }
     return lista;
@@ -219,4 +221,43 @@ ResumoFinanceiro FinanceiroRepository::resumo()
         && q.next())
         r.totalAReceber = q.value(0).toLongLong();
     return r;
+}
+
+bool FinanceiroRepository::excluirDespesa(int contaPagarId)
+{
+    QSqlQuery leitura(m_db);
+    leitura.prepare(QStringLiteral(
+        "SELECT status, compra_id FROM contas_pagar WHERE id = :id"));
+    leitura.bindValue(QStringLiteral(":id"), contaPagarId);
+    if (!leitura.exec() || !leitura.next()) {
+        m_erro = QStringLiteral("Conta não encontrada.");
+        return false;
+    }
+    const QString status = leitura.value(0).toString();
+    const bool deCompra = !leitura.value(1).isNull();
+
+    if (deCompra) {
+        m_erro = QStringLiteral("Esta conta veio de uma compra e não pode ser excluída — "
+                                "a mercadoria já entrou no estoque. Cancele a compra, se for o caso.");
+        return false;
+    }
+    if (status != QStringLiteral("aberta")) {
+        m_erro = QStringLiteral("Esta despesa já foi paga. Desfaça o pagamento primeiro "
+                                "(botão \"Desfazer\"), aí ela pode ser excluída.");
+        return false;
+    }
+
+    QSqlQuery del(m_db);
+    del.prepare(QStringLiteral("DELETE FROM contas_pagar WHERE id = :id AND status = 'aberta' "
+                               "AND compra_id IS NULL"));
+    del.bindValue(QStringLiteral(":id"), contaPagarId);
+    if (!del.exec()) {
+        m_erro = del.lastError().text();
+        return false;
+    }
+    if (del.numRowsAffected() <= 0) {
+        m_erro = QStringLiteral("Não foi possível excluir esta despesa.");
+        return false;
+    }
+    return true;
 }

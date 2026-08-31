@@ -16,6 +16,7 @@ struct ContaPagar
     bool vencida = false;
     QString pagoEm;           // ISO date, vazio se ainda aberta
     QString formaPagamento;   // dinheiro/pix/debito/credito; vazio = desconhecida
+    bool avulsa = false;      // despesa digitada à mão (não veio de uma compra)
 };
 
 struct ContaReceber
@@ -53,6 +54,11 @@ public:
     // quem chamou decidir o que fazer com o caixa) e em *valor o valor dela.
     bool estornarPagamento(int contaPagarId, QString *forma = nullptr,
                            qint64 *valor = nullptr, QString *descricao = nullptr);
+
+    // Apaga uma despesa lançada por engano. Só vale para despesa AVULSA e ainda
+    // ABERTA: conta ligada a uma compra e conta já paga têm história (mercadoria
+    // que entrou, dinheiro que saiu) e não podem simplesmente sumir.
+    bool excluirDespesa(int contaPagarId);
     bool receber(int contaReceberId);
     // Recebe um pagamento (parcial ou total) de UMA conta a receber. Se cobrir
     // o valor, marca 'paga'; senão reduz o saldo da conta. Retorna o valor

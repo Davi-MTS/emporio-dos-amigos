@@ -213,6 +213,10 @@ public:
     // da gaveta, devolve o dinheiro para o caixa aberto. { ok, erro, aviso }.
     Q_INVOKABLE QVariantMap estornarPagamento(int id);
 
+    // Apaga uma despesa lançada por engano (só avulsa e ainda aberta).
+    // { ok, erro }. Exige ve_financeiro.
+    Q_INVOKABLE QVariantMap excluirDespesa(int id);
+
     // Mostra as contas JÁ PAGAS junto com as abertas (para achar o que estornar).
     Q_INVOKABLE void mostrarContasPagas(bool mostrar);
 

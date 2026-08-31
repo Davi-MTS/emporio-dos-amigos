@@ -1,5 +1,6 @@
 #include <QtTest>
 
+#include <QSqlError>
 #include <QSqlQuery>
 #include <QTemporaryDir>
 
@@ -25,6 +26,7 @@ private slots:
     void estornoDevolveODinheiroParaAGaveta();
     void estornoDePixNaoTocaNoCaixa();
     void naoEstornaContaQueNaoFoiPaga();
+    void excluirDespesaSoValeParaAvulsaEmAberto();
 
 private:
     QTemporaryDir m_dir;
@@ -171,6 +173,59 @@ void TstEstorno::naoEstornaContaQueNaoFoiPaga()
     QVERIFY(!r.value(QStringLiteral("erro")).toString().isEmpty());
     QCOMPARE(m_app->caixaResumo().value(QStringLiteral("dinheiroEsperado")).toLongLong(),
              esperado);
+}
+
+// Excluir despesa e destrutivo de verdade: some do banco, nao vira status. Por
+// isso so vale para o caso inofensivo - despesa digitada a mao e ainda nao
+// paga. Conta que veio de compra tem mercadoria atras dela; conta paga tem
+// dinheiro que ja saiu da gaveta. Nenhuma das duas pode sumir sem rastro.
+void TstEstorno::excluirDespesaSoValeParaAvulsaEmAberto()
+{
+    // 1) Avulsa e em aberto: sai.
+    const int id = criarDespesa(QStringLiteral("Lancada por engano"), 4200);
+    QVERIFY(id > 0);
+    const QVariantMap ok = m_app->excluirDespesa(id);
+    QVERIFY2(ok.value(QStringLiteral("ok")).toBool(),
+             qUtf8Printable(ok.value(QStringLiteral("erro")).toString()));
+
+    bool aindaExiste = false;
+    for (const auto &c : fin().contasPagar(false)) {
+        if (c.id == id)
+            aindaExiste = true;
+    }
+    QVERIFY2(!aindaExiste, "a despesa deveria ter sumido");
+
+    // 2) Ja paga: recusa e explica o caminho.
+    const int paga = criarDespesa(QStringLiteral("Ja paga"), 1500);
+    QVERIFY(paga > 0);
+    QVERIFY(m_app->pagarConta(paga, QStringLiteral("dinheiro")));
+    const qint64 gaveta = m_app->caixaResumo().value(QStringLiteral("dinheiroEsperado")).toLongLong();
+
+    const QVariantMap r2 = m_app->excluirDespesa(paga);
+    QCOMPARE(r2.value(QStringLiteral("ok")).toBool(), false);
+    QVERIFY(r2.value(QStringLiteral("erro")).toString().contains(QStringLiteral("Desfaz"),
+                                                                 Qt::CaseInsensitive));
+    // E o caixa nao pode ter sido tocado pela tentativa.
+    QCOMPARE(m_app->caixaResumo().value(QStringLiteral("dinheiroEsperado")).toLongLong(), gaveta);
+
+    // 3) Conta vinda de COMPRA: recusa.
+    QSqlQuery c(m_db.connection());
+    QVERIFY2(c.exec(QStringLiteral(
+                 "INSERT INTO compras (fornecedor_id, origem, total) "
+                 "VALUES (NULL, 'manual', 5000)")),
+             qUtf8Printable(c.lastError().text()));
+    const int compraId = c.lastInsertId().toInt();
+    QSqlQuery cp(m_db.connection());
+    cp.prepare(QStringLiteral(
+        "INSERT INTO contas_pagar (compra_id, valor, status) VALUES (:c, 5000, 'aberta')"));
+    cp.bindValue(QStringLiteral(":c"), compraId);
+    QVERIFY(cp.exec());
+    const int daCompra = cp.lastInsertId().toInt();
+
+    const QVariantMap r3 = m_app->excluirDespesa(daCompra);
+    QCOMPARE(r3.value(QStringLiteral("ok")).toBool(), false);
+    QVERIFY(r3.value(QStringLiteral("erro")).toString().contains(QStringLiteral("compra"),
+                                                                 Qt::CaseInsensitive));
 }
 
 QTEST_MAIN(TstEstorno)

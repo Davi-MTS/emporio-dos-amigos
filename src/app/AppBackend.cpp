@@ -725,6 +725,29 @@ QVariantMap AppBackend::estornarPagamento(int id)
     return out;
 }
 
+QVariantMap AppBackend::excluirDespesa(int id)
+{
+    QVariantMap out;
+    out[QStringLiteral("ok")] = false;
+
+    if (!temPermissao(QStringLiteral("ve_financeiro"))) {
+        out[QStringLiteral("erro")] = tr("Seu usuário não pode excluir despesas.");
+        m_erro = out.value(QStringLiteral("erro")).toString();
+        return out;
+    }
+    if (!m_financeiroRepo.excluirDespesa(id)) {
+        out[QStringLiteral("erro")] = m_financeiroRepo.ultimoErro();
+        m_erro = m_financeiroRepo.ultimoErro();
+        return out;
+    }
+
+    recarregarFinanceiro();
+    m_erro.clear();
+    out[QStringLiteral("ok")] = true;
+    out[QStringLiteral("erro")] = QString();
+    return out;
+}
+
 QVariantMap AppBackend::receberContaValor(int id, const QString &valorTexto,
                                           const QString &forma)
 {

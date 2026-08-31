@@ -111,6 +111,7 @@ Rectangle {
                         required property string status
                         required property string pagoEm
                         required property string formaPagamento
+                        required property bool avulsa
                         readonly property bool paga: status === "paga"
                         width: ListView.view.width
                         height: 54
@@ -161,6 +162,15 @@ Rectangle {
                                 kind: "ghost"
                                 text: qsTr("Desfazer")
                                 onClicked: estornoDialog.abrir(rp.idConta, rp.valor, rp.descricao, rp.formaPagamento)
+                            }
+                            // Só despesa digitada à mão e ainda em aberto. Conta de
+                            // compra tem mercadoria atrás dela, e conta paga tem
+                            // dinheiro que já saiu — essas não somem.
+                            AppButton {
+                                visible: rp.avulsa && !rp.paga
+                                kind: "perigo"
+                                text: qsTr("Excluir")
+                                onClicked: excluirDialog.abrir(rp.idConta, rp.valor, rp.descricao)
                             }
                         }
                         Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.border }
@@ -404,6 +414,59 @@ Rectangle {
                     }
                 }
                 AppButton { kind: "default"; text: qsTr("Cancelar"); onClicked: pagarDialog.close() }
+                Item { Layout.fillWidth: true }
+            }
+        }
+    }
+
+    // Excluir uma despesa lançada por engano.
+    AppDialog {
+        id: excluirDialog
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: 460
+        padding: Theme.spacingLg
+        property int contaId: 0
+        property int valorConta: 0
+        property string descricao: ""
+        function abrir(id, valor, desc) {
+            contaId = id; valorConta = valor; descricao = desc || "";
+            excErro.text = "";
+            open();
+        }
+        title: qsTr("Excluir despesa")
+        contentItem: ColumnLayout {
+            spacing: Theme.spacingMd
+            Text {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: qsTr("Apagar de vez: ") + excluirDialog.descricao + " · "
+                      + App.formatarDinheiro(excluirDialog.valorConta)
+                color: Theme.text
+                font.pixelSize: Theme.fontMd
+                font.weight: Font.DemiBold
+            }
+            Text {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: qsTr("A despesa some da lista e não fica no histórico. Como ela ainda não foi paga, nada muda no caixa.")
+                color: Theme.textMuted
+                font.pixelSize: Theme.fontSm
+            }
+            Label { id: excErro; visible: text.length > 0; color: Theme.danger; font.pixelSize: Theme.fontSm; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+            RowLayout {
+                Layout.fillWidth: true
+                AppButton {
+                    kind: "perigo"
+                    text: qsTr("Excluir despesa")
+                    onClicked: {
+                        var r = App.excluirDespesa(excluirDialog.contaId);
+                        if (r.ok) { tela.carregar(); excluirDialog.close(); }
+                        else excErro.text = r.erro;
+                    }
+                }
+                AppButton { kind: "default"; text: qsTr("Voltar"); onClicked: excluirDialog.close() }
                 Item { Layout.fillWidth: true }
             }
         }
