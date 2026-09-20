@@ -11,12 +11,15 @@
 #     -Qt      caminho do Qt        (padrão: C:\Qt\6.8.3\mingw_64)
 #     -MinGW   caminho do compilador(padrão: C:\Qt\Tools\mingw1310_64\bin)
 #     -Saida   pasta de saída       (padrão: deploy\pacote)
+#     -OpenSSL pasta com libssl-3-x64.dll / libcrypto-3-x64.dll
+#              (padrão: a do Git for Windows, C:\Program Files\Git\mingw64\bin)
 # =============================================================================
 param(
     [string]$Qt     = "C:\Qt\6.8.3\mingw_64",
     [string]$MinGW  = "C:\Qt\Tools\mingw1310_64\bin",
     [string]$CMake  = "C:\Qt\Tools\CMake_64\bin\cmake.exe",
-    [string]$Saida  = ""
+    [string]$Saida  = "",
+    [string]$OpenSSL = "C:\Program Files\Git\mingw64\bin"
 )
 
 # O PowerShell 5.1 trata QUALQUER stderr de programa externo como erro — e o
@@ -38,13 +41,26 @@ Write-Host "== Empacotando o $app ==" -ForegroundColor Cyan
 foreach ($p in @($Qt, $MinGW, $CMake)) {
     if (-not (Test-Path $p)) { throw "Nao encontrei: $p  (ajuste os parametros do script)" }
 }
+# OpenSSL: sem ele o Telegram nao funciona em Windows 10 antigo (ver passo 3c).
+# Conferido ANTES de compilar, para nao gerar um pacote que falha so na loja.
+$sslDlls = @("libssl-3-x64.dll", "libcrypto-3-x64.dll")
+foreach ($dll in $sslDlls) {
+    if (-not (Test-Path (Join-Path $OpenSSL $dll))) {
+        throw "Nao encontrei $dll em $OpenSSL. Instale o Git for Windows ou passe -OpenSSL <pasta com as DLLs do OpenSSL 3>."
+    }
+}
+$sslPlugin = Join-Path $Qt "plugins\tls\qopensslbackend.dll"
+if (-not (Test-Path $sslPlugin)) { throw "Nao encontrei o plugin $sslPlugin" }
 $env:PATH = "$Qt\bin;$MinGW;$env:PATH"
 
 # --- 1. Compila em Release (sem os testes) --------------------------------
 Write-Host "`n[1/4] Compilando em Release..." -ForegroundColor Yellow
 $qtCMake = $Qt -replace '\\', '/'
 Exec "Configuracao do CMake" {
-    & $CMake -S $raiz -B $build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$qtCMake"
+    # Testes e ferramenta do manual ficam de fora EXPLICITAMENTE: o cache do
+    # build\release guarda o valor antigo, entao so o padrao do CMake nao basta.
+    & $CMake -S $raiz -B $build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$qtCMake" `
+        -DDISTRIBUIDORA_BUILD_TESTS=OFF -DDISTRIBUIDORA_BUILD_TOOLS=OFF
 }
 Exec "Compilacao" { & $CMake --build $build }
 $exe = Join-Path $build "distribuidora.exe"
@@ -71,6 +87,22 @@ foreach ($dll in @("libgcc_s_seh-1.dll", "libstdc++-6.dll", "libwinpthread-1.dll
     $o = Join-Path $MinGW $dll
     if (Test-Path $o) { Copy-Item $o $Saida -Force }
 }
+
+# --- 3c. OpenSSL (Telegram em Windows 10 antigo) ---------------------------
+# O windeployqt so traz o TLS do proprio Windows (schannel). No PC da loja
+# (Windows 10 1709, build 16299) o schannel do Qt 6.8 nao consegue abrir
+# conexao segura: o Telegram falhava com "nao foi possivel criar um canal
+# seguro para SSL/TLS", mesmo com internet e o mesmo token funcionando aqui.
+# Com as DLLs do OpenSSL ao lado do exe e o plugin openssl, o Qt usa o OpenSSL
+# (ele tem prioridade sobre o schannel) e nao depende da versao do Windows.
+foreach ($dll in $sslDlls) { Copy-Item (Join-Path $OpenSSL $dll) $Saida -Force }
+$tlsDir = Join-Path $Saida "tls"
+New-Item -ItemType Directory -Force -Path $tlsDir | Out-Null
+Copy-Item $sslPlugin $tlsDir -Force
+# Licenca do OpenSSL (Apache 2.0) acompanha as DLLs.
+$sslLic = Join-Path (Split-Path -Parent $OpenSSL) "share\licenses\openssl\LICENSE"
+if (Test-Path $sslLic) { Copy-Item $sslLic (Join-Path $Saida "LICENSE-OpenSSL.txt") -Force }
+else { Write-Warning "Licenca do OpenSSL nao encontrada em $sslLic - inclua LICENSE-OpenSSL.txt a mao." }
 
 # Instruções para quem vai instalar na loja.
 @"

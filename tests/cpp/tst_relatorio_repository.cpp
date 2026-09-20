@@ -22,6 +22,8 @@ private slots:
     void vendasPorFormaEMaisVendidos();
     void produtosParados();
     void lucroTravadoNoMomentoDaVenda();
+    void diaEspecifico();
+    void maisVendidosNaoMisturaMlComUnidade();
 
 private:
     QTemporaryDir m_dir;
@@ -134,6 +136,87 @@ void TstRelatorioRepository::lucroTravadoNoMomentoDaVenda()
     QCOMPARE(f.total, qint64(2500));
     QCOMPARE(f.custo, qint64(1500));   // 5 * 3,00 travado
     QCOMPARE(f.lucro, qint64(1000));
+}
+
+// "Quanto vendi ontem?" A receita vem de `vendas.data` e o custo de
+// `movimentacoes_estoque.data` — duas tabelas. Se o filtro do dia pegasse só uma
+// delas, o lucro do dia sairia com a receita de um dia e o custo de outro.
+void TstRelatorioRepository::diaEspecifico()
+{
+    const FaturamentoResumo hojeAntes = rel().faturamento(0);
+
+    // Custo médio de A NESTE momento. Não é mais 3,00: o teste anterior deu
+    // entrada a 9,00. É esse custo que a venda abaixo trava.
+    QSqlQuery c(m_db.connection());
+    QVERIFY(c.exec(QStringLiteral("SELECT custo_medio_unitario FROM estoque WHERE produto_id = %1").arg(m_prodA)));
+    QVERIFY(c.next());
+    const qint64 custoEsperado = 4 * c.value(0).toLongLong() / 1000;
+
+    // Uma venda nova (4 un de A a 5,00 = 20,00), que depois é empurrada para
+    // ONTEM junto com a baixa de estoque dela.
+    VendaRepository vrepo(m_db.connection());
+    QVector<LinhaVenda> it; LinhaVenda l; l.produtoId = m_prodA; l.embalagemId = m_embA;
+    l.fator = 1; l.qtdEmbalagem = 4; l.precoUnit = 500; it.push_back(l);
+    QVector<PagamentoVenda> pg; PagamentoVenda p; p.forma = QStringLiteral("pix"); p.valor = 2000; pg.push_back(p);
+    const ResultadoVenda r = vrepo.registrarVenda(m_sessaoId, 0, 0, it, pg, m_usuarioId);
+    QVERIFY2(r.ok, qPrintable(r.erro));
+
+    QSqlQuery q(m_db.connection());
+    QVERIFY(q.exec(QStringLiteral("UPDATE vendas SET data = datetime(data, '-1 day') WHERE id = %1").arg(r.vendaId)));
+    QVERIFY(q.exec(QStringLiteral("UPDATE movimentacoes_estoque SET data = datetime(data, '-1 day') "
+                                  "WHERE origem = 'venda:%1'").arg(r.vendaId)));
+
+    const QDate hoje = QDate::currentDate();
+    const FaturamentoResumo ontem = rel().faturamento(Periodo::doDia(hoje.addDays(-1)));
+    QCOMPARE(ontem.total, qint64(2000));
+    QCOMPARE(ontem.numVendas, 1);
+    QVERIFY(custoEsperado > 0);
+    QCOMPARE(ontem.custo, custoEsperado);   // o custo da venda veio junto para ontem
+    QCOMPARE(ontem.lucro, qint64(2000) - custoEsperado);
+
+    // Hoje não ganhou a venda de ontem.
+    const FaturamentoResumo hojeDepois = rel().faturamento(0);
+    QCOMPARE(hojeDepois.total, hojeAntes.total);
+    QCOMPARE(hojeDepois.lucro, hojeAntes.lucro);
+
+    // O dia específico de hoje é o mesmo que o botão "Hoje".
+    const FaturamentoResumo hojePorData = rel().faturamento(Periodo::doDia(hoje));
+    QCOMPARE(hojePorData.total, hojeDepois.total);
+    QCOMPARE(hojePorData.lucro, hojeDepois.lucro);
+
+    // Anteontem: nada.
+    QCOMPARE(rel().faturamento(Periodo::doDia(hoje.addDays(-2))).numVendas, 0);
+
+    // As listas também respeitam o dia.
+    const auto formasOntem = rel().vendasPorForma(Periodo::doDia(hoje.addDays(-1)));
+    QCOMPARE(formasOntem.size(), 1);
+    QCOMPARE(formasOntem.first().forma, QStringLiteral("pix"));
+    QCOMPARE(rel().maisVendidos(Periodo::doDia(hoje.addDays(-1)), 10).first().qtd, qint64(4));
+}
+
+// Somar unidade base punha 2000 ml de whisky (2 garrafas) acima de 5 latas.
+void TstRelatorioRepository::maisVendidosNaoMisturaMlComUnidade()
+{
+    ProdutoRepository prepo(m_db.connection());
+    Produto w; w.nome = QStringLiteral("Whisky 1L"); w.unidadeBase = QStringLiteral("ml");
+    Embalagem g; g.nome = QStringLiteral("Garrafa"); g.fator = 1000; g.precoVenda = 9000;
+    w.embalagens = {g};
+    QVERIFY2(prepo.salvar(w), qUtf8Printable(prepo.ultimoErro()));
+
+    VendaRepository vrepo(m_db.connection());
+    QVector<LinhaVenda> it; LinhaVenda l; l.produtoId = w.id; l.embalagemId = w.embalagens.first().id;
+    l.fator = 1000; l.qtdEmbalagem = 2; l.precoUnit = 9000; it.push_back(l);
+    QVector<PagamentoVenda> pg; PagamentoVenda p; p.forma = QStringLiteral("pix"); p.valor = 18000; pg.push_back(p);
+    QVERIFY(vrepo.registrarVenda(m_sessaoId, 0, 0, it, pg, m_usuarioId).ok);
+
+    const auto top = rel().maisVendidos(0, 10);
+    int posWhisky = -1, posA = -1;
+    for (int i = 0; i < top.size(); ++i) {
+        if (top.at(i).nome == QStringLiteral("Whisky 1L")) { posWhisky = i; QCOMPARE(top.at(i).qtd, qint64(2)); }
+        if (top.at(i).qtd >= 5 && posA < 0) posA = i;
+    }
+    QVERIFY(posWhisky >= 0);
+    QVERIFY2(posA >= 0 && posA < posWhisky, "2 garrafas apareceram acima de 5 unidades");
 }
 
 QTEST_MAIN(TstRelatorioRepository)

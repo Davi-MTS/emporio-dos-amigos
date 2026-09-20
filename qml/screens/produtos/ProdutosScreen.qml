@@ -209,7 +209,10 @@ Rectangle {
                 nome: e.nome || "",
                 fator: e.fator || 1,
                 codigoBarras: e.codigoBarras || "",
-                precoTexto: App.formatarValor(e.preco || 0)
+                precoTexto: App.formatarValor(e.preco || 0),
+                // Guardado só para devolver ao salvar: sem ele o backend
+                // gravava "sem custo" por cima do custo de compra da embalagem.
+                custo: (e.custo !== undefined && e.custo !== null) ? e.custo : -1
             });
         }
     }
@@ -239,13 +242,23 @@ Rectangle {
         }
         for (var i = 0; i < embModel.count; i++) {
             var e = embModel.get(i);
-            var cents = App.parseDinheiro(e.precoTexto);
+            // Preço escrito errado ("4,5O") virava R$ 0,00 em silêncio — e o
+            // produto passava a sair de graça no PDV. Vazio continua sendo 0.
+            var txt = ("" + e.precoTexto).trim();
+            var cents = txt.length === 0 ? 0 : App.parseDinheiro(txt);
+            if (cents < 0) {
+                erroLabel.text = qsTr("Preço inválido na embalagem \"%1\". Escreva só o valor, como 4,50.")
+                                 .arg(e.nome);
+                abasProduto.currentIndex = 1;
+                return;
+            }
             dados.embalagens.push({
                 id: e.embId,
                 nome: e.nome,
                 fator: e.fator,
                 codigoBarras: e.codigoBarras,
-                preco: cents < 0 ? 0 : cents
+                preco: cents,
+                custo: e.custo
             });
         }
         if (App.salvarProduto(dados))
@@ -503,6 +516,7 @@ Rectangle {
                         // formulário gigante empilhado.
                         SegmentedControl {
                             id: abasProduto
+                            objectName: "abasProduto"
                             Layout.fillWidth: true
                             Layout.preferredHeight: 40
                             Layout.bottomMargin: Theme.spacingXs
@@ -758,13 +772,18 @@ Rectangle {
                                 spacing: Theme.spacingSm
 
                                 AppTextField {
+                                    objectName: "nomeEmbalagem"
                                     Layout.preferredWidth: 130
                                     text: nome
                                     onTextChanged: embModel.setProperty(index, "nome", text)
                                 }
+                                // Embalagem nova começa em 0 ("informe"): começar
+                                // em 1 fazia caixinhas e fardos serem salvos como
+                                // se fossem uma unidade. O salvar recusa o 0.
                                 AppSpinBox {
+                                    objectName: "fatorEmbalagem"
                                     Layout.preferredWidth: 96
-                                    from: 1; to: 100000
+                                    from: 0; to: 100000
                                     value: fator
                                     onValueModified: embModel.setProperty(index, "fator", value)
                                 }
@@ -776,6 +795,7 @@ Rectangle {
                                     onTextChanged: embModel.setProperty(index, "codigoBarras", text)
                                 }
                                 AppTextField {
+                                    objectName: "precoEmbalagem"
                                     Layout.preferredWidth: 104
                                     text: precoTexto
                                     horizontalAlignment: Text.AlignRight
@@ -792,9 +812,10 @@ Rectangle {
 
                         AppButton {
                             kind: "ghost"
+                            objectName: "adicionarEmbalagem"
                             text: qsTr("＋ Adicionar embalagem")
                             onClicked: embModel.append({
-                                embId: 0, nome: "", fator: 1, codigoBarras: "", precoTexto: "0,00"
+                                embId: 0, nome: "", fator: 0, codigoBarras: "", precoTexto: "0,00", custo: -1
                             })
                         }
 
@@ -997,6 +1018,7 @@ Rectangle {
 
                         Label {
                             id: erroLabel
+                            objectName: "erroProduto"
                             Layout.fillWidth: true
                             visible: text.length > 0
                             color: Theme.danger
@@ -1012,6 +1034,7 @@ Rectangle {
                         spacing: Theme.spacingSm
                         AppButton {
                             kind: "accent"
+                            objectName: "salvarProduto"
                             text: qsTr("Salvar")
                             enabled: tela.podeEditar
                             onClicked: tela.salvar()

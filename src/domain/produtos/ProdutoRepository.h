@@ -40,6 +40,11 @@ public:
     // embalagem correspondente (para saber o fator e o preço). nullopt se não achar.
     std::optional<QPair<Produto, Embalagem>> buscarPorCodigoBarras(const QString &codigo);
 
+    // Fator da embalagem NO CADASTRO, só se ela pertencer a este produto.
+    // É a fonte da verdade para compra e venda: a tela manda a embalagem
+    // escolhida, e o fator sai daqui — nunca do que a tela disser.
+    std::optional<int> fatorDaEmbalagem(int produtoId, int embalagemId);
+
     QVector<QPair<int, QString>> listarCategorias();
 
     // Cria uma categoria e devolve o id. Se já existir uma com o mesmo nome

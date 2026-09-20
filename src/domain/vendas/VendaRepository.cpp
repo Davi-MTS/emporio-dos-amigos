@@ -29,6 +29,25 @@ ResultadoVenda VendaRepository::registrarVenda(int sessaoId, int clienteId,
         res.erro = QStringLiteral("A venda não tem itens.");
         return res;
     }
+    // Quantidade zero ou negativa DEVOLVERIA mercadoria ao estoque como se
+    // fosse venda; valor negativo abateria o total. A tela não deixa, mas a
+    // regra que protege o estoque e o caixa fica aqui.
+    for (const LinhaVenda &l : itens) {
+        if (l.qtdEmbalagem <= 0 || l.precoUnit < 0 || l.desconto < 0) {
+            res.erro = QStringLiteral("Item da venda com quantidade ou valor inválido.");
+            return res;
+        }
+    }
+    for (const PagamentoVenda &p : pagamentos) {
+        if (p.valor <= 0) {
+            res.erro = QStringLiteral("Pagamento com valor inválido.");
+            return res;
+        }
+    }
+    if (descontoGeral < 0) {
+        res.erro = QStringLiteral("Desconto inválido.");
+        return res;
+    }
 
     // Total = soma dos subtotais - desconto geral.
     qint64 total = 0;
@@ -197,14 +216,22 @@ ResultadoVenda VendaRepository::registrarVenda(int sessaoId, int clienteId,
             // médio, então lê-lo agora capta o COGS correto). Gravado na
             // movimentação para o lucro não mudar com compras futuras.
             qint64 custoUnit = 0;
+            qint64 saldoAntes = 0;
             {
                 QSqlQuery qc(m_db);
                 qc.prepare(QStringLiteral(
-                    "SELECT custo_medio_unitario FROM estoque WHERE produto_id = :pid"));
+                    "SELECT custo_medio_unitario, quantidade_atual FROM estoque WHERE produto_id = :pid"));
                 qc.bindValue(QStringLiteral(":pid"), b.produtoId);
-                if (qc.exec() && qc.next())
+                if (qc.exec() && qc.next()) {
                     custoUnit = qc.value(0).toLongLong();
+                    saldoAntes = qc.value(1).toLongLong();
+                }
             }
+            // Unidades vendidas além do que havia no estoque. O custo delas ainda
+            // não existe (a mercadoria não foi lançada): ficam com o custo médio
+            // de agora como PROVISÓRIO e são acertadas quando a compra chegar —
+            // ver EstoqueRepository::acertarCustoPendente.
+            const qint64 pendente = qBound(Q_INT64_C(0), b.qtd - qMax(Q_INT64_C(0), saldoAntes), b.qtd);
 
             QSqlQuery qe2(m_db);
             qe2.prepare(QStringLiteral(
@@ -220,13 +247,14 @@ ResultadoVenda VendaRepository::registrarVenda(int sessaoId, int clienteId,
             QSqlQuery qm(m_db);
             qm.prepare(QStringLiteral(
                 "INSERT INTO movimentacoes_estoque "
-                "(produto_id, tipo, quantidade, origem, usuario_id, custo_unit, data) "
-                "VALUES (:pid, 'saida_venda', :qtd, :origem, :uid, :custo, datetime('now','localtime'))"));
+                "(produto_id, tipo, quantidade, origem, usuario_id, custo_unit, qtd_pendente_custo, data) "
+                "VALUES (:pid, 'saida_venda', :qtd, :origem, :uid, :custo, :pend, datetime('now','localtime'))"));
             qm.bindValue(QStringLiteral(":pid"), b.produtoId);
             qm.bindValue(QStringLiteral(":qtd"), -b.qtd); // saída = negativo
             qm.bindValue(QStringLiteral(":origem"), QStringLiteral("venda:%1").arg(vendaId));
             qm.bindValue(QStringLiteral(":uid"), usuarioId > 0 ? QVariant(usuarioId) : QVariant());
             qm.bindValue(QStringLiteral(":custo"), custoUnit);
+            qm.bindValue(QStringLiteral(":pend"), pendente);
             if (!qm.exec()) {
                 res.erro = qm.lastError().text();
                 m_db.rollback();
@@ -280,6 +308,7 @@ ResultadoVenda VendaRepository::registrarVenda(int sessaoId, int clienteId,
 bool VendaRepository::cancelarVenda(int vendaId, const QString &motivo, int usuarioId,
                                     int sessaoAbertaId)
 {
+    m_aviso.clear();
     // Confere se a venda existe e ainda pode ser cancelada.
     int sessaoDaVenda = 0;
     {
@@ -295,6 +324,52 @@ bool VendaRepository::cancelarVenda(int vendaId, const QString &motivo, int usua
             return false;
         }
         sessaoDaVenda = q.value(1).toInt();
+    }
+
+    // Quanto dinheiro precisa SAIR DA GAVETA para devolver ao cliente:
+    //  - o que ele pagou em dinheiro, se a venda é de outro turno (no mesmo
+    //    turno o esperado já cai sozinho, porque o resumo só conta vendas
+    //    concluídas);
+    //  - o que ele já pagou do FIADO desta venda. Antes o cancelamento só
+    //    cancelava a conta ainda aberta: o valor recebido ficava como pago numa
+    //    venda que não existe mais, sem devolução nenhuma.
+    qint64 dinheiroOutroTurno = 0;
+    if (sessaoDaVenda != sessaoAbertaId) {
+        QSqlQuery q(m_db);
+        q.prepare(QStringLiteral(
+            "SELECT COALESCE((SELECT SUM(valor) FROM pagamentos "
+            "                 WHERE venda_id = :v1 AND forma = 'dinheiro'), 0) - troco "
+            "FROM vendas WHERE id = :v2"));
+        q.bindValue(QStringLiteral(":v1"), vendaId);
+        q.bindValue(QStringLiteral(":v2"), vendaId);
+        if (q.exec() && q.next())
+            dinheiroOutroTurno = qMax(Q_INT64_C(0), q.value(0).toLongLong());   // o que ficou na gaveta
+    }
+    qint64 fiadoJaPago = 0;
+    {
+        QSqlQuery q(m_db);
+        q.prepare(QStringLiteral(
+            "SELECT COALESCE((SELECT SUM(valor) FROM pagamentos "
+            "                 WHERE venda_id = :v1 AND forma = 'fiado'), 0) "
+            "     - COALESCE((SELECT SUM(valor) FROM contas_receber "
+            "                 WHERE venda_id = :v2 AND status = 'aberta'), 0)"));
+        q.bindValue(QStringLiteral(":v1"), vendaId);
+        q.bindValue(QStringLiteral(":v2"), vendaId);
+        if (q.exec() && q.next())
+            fiadoJaPago = qMax(Q_INT64_C(0), q.value(0).toLongLong());
+    }
+    const qint64 devolver = dinheiroOutroTurno + fiadoJaPago;
+    const auto fmt = [](qint64 c) {
+        return QStringLiteral("R$ %1,%2").arg(c / 100).arg(c % 100, 2, 10, QLatin1Char('0'));
+    };
+    // Com o caixa fechado não há turno onde lançar a saída: o dinheiro sairia
+    // da gaveta sem aparecer em conferência nenhuma (e a tela dizia que
+    // "estorna no caixa"). Pede para abrir o caixa antes.
+    if (devolver > 0 && sessaoAbertaId <= 0) {
+        m_erro = QStringLiteral("Abra o caixa antes de cancelar esta venda: %1 precisa sair "
+                                "da gaveta para devolver ao cliente, e com o caixa fechado essa "
+                                "saída não entraria em conferência nenhuma.").arg(fmt(devolver));
+        return false;
     }
 
     if (!m_db.transaction()) {
@@ -319,6 +394,22 @@ bool VendaRepository::cancelarVenda(int vendaId, const QString &motivo, int usua
         }
         while (q.next())
             devolucoes.push_back({q.value(0).toInt(), -q.value(1).toLongLong()}); // saída era negativa
+    }
+
+    // Venda cancelada não espera mais custo: sem isto, a próxima compra acertaria
+    // o custo de uma venda que não vale, e a que ainda está sem estoque de verdade
+    // ficaria com o provisório.
+    {
+        QSqlQuery qp(m_db);
+        qp.prepare(QStringLiteral(
+            "UPDATE movimentacoes_estoque SET qtd_pendente_custo = 0 "
+            "WHERE tipo = 'saida_venda' AND origem = :origem"));
+        qp.bindValue(QStringLiteral(":origem"), QStringLiteral("venda:%1").arg(vendaId));
+        if (!qp.exec()) {
+            m_erro = qp.lastError().text();
+            m_db.rollback();
+            return false;
+        }
     }
 
     for (const Devolucao &d : devolucoes) {
@@ -364,46 +455,30 @@ bool VendaRepository::cancelarVenda(int vendaId, const QString &motivo, int usua
         }
     }
 
-    // 3) Dinheiro devolvido ao cliente.
-    //    Mesma sessão: o resumo do caixa só conta vendas 'concluida', então o
-    //    esperado já cai sozinho. Sessão diferente (turno antigo): registra
-    //    sangria, senão o dinheiro sai da gaveta sem aparecer no fechamento.
-    if (sessaoAbertaId > 0 && sessaoDaVenda != sessaoAbertaId) {
-        qint64 dinheiro = 0;
-        {
-            QSqlQuery q(m_db);
-            q.prepare(QStringLiteral(
-                "SELECT COALESCE(SUM(valor),0) FROM pagamentos "
-                "WHERE venda_id = :vid AND forma = 'dinheiro'"));
-            q.bindValue(QStringLiteral(":vid"), vendaId);
-            if (q.exec() && q.next())
-                dinheiro = q.value(0).toLongLong();
+    // 3) Dinheiro devolvido ao cliente sai da gaveta como sangria, no turno
+    //    aberto (o cálculo está antes da transação).
+    const auto lancarSangria = [&](qint64 valor, const QString &motivoSangria) {
+        if (valor <= 0)
+            return true;
+        QSqlQuery q(m_db);
+        q.prepare(QStringLiteral(
+            "INSERT INTO mov_caixa (sessao_id, tipo, valor, motivo, usuario_id, data) "
+            "VALUES (:sid, 'sangria', :valor, :motivo, :uid, datetime('now','localtime'))"));
+        q.bindValue(QStringLiteral(":sid"), sessaoAbertaId);
+        q.bindValue(QStringLiteral(":valor"), valor);
+        q.bindValue(QStringLiteral(":motivo"), motivoSangria);
+        q.bindValue(QStringLiteral(":uid"), usuarioId > 0 ? QVariant(usuarioId) : QVariant());
+        if (!q.exec()) {
+            m_erro = q.lastError().text();
+            return false;
         }
-        qint64 troco = 0;
-        {
-            QSqlQuery q(m_db);
-            q.prepare(QStringLiteral("SELECT troco FROM vendas WHERE id = :vid"));
-            q.bindValue(QStringLiteral(":vid"), vendaId);
-            if (q.exec() && q.next())
-                troco = q.value(0).toLongLong();
-        }
-        const qint64 devolver = dinheiro - troco;   // o que de fato ficou na gaveta
-        if (devolver > 0) {
-            QSqlQuery q(m_db);
-            q.prepare(QStringLiteral(
-                "INSERT INTO mov_caixa (sessao_id, tipo, valor, motivo, usuario_id, data) "
-                "VALUES (:sid, 'sangria', :valor, :motivo, :uid, datetime('now','localtime'))"));
-            q.bindValue(QStringLiteral(":sid"), sessaoAbertaId);
-            q.bindValue(QStringLiteral(":valor"), devolver);
-            q.bindValue(QStringLiteral(":motivo"),
-                        QStringLiteral("Estorno da venda #%1").arg(vendaId));
-            q.bindValue(QStringLiteral(":uid"), usuarioId > 0 ? QVariant(usuarioId) : QVariant());
-            if (!q.exec()) {
-                m_erro = q.lastError().text();
-                m_db.rollback();
-                return false;
-            }
-        }
+        return true;
+    };
+    if (!lancarSangria(dinheiroOutroTurno, QStringLiteral("Estorno da venda #%1").arg(vendaId))
+        || !lancarSangria(fiadoJaPago,
+                          QStringLiteral("Devolução do fiado já pago da venda #%1").arg(vendaId))) {
+        m_db.rollback();
+        return false;
     }
 
     // 4) Marca a venda (nunca apaga: o histórico precisa mostrar o cancelamento).
@@ -427,6 +502,9 @@ bool VendaRepository::cancelarVenda(int vendaId, const QString &motivo, int usua
         return false;
     }
     m_erro.clear();
+    if (devolver > 0)
+        m_aviso = QStringLiteral("Saíram %1 da gaveta (sangria) para devolver ao cliente.")
+                      .arg(fmt(devolver));
     return true;
 }
 

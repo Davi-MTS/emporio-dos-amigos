@@ -99,11 +99,19 @@ bool UsuarioRepository::salvar(Usuario &usuario, const QString &senhaNova)
         return false;
     }
 
+    // Tirar o perfil de Administrador do ÚNICO administrador deixava a loja
+    // sem ninguém capaz de entrar em Usuários, Backup e Financeiro.
+    if (usuario.id > 0 && usuario.perfilId != 1 && ehUnicoAdministrador(usuario.id)) {
+        m_erro = QStringLiteral("Este é o único administrador. Promova outro usuário a "
+                                "Administrador antes de mudar o perfil deste.");
+        return false;
+    }
+
     QSqlQuery q(m_db);
     if (usuario.id == 0) {
         q.prepare(QStringLiteral(
-            "INSERT INTO usuarios (perfil_id, nome, login, senha_hash, ativo) "
-            "VALUES (:perfil, :nome, :login, :hash, 1)"));
+            "INSERT INTO usuarios (perfil_id, nome, login, senha_hash, ativo, criado_em) "
+            "VALUES (:perfil, :nome, :login, :hash, 1, datetime('now','localtime'))"));
         q.bindValue(QStringLiteral(":hash"), AuthService::hashSenha(senhaNova));
     } else if (!senhaNova.isEmpty()) {
         q.prepare(QStringLiteral(
@@ -130,8 +138,24 @@ bool UsuarioRepository::salvar(Usuario &usuario, const QString &senhaNova)
     return true;
 }
 
+bool UsuarioRepository::ehUnicoAdministrador(int id)
+{
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral(
+        "SELECT (SELECT perfil_id FROM usuarios WHERE id = :id1) = 1 "
+        "   AND (SELECT COUNT(*) FROM usuarios WHERE perfil_id = 1 AND ativo = 1 "
+        "        AND senha_hash <> '' AND id <> :id2) = 0"));
+    q.bindValue(QStringLiteral(":id1"), id);
+    q.bindValue(QStringLiteral(":id2"), id);
+    return q.exec() && q.next() && q.value(0).toBool();
+}
+
 bool UsuarioRepository::inativar(int id)
 {
+    if (ehUnicoAdministrador(id)) {
+        m_erro = QStringLiteral("Este é o único administrador e não pode ser desativado.");
+        return false;
+    }
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral("UPDATE usuarios SET ativo = 0 WHERE id = :id"));
     q.bindValue(QStringLiteral(":id"), id);
@@ -176,8 +200,8 @@ bool UsuarioRepository::criarPrimeiroAdmin(const QString &nome, const QString &l
         q.bindValue(QStringLiteral(":id"), existente);
     } else {
         q.prepare(QStringLiteral(
-            "INSERT INTO usuarios (perfil_id, nome, login, senha_hash, ativo) "
-            "VALUES (1, :nome, :login, :hash, 1)"));
+            "INSERT INTO usuarios (perfil_id, nome, login, senha_hash, ativo, criado_em) "
+            "VALUES (1, :nome, :login, :hash, 1, datetime('now','localtime'))"));
     }
     q.bindValue(QStringLiteral(":nome"), nome.trimmed());
     q.bindValue(QStringLiteral(":login"), login.trimmed());

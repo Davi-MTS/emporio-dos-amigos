@@ -178,14 +178,14 @@ qint64 LoteRepository::totalEmLotes(int produtoId)
     return q.value(0).toLongLong();
 }
 
-QVector<QPair<QString, qint64>> LoteRepository::divergencias()
+QVector<DivergenciaLote> LoteRepository::divergencias()
 {
-    QVector<QPair<QString, qint64>> lista;
+    QVector<DivergenciaLote> lista;
     QSqlQuery q(m_db);
     // Só produtos que TÊM algum lote: quem nunca teve validade informada não é
     // divergência, é apenas produto sem controle de vencimento.
     if (!q.exec(QStringLiteral(
-            "SELECT p.nome, COALESCE(e.quantidade_atual, 0) - SUM(l.quantidade) "
+            "SELECT p.nome, COALESCE(e.quantidade_atual, 0) - SUM(l.quantidade), p.unidade_base "
             "FROM lotes l "
             "JOIN produtos p ON p.id = l.produto_id "
             "LEFT JOIN estoque e ON e.produto_id = l.produto_id "
@@ -197,6 +197,6 @@ QVector<QPair<QString, qint64>> LoteRepository::divergencias()
         return lista;
     }
     while (q.next())
-        lista.push_back({q.value(0).toString(), q.value(1).toLongLong()});
+        lista.push_back({q.value(0).toString(), q.value(1).toLongLong(), q.value(2).toString()});
     return lista;
 }

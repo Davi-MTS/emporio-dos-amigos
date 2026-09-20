@@ -81,8 +81,9 @@ bool ClienteRepository::salvar(Cliente &cliente)
     if (cliente.id == 0) {
         q.prepare(QStringLiteral(
             "INSERT INTO clientes (nome, telefone, cpf, endereco, aniversario, "
-            "observacoes, limite_fiado, ativo) "
-            "VALUES (:nome, :tel, :cpf, :end, :aniv, :obs, :limite, 1)"));
+            "observacoes, limite_fiado, ativo, criado_em) "
+            "VALUES (:nome, :tel, :cpf, :end, :aniv, :obs, :limite, 1, "
+            "        datetime('now','localtime'))"));
     } else {
         q.prepare(QStringLiteral(
             "UPDATE clientes SET nome=:nome, telefone=:tel, cpf=:cpf, endereco=:end, "
@@ -256,7 +257,10 @@ ClienteRepository::HistoricoFiado ClienteRepository::historicoFiado(int clienteI
 
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral(
-        "SELECT MAX(v.data_hora), "
+        // A coluna é vendas.data. Com "data_hora" (que não existe) a consulta
+        // inteira falhava e a tela de Clientes nunca mostrava última compra,
+        // último pagamento nem contas em aberto.
+        "SELECT MAX(v.data), "
         "       (SELECT MAX(pago_em) FROM contas_receber "
         "         WHERE cliente_id = :c1 AND pago_em IS NOT NULL), "
         "       (SELECT COUNT(*) FROM contas_receber "

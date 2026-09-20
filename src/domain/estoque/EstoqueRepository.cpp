@@ -48,7 +48,8 @@ QVector<ItemEstoque> EstoqueRepository::listar(const QString &filtro)
         it.unidadeBase = q.value(3).toString();
         it.minimo = q.value(4).toInt();
         it.quantidade = q.value(5).toLongLong();
-        it.custoMedio = q.value(6).toLongLong() / 1000; // milésimos -> centavos
+        it.custoMedioMilli = q.value(6).toLongLong();
+        it.custoMedio = (it.custoMedioMilli + 500) / 1000; // milésimos -> centavos (arredonda)
         it.temFoto = q.value(7).toInt() != 0;
         itens.push_back(it);
     }
@@ -72,7 +73,8 @@ ItemEstoque EstoqueRepository::item(int produtoId)
         it.unidadeBase = q.value(3).toString();
         it.minimo = q.value(4).toInt();
         it.quantidade = q.value(5).toLongLong();
-        it.custoMedio = q.value(6).toLongLong() / 1000; // milésimos -> centavos
+        it.custoMedioMilli = q.value(6).toLongLong();
+        it.custoMedio = (it.custoMedioMilli + 500) / 1000; // milésimos -> centavos (arredonda)
     }
     return it;
 }
@@ -125,6 +127,80 @@ bool EstoqueRepository::registrarEntradaMilli(int produtoId, qint64 qtdBase,
     return true;
 }
 
+bool EstoqueRepository::acertarCustoPendente(int produtoId, qint64 qtdCoberta,
+                                             qint64 custoUnitBaseMilli)
+{
+    struct Pendente { qint64 id; qint64 qtd; qint64 pendente; };
+    QVector<Pendente> lista;
+    {
+        QSqlQuery q(m_db);
+        q.prepare(QStringLiteral(
+            "SELECT id, -quantidade, qtd_pendente_custo FROM movimentacoes_estoque "
+            "WHERE produto_id = :pid AND tipo = 'saida_venda' AND qtd_pendente_custo > 0 "
+            "ORDER BY id"));
+        q.bindValue(QStringLiteral(":pid"), produtoId);
+        if (!q.exec()) {
+            m_erro = q.lastError().text();
+            return false;
+        }
+        while (q.next())
+            lista.push_back({q.value(0).toLongLong(), q.value(1).toLongLong(), q.value(2).toLongLong()});
+    }
+
+    qint64 resta = qtdCoberta;
+    for (const Pendente &p : std::as_const(lista)) {
+        if (resta <= 0)
+            break;
+        const qint64 acerto = qMin(p.pendente, resta);
+
+        if (acerto == p.qtd) {
+            // A saída inteira estava sem estoque: troca o custo provisório pelo real.
+            QSqlQuery u(m_db);
+            u.prepare(QStringLiteral(
+                "UPDATE movimentacoes_estoque SET custo_unit = :c, qtd_pendente_custo = 0 "
+                "WHERE id = :id"));
+            u.bindValue(QStringLiteral(":c"), custoUnitBaseMilli);
+            u.bindValue(QStringLiteral(":id"), p.id);
+            if (!u.exec()) {
+                m_erro = u.lastError().text();
+                return false;
+            }
+        } else {
+            // Só parte dela: a parte acertada vira uma saída própria, com o custo
+            // da compra e a MESMA venda e data. Uma média arredondada no lugar
+            // disto erraria o lucro em centavos; separando fica exato.
+            QSqlQuery nova(m_db);
+            nova.prepare(QStringLiteral(
+                "INSERT INTO movimentacoes_estoque "
+                "(produto_id, tipo, quantidade, origem, usuario_id, observacao, custo_unit, "
+                " qtd_pendente_custo, data) "
+                "SELECT produto_id, tipo, :qtd, origem, usuario_id, observacao, :c, 0, data "
+                "FROM movimentacoes_estoque WHERE id = :id"));
+            nova.bindValue(QStringLiteral(":qtd"), -acerto);
+            nova.bindValue(QStringLiteral(":c"), custoUnitBaseMilli);
+            nova.bindValue(QStringLiteral(":id"), p.id);
+            if (!nova.exec()) {
+                m_erro = nova.lastError().text();
+                return false;
+            }
+
+            QSqlQuery u(m_db);
+            u.prepare(QStringLiteral(
+                "UPDATE movimentacoes_estoque "
+                "SET quantidade = quantidade + :r, qtd_pendente_custo = qtd_pendente_custo - :r "
+                "WHERE id = :id"));
+            u.bindValue(QStringLiteral(":r"), acerto);
+            u.bindValue(QStringLiteral(":id"), p.id);
+            if (!u.exec()) {
+                m_erro = u.lastError().text();
+                return false;
+            }
+        }
+        resta -= acerto;
+    }
+    return true;
+}
+
 bool EstoqueRepository::aplicarEntrada(int produtoId, qint64 qtdBase,
                                        qint64 custoUnitBase, int usuarioId,
                                        const QString &origem, const QString &observacao)
@@ -147,12 +223,35 @@ bool EstoqueRepository::aplicarEntrada(int produtoId, qint64 qtdBase,
         custoAtual = q.value(1).toLongLong();
     }
 
+    // Havia unidades vendidas sem estoque: a mercadoria que chega é a que elas
+    // deveriam ter tido. O custo delas passa a ser o desta entrada.
+    if (custoUnitBase >= 0 && qtdAtual < 0 && qtdBase > 0) {
+        if (!acertarCustoPendente(produtoId, qMin(qtdBase, -qtdAtual), custoUnitBase))
+            return false;
+    }
+
     const qint64 novaQtd = qtdAtual + qtdBase;
     qint64 novoCusto = custoAtual;
-    if (custoUnitBase >= 0 && novaQtd > 0) {
-        // Custo médio ponderado, em MILÉSIMOS de centavo (custoUnitBase e
-        // custoAtual já estão nessa escala) — preserva frações de centavo.
-        novoCusto = (qtdAtual * custoAtual + qtdBase * custoUnitBase) / novaQtd;
+    if (custoUnitBase >= 0) {
+        if (qtdAtual <= 0 || custoAtual == 0) {
+            // (custoAtual == 0 com saldo positivo: mercadoria que entrou SEM
+            // custo informado. Zero ali é "não sei", não "de graça" — fazer a
+            // média com ele baixava o custo e inflava o lucro. Eram 7 produtos
+            // assim na loja.)
+            // Saldo zerado ou NEGATIVO (vendeu antes de lançar a mercadoria — o
+            // PDV permite): as unidades negativas já foram vendidas e não estão
+            // na prateleira, então não entram na média. O custo de quem chega é
+            // o custo da compra.
+            //
+            // Antes a média ponderada rodava com qtd_atual negativa: vendeu 20,
+            // comprou 24 a R$ 3,00, o divisor virava 4 e cada unidade passava a
+            // "custar" R$ 18,00. Foi o lucro que despencava e voltava na loja.
+            novoCusto = custoUnitBase;
+        } else if (novaQtd > 0) {
+            // Custo médio ponderado, em MILÉSIMOS de centavo (custoUnitBase e
+            // custoAtual já estão nessa escala) — preserva frações de centavo.
+            novoCusto = (qtdAtual * custoAtual + qtdBase * custoUnitBase) / novaQtd;
+        }
     }
 
     {

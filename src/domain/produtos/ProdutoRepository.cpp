@@ -306,9 +306,9 @@ bool ProdutoRepository::salvar(Produto &produto)
             "INSERT INTO produtos "
             "(nome, categoria_id, marca_id, fornecedor_id, unidade_base, "
             " estoque_minimo, localizacao, taxa_manutencao, ativo, composto, "
-            " dose_de_produto_id, dose_quantidade) "
+            " dose_de_produto_id, dose_quantidade, criado_em) "
             "VALUES (:nome, :cat, :marca, :forn, :ub, :min, :loc, :taxa, 1, :composto, "
-            "        :doseOrigem, :doseQtd)"));
+            "        :doseOrigem, :doseQtd, datetime('now','localtime'))"));
     } else {
         q.prepare(QStringLiteral(
             "UPDATE produtos SET nome=:nome, categoria_id=:cat, marca_id=:marca, "
@@ -388,13 +388,45 @@ bool ProdutoRepository::salvarEmbalagens(Produto &produto)
         produto.embalagens.push_back(base);
     }
 
+    // Fator é o que converte a embalagem em estoque: errado aqui, toda venda e
+    // compra dessa embalagem baixa/entra a quantidade errada. Na loja, caixinhas,
+    // boxes e fardos foram salvos com o fator 1 que a linha nova trazia e
+    // venderam assim por dias (caixinha de 12 baixando 1 lata). Por isso:
+    //  - fator não informado (0) é recusado, em vez de virar 1 em silêncio;
+    //  - duas embalagens com o MESMO fator e preços DIFERENTES são recusadas:
+    //    a mesma quantidade não tem dois preços — uma delas está com o fator
+    //    errado. (Mesmo fator e mesmo preço é legítimo: um segundo código de
+    //    barras para a mesma unidade.)
+    for (const Embalagem &e : produto.embalagens) {
+        if (e.fator <= 0) {
+            const QString cabem = produto.unidadeBase == QStringLiteral("unidade")
+                                      ? QStringLiteral("quantas unidades cabem nela")
+                                      : QStringLiteral("quantos %1 cabem nela").arg(produto.unidadeBase);
+            m_erro = QStringLiteral("Informe o fator da embalagem \"%1\": %2 "
+                                    "(unidade avulsa = 1, caixinha de 12 latas = 12).")
+                         .arg(e.nome, cabem);
+            return false;
+        }
+    }
+    for (int i = 0; i < produto.embalagens.size(); ++i) {
+        for (int j = i + 1; j < produto.embalagens.size(); ++j) {
+            const Embalagem &a = produto.embalagens.at(i);
+            const Embalagem &b = produto.embalagens.at(j);
+            if (a.fator == b.fator && a.precoVenda != b.precoVenda) {
+                m_erro = QStringLiteral("As embalagens \"%1\" e \"%2\" estão com o mesmo fator "
+                                        "(%3) e preços diferentes. Confira o fator: uma "
+                                        "caixinha de 12 tem fator 12, não 1.")
+                             .arg(a.nome, b.nome).arg(a.fator);
+                return false;
+            }
+        }
+    }
+
     // Ids que continuam existindo (para apagar os removidos).
     QVector<int> mantidos;
 
     for (Embalagem &e : produto.embalagens) {
         e.produtoId = produto.id;
-        if (e.fator <= 0)
-            e.fator = 1;
 
         QSqlQuery q(m_db);
         if (e.id == 0) {
@@ -445,13 +477,42 @@ bool ProdutoRepository::salvarEmbalagens(Produto &produto)
     return true;
 }
 
+std::optional<int> ProdutoRepository::fatorDaEmbalagem(int produtoId, int embalagemId)
+{
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral(
+        "SELECT fator_conversao FROM produto_embalagens WHERE id = :e AND produto_id = :p"));
+    q.bindValue(QStringLiteral(":e"), embalagemId);
+    q.bindValue(QStringLiteral(":p"), produtoId);
+    if (!q.exec()) {
+        m_erro = q.lastError().text();
+        return std::nullopt;
+    }
+    if (!q.next())
+        return std::nullopt;
+    const int fator = q.value(0).toInt();
+    return fator > 0 ? fator : 1;
+}
+
 bool ProdutoRepository::inativar(int id)
 {
+    // Os códigos de barras do produto desativado são liberados. Antes ele
+    // continuava saindo no PDV pelo bipe, e o código ficava preso: cadastrar o
+    // produto substituto dava "código já cadastrado em outro produto", apontando
+    // para um produto que a busca não mostra mais. (Não há tela para reativar.)
+    if (!m_db.transaction()) {
+        m_erro = m_db.lastError().text();
+        return false;
+    }
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral("UPDATE produtos SET ativo = 0 WHERE id = :id"));
     q.bindValue(QStringLiteral(":id"), id);
-    if (!q.exec()) {
-        m_erro = q.lastError().text();
+    QSqlQuery c(m_db);
+    c.prepare(QStringLiteral("UPDATE produto_embalagens SET codigo_barras = NULL WHERE produto_id = :id"));
+    c.bindValue(QStringLiteral(":id"), id);
+    if (!q.exec() || !c.exec() || !m_db.commit()) {
+        m_erro = q.lastError().isValid() ? q.lastError().text() : c.lastError().text();
+        m_db.rollback();
         return false;
     }
     return true;
@@ -466,7 +527,9 @@ ProdutoRepository::buscarPorCodigoBarras(const QString &codigo)
 
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral(
-        "SELECT produto_id FROM produto_embalagens WHERE codigo_barras = :cod LIMIT 1"));
+        "SELECT pe.produto_id FROM produto_embalagens pe "
+        "JOIN produtos p ON p.id = pe.produto_id "
+        "WHERE pe.codigo_barras = :cod AND p.ativo = 1 LIMIT 1"));
     q.bindValue(QStringLiteral(":cod"), cod);
     if (!q.exec()) {
         m_erro = q.lastError().text();

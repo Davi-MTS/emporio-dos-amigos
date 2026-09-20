@@ -14,7 +14,11 @@ struct ItemEstoque
     QString unidadeBase;
     qint64 quantidade = 0;   // unidade base
     int minimo = 0;          // unidade base
-    qint64 custoMedio = 0;   // centavos por unidade base
+    qint64 custoMedio = 0;   // centavos por unidade base (ARREDONDADO — só para exibir)
+    // O custo de verdade, em milésimos de centavo. Qualquer conta (custo de uma
+    // caixa, valor do estoque) sai daqui: em ml o custo é fração de centavo e,
+    // truncado, a garrafa de 1 L de R$ 18,99 virava R$ 10,00.
+    qint64 custoMedioMilli = 0;
     bool temFoto = false;    // evita pedir imagem de quem não tem
 };
 
@@ -64,6 +68,11 @@ public:
     QString ultimoErro() const { return m_erro; }
 
 private:
+    // Dá custo às unidades que foram VENDIDAS SEM ESTOQUE, usando o custo da
+    // mercadoria que chegou. Cobre no máximo `qtdCoberta` unidades, das vendas
+    // mais antigas para as mais novas. Não abre transação.
+    bool acertarCustoPendente(int produtoId, qint64 qtdCoberta, qint64 custoUnitBaseMilli);
+
     bool garantirLinhaEstoque(int produtoId);
 
     QSqlDatabase m_db;

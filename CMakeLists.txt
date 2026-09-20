@@ -19,6 +19,15 @@ qt_standard_project_setup(REQUIRES 6.8)
 add_subdirectory(src)
 add_subdirectory(qml)
 
+# Ferramenta de documentacao: gera as imagens do manual a partir das telas de
+# verdade. Nao entra no pacote da loja nem no CTest. Desligada por padrao: o
+# build de Release do empacotar.ps1 nao precisa dela. Para gerar o manual:
+#     cmake -B build/mingw -DDISTRIBUIDORA_BUILD_TOOLS=ON
+option(DISTRIBUIDORA_BUILD_TOOLS "Compilar as ferramentas de documentacao" OFF)
+if(DISTRIBUIDORA_BUILD_TOOLS)
+    add_subdirectory(tools/capturar_telas)
+endif()
+
 option(DISTRIBUIDORA_BUILD_TESTS "Compilar os testes automatizados" ON)
 if(DISTRIBUIDORA_BUILD_TESTS)
     enable_testing()

@@ -119,6 +119,11 @@ public:
     Q_INVOKABLE void recarregarEstoque(const QString &filtro = QString());
     Q_INVOKABLE QVariantMap itemEstoque(int produtoId);
     Q_INVOKABLE QVariantList embalagensDe(int produtoId);
+    // Custo fora do normal na compra/entrada: compara o custo digitado com o
+    // quanto aquela embalagem rende vendida pelo preço da unidade. Devolve
+    // { nivel: "" | "alto" | "baixo", mensagem }. Só avisa — não impede.
+    // O fator é o do cadastro (nunca o da tela).
+    Q_INVOKABLE QVariantMap avaliarCusto(int produtoId, int embalagemId, const QString &custoTexto);
     // Saldo atual em estoque (unidade base). 0 se não houver linha. Usado pelo
     // PDV para avisar sobre venda com estoque insuficiente.
     Q_INVOKABLE qlonglong estoqueDisponivel(int produtoId);
@@ -246,6 +251,12 @@ public:
     Q_INVOKABLE QVariantList relatorioFormas(int dias);
     Q_INVOKABLE QVariantList relatorioMaisVendidos(int dias, int limite);
     Q_INVOKABLE QVariantList relatorioProdutosParados(int dias);
+    // Os mesmos quatro relatórios para UM dia específico ("yyyy-MM-dd"). Data
+    // inválida devolve vazio — a tela só chama com a data completa.
+    Q_INVOKABLE QVariantMap relatorioFaturamentoDia(const QString &isoDia);
+    Q_INVOKABLE QVariantList relatorioFormasDia(const QString &isoDia);
+    Q_INVOKABLE QVariantList relatorioMaisVendidosDia(const QString &isoDia, int limite);
+    Q_INVOKABLE QVariantList relatorioProdutosParadosDia(const QString &isoDia);
 
     // --- Backup / restauração (acesso restrito ao Administrador na UI) ---
     // Cria um backup íntegro agora e aplica a retenção. { ok, caminho, resumo, erro }.
@@ -304,6 +315,13 @@ signals:
 
 private:
     void _definirUsuarioAtual(const Usuario &u);
+    // Fator da embalagem escolhida, tirado do CADASTRO. A tela manda o fator
+    // junto, mas ele só serve para comparar: quando diverge, fica registrado
+    // no sistema.log e vale o do cadastro. false (com m_erro) se a embalagem
+    // não for deste produto. embalagemId <= 0 (copão, que baixa pelos
+    // insumos) usa a unidade base.
+    bool _fatorDoCadastro(int produtoId, int embalagemId, int fatorDaTela, int *fator,
+                          bool avisarDivergencia = true);
     // Miolo comum de definirFotoProduto e colarFotoProduto: reduz, converte
     // para JPEG e grava. Recebe a imagem ja lida.
     QVariantMap _gravarFoto(int produtoId, const QImage &original);

@@ -122,11 +122,13 @@ void TstCompraRepository::segundaCompraAtualizaCustoMedio()
                                                     itens, false, QString(), m_usuarioId);
     QVERIFY2(r.ok, qUtf8Printable(r.erro));
 
-    // (60*500 + 36*600) / 96 = 51600/96 = 537 (trunc).
+    // (60*500 + 36*600) / 96 = 51600/96 = 537,5 centavos: guardado exato em
+    // milésimos; para exibir, arredonda (5,38), não trunca.
     EstoqueRepository erepo(m_db.connection());
     const ItemEstoque ie = erepo.item(m_produtoId);
     QCOMPARE(ie.quantidade, qint64(96));
-    QCOMPARE(ie.custoMedio, qint64(537));
+    QCOMPARE(ie.custoMedioMilli, qint64(537500));
+    QCOMPARE(ie.custoMedio, qint64(538));
 }
 
 void TstCompraRepository::custoSubCentavoPreservado()

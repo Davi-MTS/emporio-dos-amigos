@@ -13,6 +13,8 @@
 #include <QUrl>
 #include <QUrlQuery>
 
+#include "services/log/LogService.h"
+
 namespace {
 constexpr auto kChaveToken = "telegram/token";
 constexpr auto kChaveChat  = "telegram/chatId";
@@ -92,7 +94,9 @@ void TelegramService::enviarMensagem(const QString &texto)
             // A API devolve o motivo em JSON (ex.: chat não encontrado).
             const QJsonObject o = QJsonDocument::fromJson(reply->readAll()).object();
             const QString desc = o.value(QStringLiteral("description")).toString();
-            emit resultado(false, desc.isEmpty() ? reply->errorString() : desc);
+            const QString motivo = desc.isEmpty() ? reply->errorString() : desc;
+            LogService::registrar(QStringLiteral("Telegram: mensagem NÃO enviada — %1").arg(motivo));
+            emit resultado(false, motivo);
             return;
         }
         emit resultado(true, QStringLiteral("Mensagem enviada."));
@@ -104,6 +108,8 @@ void TelegramService::enviarArquivo(const QString &caminho, const QString &legen
     if (!configurado() || !QFileInfo::exists(caminho))
         return;
     if (QFileInfo(caminho).size() > kLimiteEnvio) {
+        LogService::registrar(QStringLiteral("Telegram: %1 NÃO enviado — acima de 45 MB")
+                                  .arg(QFileInfo(caminho).fileName()));
         emit resultado(false, QStringLiteral(
             "Arquivo grande demais para o Telegram (%1 MB). Backup não enviado — "
             "copie manualmente para um pen drive.")
@@ -141,7 +147,22 @@ void TelegramService::enviarArquivo(const QString &caminho, const QString &legen
     QNetworkRequest req{QUrl(apiUrl(token(), QStringLiteral("sendDocument")))};
     QNetworkReply *reply = m_net->post(req, multi);
     multi->setParent(reply);
-    connect(reply, &QNetworkReply::finished, reply, &QNetworkReply::deleteLater);
+    // O resultado de verdade só existe aqui. Antes o log dizia "Backup enviado
+    // ao Telegram" no instante em que o envio COMEÇAVA — e na loja, onde a
+    // conexão segura falhava, o registro afirmava um envio que nunca chegou.
+    const QString nome = QFileInfo(caminho).fileName();
+    connect(reply, &QNetworkReply::finished, this, [this, reply, nome]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            const QJsonObject o = QJsonDocument::fromJson(reply->readAll()).object();
+            const QString desc = o.value(QStringLiteral("description")).toString();
+            const QString motivo = desc.isEmpty() ? reply->errorString() : desc;
+            LogService::registrar(QStringLiteral("Telegram: %1 NÃO enviado — %2").arg(nome, motivo));
+            emit resultado(false, QStringLiteral("Não consegui enviar %1: %2").arg(nome, motivo));
+            return;
+        }
+        LogService::registrar(QStringLiteral("Telegram: %1 enviado").arg(nome));
+    });
 }
 
 void TelegramService::descobrirChat(const QString &tokenInformado)

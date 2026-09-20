@@ -23,6 +23,7 @@ private slots:
     void clienteSemLimiteRecusaFiado();
     void quitarZeraSaldo();
     void recebimentoParcialFifo();
+    void historicoFiadoEnxergaAsVendas();
 
 private:
     QTemporaryDir m_dir;
@@ -137,6 +138,19 @@ void TstClienteRepository::recebimentoParcialFifo()
     const qint64 ap2 = r.aplicarRecebimento(m_cli1, 5000);
     QCOMPARE(ap2, qint64(300));
     QCOMPARE(r.saldoDevedor(m_cli1), qint64(0));
+}
+
+// A consulta usava vendas.data_hora (coluna que não existe): falhava sempre e a
+// tela de Clientes nunca mostrava última compra, último pagamento nem contas.
+void TstClienteRepository::historicoFiadoEnxergaAsVendas()
+{
+    ClienteRepository r = cli();
+    QVERIFY2(vendaFiado(m_cli1, 500, 1).ok, "venda fiado");
+    const auto h = r.historicoFiado(m_cli1);
+    QVERIFY2(r.ultimoErro().isEmpty(), qUtf8Printable(r.ultimoErro()));
+    QVERIFY(!h.ultimaCompra.isEmpty());
+    QVERIFY(!h.ultimoPagamento.isEmpty());   // o teste anterior quitou contas
+    QCOMPARE(h.contasAbertas, 1);
 }
 
 QTEST_MAIN(TstClienteRepository)

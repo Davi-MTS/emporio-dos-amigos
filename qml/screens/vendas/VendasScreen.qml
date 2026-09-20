@@ -200,6 +200,7 @@ Rectangle {
     // Detalhe da venda + cancelamento
     AppDialog {
         id: detalheDialog
+        objectName: "detalheVenda"
         parent: Overlay.overlay
         anchors.centerIn: parent
         modal: true
@@ -209,11 +210,15 @@ Rectangle {
         property int total: 0
         property bool cancelada: false
         property var itens: []
+        // Dinheiro que saiu da gaveta no cancelamento (sangria lançada): o
+        // operador precisa ver, senão estranha a gaveta no fechamento.
+        property string aviso: ""
         function abrir(id, tot, canc) {
             vendaId = id; total = tot; cancelada = canc;
             itens = App.itensDaVenda(id);
             motivoField.text = "";
             erroDet.text = "";
+            aviso = "";
             open();
         }
         title: qsTr("Venda #") + detalheDialog.vendaId
@@ -293,7 +298,7 @@ Rectangle {
                 visible: !detalheDialog.cancelada && tela.podeCancelar
                 label: qsTr("Motivo do cancelamento")
                 Layout.fillWidth: true
-                AppTextField { id: motivoField; width: parent.width; placeholderText: qsTr("ex.: cliente desistiu, item errado") }
+                AppTextField { id: motivoField; objectName: "motivoCancelamento"; width: parent.width; placeholderText: qsTr("ex.: cliente desistiu, item errado") }
             }
             Text {
                 visible: !detalheDialog.cancelada && tela.podeCancelar
@@ -303,17 +308,32 @@ Rectangle {
                 color: Theme.textMuted
                 font.pixelSize: Theme.fontXs
             }
+            Label {
+                objectName: "avisoCancelamento"
+                visible: detalheDialog.aviso.length > 0
+                text: detalheDialog.aviso
+                color: Theme.warning
+                font.pixelSize: Theme.fontSm
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+            }
             Label { id: erroDet; visible: text.length > 0; color: Theme.danger; font.pixelSize: Theme.fontSm; Layout.fillWidth: true; wrapMode: Text.WordWrap }
 
             RowLayout {
                 Layout.fillWidth: true
                 AppButton {
+                    objectName: "confirmarCancelamento"
                     visible: !detalheDialog.cancelada && tela.podeCancelar
                     kind: "accent"
                     text: qsTr("Cancelar esta venda")
                     onClicked: {
                         var r = App.cancelarVenda(detalheDialog.vendaId, motivoField.text);
-                        if (r.ok) { detalheDialog.close(); tela.carregar(); }
+                        if (r.ok && r.aviso && r.aviso.length > 0) {
+                            // Fica aberto mostrando a sangria lançada.
+                            detalheDialog.cancelada = true;
+                            detalheDialog.aviso = qsTr("Venda cancelada. ") + r.aviso;
+                            tela.carregar();
+                        } else if (r.ok) { detalheDialog.close(); tela.carregar(); }
                         else erroDet.text = r.erro;
                     }
                 }

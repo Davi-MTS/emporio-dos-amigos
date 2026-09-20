@@ -22,6 +22,21 @@ Rectangle {
 
     readonly property bool podeMovimentar: podeReceberMercadoria || podeAjustarEstoque
 
+    // Filtro por situação. As chaves são as mesmas do selo da coluna Status; a
+    // regra de quem é "zerado" ou "baixo" mora só no model (C++).
+    readonly property var chavesFiltro: ["", "zerado", "baixo", "ok"]
+    readonly property var nomesFiltro: ({ "": qsTr("Todos"), "zerado": qsTr("Zerados"),
+                                          "baixo": qsTr("Baixo"), "ok": qsTr("OK") })
+    readonly property var contagem: App.estoque.contagem
+    function rotuloFiltro(chave) {
+        var n = tela.contagem[chave === "" ? "todos" : chave];
+        return tela.nomesFiltro[chave] + "  " + (n !== undefined ? n : 0);
+    }
+
+    // O filtro vive no model, que é um só para o app: sair da tela com "Zerados"
+    // ligado faria a próxima visita abrir escondendo produtos.
+    Component.onDestruction: App.estoque.filtroStatus = ""
+
     function abrirMov(produtoId) {
         if (!podeMovimentar)
             return;   // sem permissão o diálogo não teria nenhuma ação válida
@@ -36,19 +51,32 @@ Rectangle {
         anchors.margins: Theme.spacingLg
         spacing: Theme.spacingMd
 
-        // Toolbar
-        RowLayout {
+        // Toolbar. Flow, e não RowLayout: busca + filtro + dica não cabem lado a
+        // lado na janela restaurada, e aqui passam para a linha de baixo em vez
+        // de empurrar a lista para fora da tela.
+        Flow {
+            id: barraEstoque
             Layout.fillWidth: true
             spacing: Theme.spacingSm
             AppTextField {
                 id: buscaField
-                Layout.fillWidth: true
-                Layout.maximumWidth: 420
+                width: Math.min(260, barraEstoque.width)
                 placeholderText: qsTr("Buscar produto…")
                 onTextChanged: App.recarregarEstoque(text)
             }
-            Item { Layout.fillWidth: true }
+            // Urgência primeiro: o que zerou, depois o que está acabando.
+            SegmentedControl {
+                id: filtroStatus
+                objectName: "filtroStatusEstoque"
+                width: Math.min(400, barraEstoque.width)
+                height: 40
+                options: tela.chavesFiltro.map(function (c) { return tela.rotuloFiltro(c); })
+                currentIndex: Math.max(0, tela.chavesFiltro.indexOf(App.estoque.filtroStatus))
+                onCurrentIndexChanged: App.estoque.filtroStatus = tela.chavesFiltro[currentIndex]
+            }
             Label {
+                height: 40
+                verticalAlignment: Text.AlignVCenter
                 text: tela.podeAjustarEstoque
                       ? qsTr("Clique num produto para dar entrada ou inventariar")
                       : (tela.podeReceberMercadoria
@@ -161,10 +189,22 @@ Rectangle {
                         }
                     }
 
+                    // Lista vazia com filtro ou busca ligados NÃO é "nenhum produto
+                    // cadastrado" — dizer isso faria o dono achar que perdeu o cadastro.
                     Label {
                         anchors.centerIn: parent
+                        width: parent.width - 2 * Theme.spacingLg
                         visible: lista.count === 0
-                        text: qsTr("Nenhum produto cadastrado.\nCadastre em Produtos para controlar o estoque.")
+                        wrapMode: Text.WordWrap
+                        text: {
+                            var f = App.estoque.filtroStatus;
+                            if (f === "zerado") return qsTr("Nenhum produto zerado.");
+                            if (f === "baixo")  return qsTr("Nenhum produto com estoque baixo.");
+                            if (f === "ok")     return qsTr("Nenhum produto com estoque OK.");
+                            if (buscaField.text.trim().length > 0)
+                                return qsTr("Nenhum produto encontrado para “%1”.").arg(buscaField.text.trim());
+                            return qsTr("Nenhum produto cadastrado.\nCadastre em Produtos para controlar o estoque.");
+                        }
                         horizontalAlignment: Text.AlignHCenter
                         color: Theme.textMuted
                     }
@@ -176,6 +216,7 @@ Rectangle {
     // ---------------------------------------------------------------- Diálogo
     AppDialog {
         id: movDialog
+        objectName: "movDialog"
         parent: Overlay.overlay
         anchors.centerIn: parent
         width: 480
@@ -185,6 +226,12 @@ Rectangle {
         property int produtoId: 0
         property var embalagens: []
         property var atual: ({})
+        // Custo fora do normal na entrada: só avisa. O primeiro "Confirmar"
+        // mostra o aviso; o segundo grava. Mudar custo/embalagem zera.
+        readonly property var avisoCusto: App.avaliarCusto(produtoId, embCombo.currentValue !== undefined ? embCombo.currentValue : 0, custoField.text)
+        readonly property bool temAvisoCusto: avisoCusto.nivel !== undefined && avisoCusto.nivel.length > 0
+        property bool custoConferido: false
+        onAvisoCustoChanged: custoConferido = false
 
         function abrir() {
             erro.text = "";
@@ -200,6 +247,7 @@ Rectangle {
             retQtdSpin.value = 1;
             retMotivoField.text = "";
             tabs.currentIndex = 0;
+            custoConferido = false;
             open();
         }
 
@@ -276,6 +324,7 @@ Rectangle {
                         Layout.fillWidth: true
                         AppComboBox {
                             id: embCombo
+                            objectName: "embComboEntrada"
                             width: parent.width
                             model: movDialog.embalagens
                             textRole: "nome"
@@ -299,11 +348,21 @@ Rectangle {
                             Layout.fillWidth: true
                             AppTextField {
                                 id: custoField
+                                objectName: "custoEntrada"
                                 width: parent.width
                                 placeholderText: qsTr("ex.: 62,90 — vazio mantém o custo")
                                 horizontalAlignment: Text.AlignRight
                             }
                         }
+                    }
+                    Text {
+                        objectName: "avisoCustoEntrada"
+                        Layout.fillWidth: true
+                        visible: movDialog.temAvisoCusto
+                        text: movDialog.temAvisoCusto ? "⚠ " + movDialog.avisoCusto.mensagem : ""
+                        color: Theme.warning
+                        font.pixelSize: Theme.fontSm
+                        wrapMode: Text.WordWrap
                     }
                     Text {
                         Layout.fillWidth: true
@@ -426,6 +485,7 @@ Rectangle {
 
             Label {
                 id: erro
+                objectName: "erroMovimento"
                 Layout.fillWidth: true
                 visible: text.length > 0
                 color: Theme.danger
@@ -437,8 +497,10 @@ Rectangle {
                 Layout.fillWidth: true
                 Layout.topMargin: Theme.spacingSm
                 AppButton {
+                    objectName: "confirmarMovimento"
                     kind: "accent"
-                    text: qsTr("Confirmar")
+                    text: tabs.currentIndex === 0 && movDialog.custoConferido
+                          ? qsTr("Confirmar mesmo assim") : qsTr("Confirmar")
                     // Data escrita errada viraria entrada sem validade nenhuma,
                     // em silêncio — melhor barrar o botão.
                     enabled: tabs.currentIndex !== 0
@@ -446,6 +508,11 @@ Rectangle {
                              || (validadeField.iso.length > 0)
                     onClicked: {
                         var ok;
+                        if (tabs.currentIndex === 0 && movDialog.temAvisoCusto && !movDialog.custoConferido) {
+                            movDialog.custoConferido = true;
+                            erro.text = qsTr("Confira o custo (aviso acima). Se estiver certo, clique em “Confirmar mesmo assim”.");
+                            return;
+                        }
                         if (tabs.currentIndex === 0)
                             ok = tela.podeReceberMercadoria
                                  && App.registrarEntrada(movDialog.produtoId, embCombo.currentValue,

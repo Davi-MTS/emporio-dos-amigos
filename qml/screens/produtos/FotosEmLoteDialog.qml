@@ -315,7 +315,10 @@ AppDialog {
                         required property var modelData
                         width: ListView.view.width
                         height: 42
-                        onClicked: dlg.atribuir(cand.modelData.produtoId,
+                        // Qt.callLater, e nao chamada direta: atribuir() anda a fila e
+                        // esvazia `candidatos`, o que DESTROI este delegate. Destruir o
+                        // objeto de dentro do proprio onClicked e crash classico do QML.
+                        onClicked: Qt.callLater(dlg.atribuir, cand.modelData.produtoId,
                                                 cand.modelData.temFoto === true)
 
                         contentItem: RowLayout {

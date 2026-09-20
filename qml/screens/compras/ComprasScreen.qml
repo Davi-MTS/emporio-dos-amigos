@@ -101,6 +101,7 @@ Rectangle {
     // ======================= NOVA COMPRA =======================
     AppDialog {
         id: novaCompraDialog
+        objectName: "novaCompraDialog"
         parent: Overlay.overlay
         anchors.centerIn: parent
         modal: true
@@ -108,6 +109,9 @@ Rectangle {
         padding: Theme.spacingLg
         property var fornecedores: []
         property int totalCompra: 0
+        // Custo fora do normal só avisa: o primeiro clique mostra o aviso, o
+        // segundo registra. Qualquer mudança nos itens pede a conferência de novo.
+        property bool custoConferido: false
 
         ListModel { id: itensModel }   // produtoId, nome, embList, embId, fator, qtd, custoTexto, validadeTexto
         ListModel { id: sugCompra }
@@ -123,10 +127,12 @@ Rectangle {
             notaDataField.text = "";
             erroCompra.text = "";
             totalCompra = 0;
+            custoConferido = false;
             fornCombo.currentIndex = 0;
             open();
         }
         function recomputar() {
+            custoConferido = false;
             var s = 0;
             for (var i = 0; i < itensModel.count; i++) {
                 var it = itensModel.get(i);
@@ -142,8 +148,10 @@ Rectangle {
             // embalagem). É só uma sugestão editável — agiliza recompras.
             var est = App.itemEstoque(item.produtoId);
             var fator = item.fator > 0 ? item.fator : 1;
-            var custoIni = (est && est.custoMedio > 0)
-                           ? App.formatarValor(est.custoMedio * fator) : "";
+            // custoMedioMilli, não custoMedio: este é arredondado por unidade
+            // base e, em ml, errava a garrafa em até R$ 9,00.
+            var custoIni = (est && est.custoMedioMilli > 0)
+                           ? App.formatarValor(Math.round(est.custoMedioMilli * fator / 1000)) : "";
             // embListJson: o ListModel NÃO preserva arrays de objetos (viram
             // ListModel aninhado e o índice [] devolve undefined) — por isso a
             // escolha de "Caixa" não aplicava o fator. String JSON atravessa.
@@ -198,6 +206,21 @@ Rectangle {
                 }
                 itens.push({ produtoId: it.produtoId, embalagemId: it.embId, fator: it.fator,
                              qtd: it.qtd, custo: c, validade: validade });
+            }
+            if (!custoConferido) {
+                var estranhos = [];
+                for (var j = 0; j < itensModel.count; j++) {
+                    var ij = itensModel.get(j);
+                    var a = App.avaliarCusto(ij.produtoId, ij.embId, ij.custoTexto);
+                    if (a.nivel && a.nivel.length > 0)
+                        estranhos.push(ij.nome);
+                }
+                if (estranhos.length > 0) {
+                    custoConferido = true;
+                    erroCompra.text = qsTr("Custo fora do normal em: %1. Confira os avisos acima; se estiver certo, clique em “Registrar mesmo assim”.")
+                                      .arg(estranhos.join(", "));
+                    return;
+                }
             }
             var r = App.registrarCompra({
                 fornecedorId: fornCombo.currentValue ? fornCombo.currentValue : 0,
@@ -324,9 +347,10 @@ Rectangle {
                         spacing: 4
                         Repeater {
                             model: itensModel
-                            delegate: RowLayout {
+                            delegate: ColumnLayout {
                                 id: compraRow
                                 required property int index
+                                required property int produtoId
                                 required property string nome
                                 required property string embListJson
                                 required property int embId
@@ -334,6 +358,14 @@ Rectangle {
                                 required property string custoTexto
                                 required property string validadeTexto
                                 readonly property var embList: JSON.parse(compraRow.embListJson && compraRow.embListJson.length ? compraRow.embListJson : "[]")
+                                // Custo fora do normal (acima do preço de venda ou
+                                // abaixo de 10% dele): quase sempre é custo da caixa
+                                // lançado na unidade, ou o contrário.
+                                readonly property var aviso: App.avaliarCusto(compraRow.produtoId, compraRow.embId, compraRow.custoTexto)
+                                readonly property bool temAviso: aviso.nivel !== undefined && aviso.nivel.length > 0
+                                Layout.fillWidth: true
+                                spacing: 2
+                                RowLayout {
                                 Layout.fillWidth: true
                                 spacing: Theme.spacingSm
                                 Text { text: compraRow.nome; Layout.fillWidth: true; color: Theme.text; font.pixelSize: Theme.fontSm; elide: Text.ElideRight }
@@ -350,9 +382,9 @@ Rectangle {
                                             itensModel.setProperty(compraRow.index, "fator", e.fator);
                                             var row = itensModel.get(compraRow.index);
                                             var est = App.itemEstoque(row.produtoId);
-                                            if (est && est.custoMedio > 0)
+                                            if (est && est.custoMedioMilli > 0)
                                                 itensModel.setProperty(compraRow.index, "custoTexto",
-                                                                       App.formatarValor(est.custoMedio * e.fator));
+                                                                       App.formatarValor(Math.round(est.custoMedioMilli * e.fator / 1000)));
                                             novaCompraDialog.recomputar();
                                         }
                                     }
@@ -374,6 +406,7 @@ Rectangle {
                                                                           "validadeTexto", text)
                                 }
                                 AppTextField {
+                                    objectName: "custoItemCompra"
                                     Layout.preferredWidth: 112
                                     text: compraRow.custoTexto
                                     horizontalAlignment: Text.AlignRight
@@ -381,6 +414,16 @@ Rectangle {
                                     onTextChanged: { itensModel.setProperty(compraRow.index, "custoTexto", text); novaCompraDialog.recomputar(); }
                                 }
                                 ToolButton { text: "✕"; onClicked: { itensModel.remove(compraRow.index); novaCompraDialog.recomputar(); } }
+                                }
+                                Text {
+                                    objectName: "avisoCusto"
+                                    Layout.fillWidth: true
+                                    visible: compraRow.temAviso
+                                    text: compraRow.temAviso ? "⚠ " + compraRow.aviso.mensagem : ""
+                                    color: Theme.warning
+                                    font.pixelSize: Theme.fontXs
+                                    wrapMode: Text.WordWrap
+                                }
                             }
                         }
                     }
@@ -405,11 +448,16 @@ Rectangle {
                 Text { text: App.formatarDinheiro(novaCompraDialog.totalCompra); color: Theme.primary; font.pixelSize: Theme.fontLg; font.weight: Font.Bold }
             }
 
-            Label { id: erroCompra; visible: text.length > 0; color: Theme.danger; font.pixelSize: Theme.fontSm; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+            Label { id: erroCompra; objectName: "erroCompra"; visible: text.length > 0; color: Theme.danger; font.pixelSize: Theme.fontSm; Layout.fillWidth: true; wrapMode: Text.WordWrap }
 
             RowLayout {
                 Layout.fillWidth: true
-                AppButton { kind: "accent"; text: qsTr("Registrar compra"); onClicked: novaCompraDialog.confirmar() }
+                AppButton {
+                    objectName: "registrarCompra"
+                    kind: "accent"
+                    text: novaCompraDialog.custoConferido ? qsTr("Registrar mesmo assim") : qsTr("Registrar compra")
+                    onClicked: novaCompraDialog.confirmar()
+                }
                 AppButton { kind: "default"; text: qsTr("Cancelar"); onClicked: novaCompraDialog.close() }
                 Item { Layout.fillWidth: true }
             }

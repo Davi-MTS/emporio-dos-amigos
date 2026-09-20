@@ -95,8 +95,12 @@ public:
     QVector<ItemVendido> itens(int vendaId);
 
     QString ultimoErro() const { return m_erro; }
+    // Depois de um cancelamento que tirou dinheiro da gaveta: o que foi lançado
+    // (para a tela contar ao operador). Vazio quando não saiu nada.
+    QString ultimoAviso() const { return m_aviso; }
 
 private:
     QSqlDatabase m_db;
     QString m_erro;
+    QString m_aviso;
 };

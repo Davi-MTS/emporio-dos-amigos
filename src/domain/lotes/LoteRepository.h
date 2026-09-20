@@ -33,6 +33,17 @@ struct ResumoVencimento
 // prateleira, e o contrário deixaria mercadoria velha encalhada.
 //
 // Nenhum método abre transação: quem chama (venda, compra) já está dentro de uma.
+// Produto cujo estoque não bate com a soma dos lotes. `diferenca` positiva =
+// parte do saldo sem validade registrada; negativa = lotes somam mais do que o
+// saldo (ajuste de inventário para baixo). Vem com a unidade porque "+650" sem
+// dizer que são ml não informa nada.
+struct DivergenciaLote
+{
+    QString produto;
+    qint64 diferenca = 0;
+    QString unidade;
+};
+
 class LoteRepository
 {
 public:
@@ -60,7 +71,7 @@ public:
     // Produtos cuja soma de lotes não bate com o estoque. Acontece quando parte
     // entrou sem validade, ou depois de um ajuste de inventário — que mexe no
     // saldo mas não sabe de qual remessa tirar.
-    QVector<QPair<QString, qint64>> divergencias();
+    QVector<DivergenciaLote> divergencias();
 
     QString ultimoErro() const { return m_erro; }
 

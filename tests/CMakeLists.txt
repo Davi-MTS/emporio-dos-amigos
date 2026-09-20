@@ -36,6 +36,19 @@ distribuidora_add_test(tst_foto_produto           cpp/tst_foto_produto.cpp)
 distribuidora_add_test(tst_lotes                  cpp/tst_lotes.cpp)
 distribuidora_add_test(tst_mensagens              cpp/tst_mensagens.cpp)
 distribuidora_add_test(tst_copao                  cpp/tst_copao.cpp)
+distribuidora_add_test(tst_custo_estoque_negativo cpp/tst_custo_estoque_negativo.cpp)
+distribuidora_add_test(tst_fator_embalagem        cpp/tst_fator_embalagem.cpp)
+distribuidora_add_test(tst_verificacao_geral      cpp/tst_verificacao_geral.cpp)
+distribuidora_add_test(tst_banco_real             cpp/tst_banco_real.cpp)
+
+# Precisa da biblioteca de interface: o ProdutoFotoProvider vive nela (depende de
+# QtQuick). Reproduz o crash da loja ao pôr foto em produto.
+qt_add_executable(tst_foto_concorrencia cpp/tst_foto_concorrencia.cpp)
+target_link_libraries(tst_foto_concorrencia
+    PRIVATE Distribuidora::Core distribuidora_ui distribuidora_uiplugin Qt6::Test)
+add_test(NAME tst_foto_concorrencia COMMAND tst_foto_concorrencia)
+set_tests_properties(tst_foto_concorrencia PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_FORCE_STDERR_LOGGING=1")
 
 # -----------------------------------------------------------------------------
 # Testes de INTERFACE (Qt Quick Test)

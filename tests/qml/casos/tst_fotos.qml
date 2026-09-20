@@ -241,6 +241,37 @@ TestCase {
         verify(filtro !== null, "filtro 'Sem foto' não está na tela");
     }
 
+    // ----------------------------------------------------- o crash da loja
+    // Pôr foto num produto derrubava o sistema inteiro. A lista de Produtos pede
+    // as miniaturas numa thread separada (asynchronous) e o provider usava a
+    // conexão do banco da thread principal — que estava ocupada recarregando a
+    // mesma lista. Aqui é a tela de verdade: vários produtos com foto na lista,
+    // gravando foto atrás de foto enquanto as miniaturas carregam.
+    function test_gravar_fotos_com_a_lista_carregando_miniaturas() {
+        var cat = App.categorias()[0].id;
+        var ids = [];
+        for (var i = 0; i < 15; i++) {
+            var p = App.novoProduto();
+            p.nome = "Zzz Lista Foto " + i;
+            p.categoriaId = cat;
+            verify(App.salvarProduto(p), App.ultimoErro());
+            ids.push(App.buscarProdutosPorNome("Zzz Lista Foto " + i)[0].produtoId);
+        }
+        var caminho = decodeURIComponent(("" + FotosDeTeste[0]).replace(/^file:\/{2,3}/, ""));
+
+        var tela = createTemporaryObject(cProdutos, palco, { width: 1160, height: 740 });
+        verify(tela !== null, cProdutos.errorString());
+        wait(50);
+
+        for (var rodada = 0; rodada < 60; rodada++) {
+            var r = App.definirFotoProduto(ids[rodada % ids.length], caminho);
+            verify(r.ok, r.erro);
+            wait(15);   // deixa as miniaturas começarem a carregar na outra thread
+        }
+        wait(300);
+        verify(App.produtoTemFoto(ids[0]));
+    }
+
     // ------------------------------------------------------------ tamanhos
     // Janela restaurada é o tamanho em que o dono realmente usa. Nada pode
     // começar fora dela nem ser espremido a zero.

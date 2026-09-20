@@ -14,7 +14,6 @@ Rectangle {
     color: Theme.background
 
     property var resumo: ({})
-    property var divergencias: []
     property int filtroDias: 30
 
     ListModel { id: lotesModel }
@@ -22,7 +21,6 @@ Rectangle {
     Component.onCompleted: carregar()
     function carregar() {
         resumo = App.resumoVencimento();
-        divergencias = App.divergenciasDeLote();
         lotesModel.clear();
         var l = App.lotes(filtroDias);
         for (var i = 0; i < l.length; i++)
@@ -133,45 +131,6 @@ Rectangle {
                 }
             }
             AppButton { kind: "ghost"; text: qsTr("↻ Atualizar"); onClicked: tela.carregar() }
-        }
-
-        // Sem esta explicação, alguém acharia que o sistema perdeu mercadoria.
-        Rectangle {
-            Layout.fillWidth: true
-            visible: tela.divergencias.length > 0
-            radius: Theme.radiusSm
-            color: Theme.surface
-            border.color: Theme.warning
-            implicitHeight: divCol.implicitHeight + 2 * Theme.spacingMd
-            ColumnLayout {
-                id: divCol
-                anchors.fill: parent
-                anchors.margins: Theme.spacingMd
-                spacing: 2
-                Text {
-                    Layout.fillWidth: true
-                    wrapMode: Text.WordWrap
-                    text: qsTr("Estoque e lotes não batem em ") + tela.divergencias.length
-                          + qsTr(" produto(s). Normal quando parte da mercadoria entrou sem validade informada, ou depois de um ajuste de inventário — o ajuste mexe no saldo, mas não sabe de qual remessa tirar. O estoque continua correto; só a validade dessa parte não é acompanhada.")
-                    color: Theme.warning
-                    font.pixelSize: Theme.fontXs
-                    font.weight: Font.DemiBold
-                }
-                Repeater {
-                    model: tela.divergencias
-                    delegate: Text {
-                        required property var modelData
-                        Layout.fillWidth: true
-                        elide: Text.ElideRight
-                        text: "· " + modelData.produto + ": "
-                              + (modelData.diferenca > 0
-                                 ? qsTr("+") + modelData.diferenca + qsTr(" sem validade")
-                                 : "" + modelData.diferenca)
-                        color: Theme.textMuted
-                        font.pixelSize: Theme.fontXs
-                    }
-                }
-            }
         }
 
         Rectangle {

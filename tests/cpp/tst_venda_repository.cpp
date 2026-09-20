@@ -23,6 +23,8 @@ private slots:
     void excedenteEmPixNaoViraTroco();
     void cancelamentoDevolveEstoqueEFiado();
     void cancelamentoSaiDoCaixaEDoHistorico();
+    void cancelamentoDevolveFiadoJaPago();
+    void cancelamentoComCaixaFechado();   // fecha o caixa: fica por último
 
 private:
     QTemporaryDir m_dir;
@@ -258,6 +260,81 @@ void TstVendaRepository::cancelamentoSaiDoCaixaEDoHistorico()
 
     // Itens continuam consultáveis.
     QVERIFY(!vrepo.itens(r.vendaId).isEmpty());
+}
+
+// Fiado já pago (em parte) e depois cancelado: antes o valor recebido ficava
+// registrado como pago numa venda que não existe mais, sem devolução nenhuma
+// (venda nº 3 do banco da loja). Agora sai da gaveta como sangria.
+void TstVendaRepository::cancelamentoDevolveFiadoJaPago()
+{
+    VendaRepository vrepo(m_db.connection());
+    CaixaRepository caixa(m_db.connection());
+    ClienteRepository crepo(m_db.connection());
+
+    QSqlQuery c(m_db.connection());
+    QVERIFY(c.exec(QStringLiteral(
+        "INSERT INTO clientes (nome, limite_fiado, ativo) VALUES ('Cli Pagou', 50000, 1)")));
+    const int cliente = c.lastInsertId().toInt();
+
+    QVector<LinhaVenda> itens;
+    LinhaVenda l; l.produtoId = m_produtoId; l.embalagemId = m_embBaseId; l.fator = 1;
+    l.qtdEmbalagem = 4; l.precoUnit = 500; itens.push_back(l);
+    QVector<PagamentoVenda> pags;
+    PagamentoVenda p; p.forma = QStringLiteral("fiado"); p.valor = 2000; pags.push_back(p);
+    const ResultadoVenda r = vrepo.registrarVenda(m_sessaoId, cliente, 0, itens, pags, m_usuarioId);
+    QVERIFY2(r.ok, qUtf8Printable(r.erro));
+
+    QCOMPARE(crepo.aplicarRecebimento(cliente, 800), qint64(800));   // pagou 8,00 dos 20,00
+
+    const qint64 sangriasAntes = caixa.resumo(m_sessaoId).sangrias;
+    QVERIFY2(vrepo.cancelarVenda(r.vendaId, QStringLiteral("desistiu"), m_usuarioId, m_sessaoId),
+             qUtf8Printable(vrepo.ultimoErro()));
+    QCOMPARE(caixa.resumo(m_sessaoId).sangrias, sangriasAntes + 800);
+    QVERIFY(vrepo.ultimoAviso().contains(QStringLiteral("8,00")));
+    QCOMPARE(crepo.saldoDevedor(cliente), qint64(0));
+}
+
+// Venda de um turno já fechado, paga em dinheiro, cancelada com o caixa
+// FECHADO: o dinheiro sairia da gaveta sem aparecer em turno nenhum. Recusa e
+// pede para abrir o caixa; com o caixa aberto, lança a sangria.
+void TstVendaRepository::cancelamentoComCaixaFechado()
+{
+    VendaRepository vrepo(m_db.connection());
+    CaixaRepository caixa(m_db.connection());
+
+    QVector<LinhaVenda> itens;
+    LinhaVenda l; l.produtoId = m_produtoId; l.embalagemId = m_embBaseId; l.fator = 1;
+    l.qtdEmbalagem = 2; l.precoUnit = 500; itens.push_back(l);
+    QVector<PagamentoVenda> din;
+    PagamentoVenda p; p.forma = QStringLiteral("dinheiro"); p.valor = 1000; din.push_back(p);
+    const ResultadoVenda rDin = vrepo.registrarVenda(m_sessaoId, 0, 0, itens, din, m_usuarioId);
+    QVERIFY2(rDin.ok, qUtf8Printable(rDin.erro));
+    QVector<PagamentoVenda> pix;
+    PagamentoVenda px; px.forma = QStringLiteral("pix"); px.valor = 1000; pix.push_back(px);
+    const ResultadoVenda rPix = vrepo.registrarVenda(m_sessaoId, 0, 0, itens, pix, m_usuarioId);
+    QVERIFY2(rPix.ok, qUtf8Printable(rPix.erro));
+
+    QVERIFY(caixa.fechar(m_sessaoId, 0, m_usuarioId).ok);
+
+    // Dinheiro + caixa fechado: recusa, e a venda continua valendo.
+    QVERIFY(!vrepo.cancelarVenda(rDin.vendaId, QStringLiteral("x"), m_usuarioId, 0));
+    QVERIFY2(vrepo.ultimoErro().contains(QStringLiteral("Abra o caixa")),
+             qUtf8Printable(vrepo.ultimoErro()));
+    QSqlQuery q(m_db.connection());
+    QVERIFY(q.exec(QStringLiteral("SELECT status FROM vendas WHERE id = %1").arg(rDin.vendaId)));
+    QVERIFY(q.next());
+    QCOMPARE(q.value(0).toString(), QStringLiteral("concluida"));
+
+    // Pix não mexe na gaveta: cancela mesmo com o caixa fechado.
+    QVERIFY2(vrepo.cancelarVenda(rPix.vendaId, QStringLiteral("x"), m_usuarioId, 0),
+             qUtf8Printable(vrepo.ultimoErro()));
+
+    // Abrindo o caixa, o cancelamento passa e a saída entra no turno novo.
+    const int novo = caixa.abrirSessao(0, m_usuarioId);
+    QVERIFY(novo > 0);
+    QVERIFY2(vrepo.cancelarVenda(rDin.vendaId, QStringLiteral("x"), m_usuarioId, novo),
+             qUtf8Printable(vrepo.ultimoErro()));
+    QCOMPARE(caixa.resumo(novo).sangrias, qint64(1000));
 }
 
 QTEST_MAIN(TstVendaRepository)

@@ -176,8 +176,9 @@ void TstLotes::entradaSemValidadeApareceComoDivergencia()
 
     const auto div = lotes().divergencias();
     QCOMPARE(div.size(), 1);
-    QCOMPARE(div.at(0).first, QStringLiteral("Chocolate Teste"));
-    QCOMPARE(div.at(0).second, qint64(7));   // 7 unidades fora do controle de validade
+    QCOMPARE(div.at(0).produto, QStringLiteral("Chocolate Teste"));
+    QCOMPARE(div.at(0).diferenca, qint64(7));   // 7 unidades fora do controle de validade
+    QVERIFY(!div.at(0).unidade.isEmpty());      // a tela precisa dizer 7 O QUÊ
 }
 
 // A mercadoria costuma entrar pela COMPRA, não pela tela de estoque. Se a

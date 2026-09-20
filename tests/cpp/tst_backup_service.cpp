@@ -1,5 +1,6 @@
 #include <QtTest>
 
+#include <QDir>
 #include <QFileInfo>
 #include <QFile>
 #include <QSqlQuery>
@@ -19,6 +20,7 @@ private slots:
     void retencaoMantemCincoMaisRecentes();
     void restauracaoRoundTrip();
     void recusaArquivoQueNaoEBackup();
+    void restauracaoQueFalhaMantemOBanco();
 
 private:
     QTemporaryDir m_dbDir;
@@ -175,6 +177,43 @@ void TstBackupService::recusaArquivoQueNaoEBackup()
              qUtf8Printable(svc.ultimoErro()));
     QVERIFY(!lido.resumo.isEmpty());
     QVERIFY(lido.tamanho > 0);
+}
+
+// A restauração apagava o banco ANTES de copiar o backup: se a cópia falhasse,
+// o sistema abria vazio. Agora a cópia é feita ao lado e só então trocada.
+void TstBackupService::restauracaoQueFalhaMantemOBanco()
+{
+    QTemporaryDir dir;
+    const QString db = dir.filePath(QStringLiteral("loja.db"));
+    const QString bkp = dir.filePath(QStringLiteral("copia.db"));
+    const auto escrever = [](const QString &caminho, const QByteArray &conteudo) {
+        QFile f(caminho);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write(conteudo);
+    };
+    const auto ler = [](const QString &caminho) {
+        QFile f(caminho);
+        return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray();
+    };
+    escrever(db, "BANCO-DA-LOJA");
+    escrever(bkp, "BACKUP");
+    escrever(db + QStringLiteral(".restore"), bkp.toUtf8());
+
+    // Força a cópia a falhar: o arquivo temporário não pode ser criado.
+    QVERIFY(QDir().mkpath(db + QStringLiteral(".restaurando")));
+    QString erro;
+    QVERIFY(!BackupService::aplicarRestauracaoPendente(db, &erro));
+    QCOMPARE(ler(db), QByteArray("BANCO-DA-LOJA"));   // o banco continua lá
+    QVERIFY(!QFileInfo::exists(db + QStringLiteral(".restore")));
+    QVERIFY(!erro.isEmpty());
+
+    // Sem o obstáculo, a troca acontece e não sobra arquivo intermediário.
+    QVERIFY(QDir(db + QStringLiteral(".restaurando")).removeRecursively());
+    escrever(db + QStringLiteral(".restore"), bkp.toUtf8());
+    QVERIFY2(BackupService::aplicarRestauracaoPendente(db, &erro), qUtf8Printable(erro));
+    QCOMPARE(ler(db), QByteArray("BACKUP"));
+    QVERIFY(!QFileInfo::exists(db + QStringLiteral(".anterior")));
+    QVERIFY(!QFileInfo::exists(db + QStringLiteral(".restaurando")));
 }
 
 QTEST_MAIN(TstBackupService)

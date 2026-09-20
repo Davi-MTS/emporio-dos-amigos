@@ -116,5 +116,7 @@ qt_add_resources(DistribuidoraCore "db_scripts"
         ${CMAKE_SOURCE_DIR}/db/migrations/0014_produto_foto.sql
         ${CMAKE_SOURCE_DIR}/db/migrations/0015_lote_validade.sql
         ${CMAKE_SOURCE_DIR}/db/migrations/0016_composicao_padrao.sql
+        ${CMAKE_SOURCE_DIR}/db/migrations/0017_custo_pendente.sql
+        ${CMAKE_SOURCE_DIR}/db/migrations/0018_criado_em_local.sql
         ${CMAKE_SOURCE_DIR}/db/seed/0001_dados_iniciais.sql
 )

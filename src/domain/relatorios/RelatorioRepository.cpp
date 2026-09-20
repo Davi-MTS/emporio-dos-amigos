@@ -9,8 +9,14 @@ RelatorioRepository::RelatorioRepository(QSqlDatabase db)
 {
 }
 
-QString RelatorioRepository::filtroPeriodo(int dias, const QString &coluna)
+QString RelatorioRepository::filtroPeriodo(const Periodo &periodo, const QString &coluna)
 {
+    // Dia específico. A data vem de QDate, nunca de texto digitado, então só tem
+    // dígitos e hífens — seguro para entrar na consulta.
+    if (periodo.dia.isValid())
+        return QStringLiteral("date(%1) = '%2'").arg(coluna, periodo.dia.toString(Qt::ISODate));
+
+    const int dias = periodo.dias;
     // As datas são gravadas em hora LOCAL (migration 0009), então comparamos com
     // 'now','localtime'. Usar UTC jogava a venda da noite para o dia seguinte.
     if (dias <= 0)
@@ -37,7 +43,10 @@ DashboardKpis RelatorioRepository::dashboard()
 
     if (q.exec(QStringLiteral(
             "SELECT COUNT(*) FROM produtos p JOIN estoque e ON e.produto_id=p.id "
-            "WHERE p.ativo=1 AND p.composto=0 AND e.quantidade_atual <= p.estoque_minimo"))
+            // Dose não tem estoque próprio (baixa a garrafa): contá-la como
+            // "em falta" divergia da tela de Estoque, que não a mostra.
+            "WHERE p.ativo=1 AND p.composto=0 AND COALESCE(p.dose_de_produto_id,0)=0 "
+            "  AND e.quantidade_atual <= p.estoque_minimo"))
         && q.next())
         k.produtosEmFalta = q.value(0).toInt();
 
@@ -49,10 +58,10 @@ DashboardKpis RelatorioRepository::dashboard()
     return k;
 }
 
-FaturamentoResumo RelatorioRepository::faturamento(int dias)
+FaturamentoResumo RelatorioRepository::faturamento(const Periodo &periodo)
 {
     FaturamentoResumo r;
-    const QString filtro = filtroPeriodo(dias, QStringLiteral("data"));
+    const QString filtro = filtroPeriodo(periodo, QStringLiteral("data"));
 
     QSqlQuery q(m_db);
     if (q.exec(QStringLiteral(
@@ -69,7 +78,7 @@ FaturamentoResumo RelatorioRepository::faturamento(int dias)
     // baixado — vale para produto normal e para insumos de composto). Usa o
     // custo TRAVADO no momento da venda (m.custo_unit); para linhas antigas
     // (sem custo_unit) cai para o custo médio atual.
-    const QString filtroMov = filtroPeriodo(dias, QStringLiteral("m.data"));
+    const QString filtroMov = filtroPeriodo(periodo, QStringLiteral("m.data"));
     // custo_unit e custo_medio_unitario estão em MILÉSIMOS de centavo; ÷1000 no
     // total traz de volta para centavos.
     // O JOIN com vendas NÃO é decorativo: sem ele, uma venda CANCELADA entrava só
@@ -92,10 +101,10 @@ FaturamentoResumo RelatorioRepository::faturamento(int dias)
     return r;
 }
 
-QVector<FormaTotal> RelatorioRepository::vendasPorForma(int dias)
+QVector<FormaTotal> RelatorioRepository::vendasPorForma(const Periodo &periodo)
 {
     QVector<FormaTotal> lista;
-    const QString filtro = filtroPeriodo(dias, QStringLiteral("v.data"));
+    const QString filtro = filtroPeriodo(periodo, QStringLiteral("v.data"));
     QSqlQuery q(m_db);
     if (q.exec(QStringLiteral(
             "SELECT p.forma, SUM(p.valor) FROM pagamentos p "
@@ -108,17 +117,24 @@ QVector<FormaTotal> RelatorioRepository::vendasPorForma(int dias)
     return lista;
 }
 
-QVector<ProdutoVendido> RelatorioRepository::maisVendidos(int dias, int limite)
+QVector<ProdutoVendido> RelatorioRepository::maisVendidos(const Periodo &periodo, int limite)
 {
     QVector<ProdutoVendido> lista;
-    const QString filtro = filtroPeriodo(dias, QStringLiteral("v.data"));
+    const QString filtro = filtroPeriodo(periodo, QStringLiteral("v.data"));
     QSqlQuery q(m_db);
+    // Quantidade na MENOR embalagem do produto, não na unidade base: somar
+    // unidade base misturava ml com lata, e 1800 ml de PARATUDO (2 garrafas)
+    // aparecia em 1º lugar, à frente de cigarros com 250 maços vendidos.
     q.prepare(QStringLiteral(
-        "SELECT pr.nome, SUM(vi.qtd_unidade_base) AS q FROM venda_itens vi "
+        "SELECT pr.nome, "
+        "       CAST(ROUND(SUM(vi.qtd_unidade_base) * 1.0 / "
+        "            COALESCE((SELECT MIN(pe.fator_conversao) FROM produto_embalagens pe "
+        "                      WHERE pe.produto_id = pr.id), 1)) AS INTEGER) AS q "
+        "FROM venda_itens vi "
         "JOIN vendas v ON v.id=vi.venda_id "
         "JOIN produtos pr ON pr.id=vi.produto_id "
         "WHERE v.status='concluida' AND %1 "
-        "GROUP BY vi.produto_id ORDER BY q DESC LIMIT :lim").arg(filtro));
+        "GROUP BY vi.produto_id ORDER BY q DESC, pr.nome LIMIT :lim").arg(filtro));
     q.bindValue(QStringLiteral(":lim"), limite);
     if (q.exec()) {
         while (q.next())
@@ -127,10 +143,10 @@ QVector<ProdutoVendido> RelatorioRepository::maisVendidos(int dias, int limite)
     return lista;
 }
 
-QVector<ProdutoParado> RelatorioRepository::produtosParados(int dias)
+QVector<ProdutoParado> RelatorioRepository::produtosParados(const Periodo &periodo)
 {
     QVector<ProdutoParado> lista;
-    const QString filtro = filtroPeriodo(dias, QStringLiteral("v.data"));
+    const QString filtro = filtroPeriodo(periodo, QStringLiteral("v.data"));
     QSqlQuery q(m_db);
     if (q.exec(QStringLiteral(
             "SELECT p.nome, COALESCE(e.quantidade_atual,0) FROM produtos p "

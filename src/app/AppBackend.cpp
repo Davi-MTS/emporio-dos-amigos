@@ -203,6 +203,10 @@ QVariantMap AppBackend::novoUsuario()
 
 bool AppBackend::salvarUsuario(const QVariantMap &dados, const QString &senha)
 {
+    if (!temPermissao(QStringLiteral("gerencia_usuarios"))) {
+        m_erro = tr("Seu usuário não pode cadastrar usuários.");
+        return false;
+    }
     Usuario u;
     u.id = dados.value(QStringLiteral("id")).toInt();
     u.nome = dados.value(QStringLiteral("nome")).toString();
@@ -219,6 +223,10 @@ bool AppBackend::salvarUsuario(const QVariantMap &dados, const QString &senha)
 
 bool AppBackend::inativarUsuario(int id)
 {
+    if (!temPermissao(QStringLiteral("gerencia_usuarios"))) {
+        m_erro = tr("Seu usuário não pode desativar usuários.");
+        return false;
+    }
     if (id == m_usuarioId) {
         m_erro = QStringLiteral("Você não pode desativar o próprio usuário logado.");
         return false;
@@ -296,6 +304,10 @@ QVariantMap AppBackend::novoFornecedor()
 
 bool AppBackend::salvarFornecedor(const QVariantMap &dados)
 {
+    if (!temPermissao(QStringLiteral("ve_financeiro"))) {
+        m_erro = tr("Seu usuário não pode cadastrar fornecedores.");
+        return false;
+    }
     Fornecedor f;
     f.id = dados.value(QStringLiteral("id")).toInt();
     f.nome = dados.value(QStringLiteral("nome")).toString();
@@ -318,8 +330,41 @@ void AppBackend::recarregarCompras()
     m_comprasModel->setCompras(m_compraRepo.listar());
 }
 
+bool AppBackend::_fatorDoCadastro(int produtoId, int embalagemId, int fatorDaTela, int *fator,
+                                  bool avisarDivergencia)
+{
+    if (embalagemId <= 0) {
+        *fator = 1;
+        return true;
+    }
+    const auto doCadastro = m_produtoRepo.fatorDaEmbalagem(produtoId, embalagemId);
+    if (!doCadastro) {
+        m_erro = tr("A embalagem escolhida não pertence a este produto. "
+                    "Escolha a embalagem de novo.");
+        return false;
+    }
+    // A tela manda o fator só por conveniência; o que vale é o cadastro. Se
+    // divergirem, fica no sistema.log. (Os registros errados da loja — caixinha
+    // baixando 1 lata, box entrando como unidade — NÃO vieram da tela: o próprio
+    // cadastro estava com fator 1 na hora, corrigido dias depois. Ver a trava
+    // de fator em ProdutoRepository::salvar.)
+    if (avisarDivergencia && fatorDaTela != *doCadastro)
+        qWarning("Fator da tela (%d) diferente do cadastro (%d): produto %d, embalagem %d. "
+                 "Usado o do cadastro.",
+                 fatorDaTela, *doCadastro, produtoId, embalagemId);
+    *fator = *doCadastro;
+    return true;
+}
+
 QVariantMap AppBackend::registrarCompra(const QVariantMap &dados)
 {
+    if (!temPermissao(QStringLiteral("ve_financeiro"))) {
+        m_erro = tr("Seu usuário não pode registrar compras.");
+        QVariantMap out;
+        out[QStringLiteral("ok")] = false;
+        out[QStringLiteral("erro")] = m_erro;
+        return out;
+    }
     QVector<ItemCompra> itens;
     const QVariantList itensIn = dados.value(QStringLiteral("itens")).toList();
     for (const QVariant &v : itensIn) {
@@ -327,7 +372,14 @@ QVariantMap AppBackend::registrarCompra(const QVariantMap &dados)
         ItemCompra it;
         it.produtoId = im.value(QStringLiteral("produtoId")).toInt();
         it.embalagemId = im.value(QStringLiteral("embalagemId")).toInt();
-        it.fator = im.value(QStringLiteral("fator"), 1).toInt();
+        // O fator sai do cadastro da embalagem, não da tela.
+        if (!_fatorDoCadastro(it.produtoId, it.embalagemId,
+                              im.value(QStringLiteral("fator"), 1).toInt(), &it.fator)) {
+            QVariantMap out;
+            out[QStringLiteral("ok")] = false;
+            out[QStringLiteral("erro")] = m_erro;
+            return out;
+        }
         it.qtdEmbalagem = im.value(QStringLiteral("qtd")).toLongLong();
         it.custoUnitEmbalagem = im.value(QStringLiteral("custo")).toLongLong();
         it.validade = im.value(QStringLiteral("validade")).toString();
@@ -575,6 +627,10 @@ QVariantMap AppBackend::resumoFinanceiro()
 
 bool AppBackend::pagarConta(int id, const QString &forma)
 {
+    if (!temPermissao(QStringLiteral("ve_financeiro"))) {
+        m_erro = tr("Seu usuário não pode pagar contas.");
+        return false;
+    }
     // Lê valor/descrição antes de pagar (para lançar a sangria, se em dinheiro).
     qint64 valor = 0;
     QString descricao;
@@ -805,6 +861,10 @@ QVariantMap AppBackend::receberContaValor(int id, const QString &valorTexto,
 bool AppBackend::criarDespesa(const QString &descricao, const QString &valorTexto,
                               const QString &vencimento)
 {
+    if (!temPermissao(QStringLiteral("ve_financeiro"))) {
+        m_erro = tr("Seu usuário não pode lançar despesas.");
+        return false;
+    }
     const auto v = Money::parse(valorTexto);
     if (!v) {
         m_erro = QStringLiteral("Valor inválido.");
@@ -837,9 +897,10 @@ QVariantMap AppBackend::dashboard()
     return m;
 }
 
-QVariantMap AppBackend::relatorioFaturamento(int dias)
+// Conversão dos resultados para o QML — uma só, usada tanto pelo período em dias
+// quanto pelo dia específico.
+static QVariantMap mapaFaturamento(const FaturamentoResumo &r)
 {
-    const FaturamentoResumo r = m_relatorioRepo.faturamento(dias);
     QVariantMap m;
     m[QStringLiteral("total")] = static_cast<qlonglong>(r.total);
     m[QStringLiteral("numVendas")] = r.numVendas;
@@ -849,10 +910,9 @@ QVariantMap AppBackend::relatorioFaturamento(int dias)
     return m;
 }
 
-QVariantList AppBackend::relatorioFormas(int dias)
+static QVariantList listaFormas(const QVector<FormaTotal> &fs)
 {
     QVariantList lista;
-    const auto fs = m_relatorioRepo.vendasPorForma(dias);
     for (const FormaTotal &f : fs) {
         QVariantMap m;
         m[QStringLiteral("forma")] = f.forma;
@@ -862,10 +922,9 @@ QVariantList AppBackend::relatorioFormas(int dias)
     return lista;
 }
 
-QVariantList AppBackend::relatorioMaisVendidos(int dias, int limite)
+static QVariantList listaVendidos(const QVector<ProdutoVendido> &ps)
 {
     QVariantList lista;
-    const auto ps = m_relatorioRepo.maisVendidos(dias, limite);
     for (const ProdutoVendido &p : ps) {
         QVariantMap m;
         m[QStringLiteral("nome")] = p.nome;
@@ -875,10 +934,9 @@ QVariantList AppBackend::relatorioMaisVendidos(int dias, int limite)
     return lista;
 }
 
-QVariantList AppBackend::relatorioProdutosParados(int dias)
+static QVariantList listaParados(const QVector<ProdutoParado> &ps)
 {
     QVariantList lista;
-    const auto ps = m_relatorioRepo.produtosParados(dias);
     for (const ProdutoParado &p : ps) {
         QVariantMap m;
         m[QStringLiteral("nome")] = p.nome;
@@ -886,6 +944,58 @@ QVariantList AppBackend::relatorioProdutosParados(int dias)
         lista.push_back(m);
     }
     return lista;
+}
+
+QVariantMap AppBackend::relatorioFaturamento(int dias)
+{
+    return mapaFaturamento(m_relatorioRepo.faturamento(dias));
+}
+
+QVariantList AppBackend::relatorioFormas(int dias)
+{
+    return listaFormas(m_relatorioRepo.vendasPorForma(dias));
+}
+
+QVariantList AppBackend::relatorioMaisVendidos(int dias, int limite)
+{
+    return listaVendidos(m_relatorioRepo.maisVendidos(dias, limite));
+}
+
+QVariantList AppBackend::relatorioProdutosParados(int dias)
+{
+    return listaParados(m_relatorioRepo.produtosParados(dias));
+}
+
+QVariantMap AppBackend::relatorioFaturamentoDia(const QString &isoDia)
+{
+    const QDate dia = QDate::fromString(isoDia, Qt::ISODate);
+    if (!dia.isValid())
+        return {};
+    return mapaFaturamento(m_relatorioRepo.faturamento(Periodo::doDia(dia)));
+}
+
+QVariantList AppBackend::relatorioFormasDia(const QString &isoDia)
+{
+    const QDate dia = QDate::fromString(isoDia, Qt::ISODate);
+    if (!dia.isValid())
+        return {};
+    return listaFormas(m_relatorioRepo.vendasPorForma(Periodo::doDia(dia)));
+}
+
+QVariantList AppBackend::relatorioMaisVendidosDia(const QString &isoDia, int limite)
+{
+    const QDate dia = QDate::fromString(isoDia, Qt::ISODate);
+    if (!dia.isValid())
+        return {};
+    return listaVendidos(m_relatorioRepo.maisVendidos(Periodo::doDia(dia), limite));
+}
+
+QVariantList AppBackend::relatorioProdutosParadosDia(const QString &isoDia)
+{
+    const QDate dia = QDate::fromString(isoDia, Qt::ISODate);
+    if (!dia.isValid())
+        return {};
+    return listaParados(m_relatorioRepo.produtosParados(Periodo::doDia(dia)));
 }
 
 void AppBackend::recarregarProdutos(const QString &filtro)
@@ -1329,6 +1439,7 @@ QVariantMap AppBackend::itemEstoque(int produtoId)
     m[QStringLiteral("quantidade")] = static_cast<qlonglong>(it.quantidade);
     m[QStringLiteral("minimo")] = it.minimo;
     m[QStringLiteral("custoMedio")] = static_cast<qlonglong>(it.custoMedio);
+    m[QStringLiteral("custoMedioMilli")] = static_cast<qlonglong>(it.custoMedioMilli);
     return m;
 }
 
@@ -1364,6 +1475,64 @@ QVariantList AppBackend::embalagensDe(int produtoId)
     return lista;
 }
 
+// Os limites saíram do banco da loja: dos custos lançados, os que ficaram
+// acima do preço de venda ou abaixo de 10% dele eram todos erro de digitação
+// ou de embalagem (custo da caixa na unidade, ou o contrário) — e nenhum
+// custo certo caiu fora dessa faixa.
+QVariantMap AppBackend::avaliarCusto(int produtoId, int embalagemId, const QString &custoTexto)
+{
+    QVariantMap out{{QStringLiteral("nivel"), QString()}, {QStringLiteral("mensagem"), QString()}};
+    const qint64 custo = Money::parse(custoTexto).value_or(0);
+    if (custo <= 0)
+        return out;
+    const auto p = m_produtoRepo.obter(produtoId);
+    if (!p)
+        return out;
+
+    // Preço de referência: o da menor embalagem com preço (normalmente a
+    // unidade), levado para a unidade base.
+    const Embalagem *ref = nullptr;
+    const Embalagem *escolhida = nullptr;
+    for (const Embalagem &e : p->embalagens) {
+        if (e.precoVenda > 0 && e.fator > 0 && (!ref || e.fator < ref->fator))
+            ref = &e;
+        if (e.id == embalagemId)
+            escolhida = &e;
+    }
+    if (!ref)
+        return out;   // sem preço de venda não há com o que comparar
+    const int fator = escolhida && escolhida->fator > 0 ? escolhida->fator : 1;
+    const QString nomeEmb = escolhida ? escolhida->nome : p->unidadeBase;
+
+    // Quanto essa embalagem rende vendida pelo preço de referência.
+    const qint64 rende = qRound64(double(ref->precoVenda) * fator / ref->fator);
+    if (rende <= 0)
+        return out;
+
+    // "12 unidade" fica torto em português; em ml/g o plural é a própria
+    // unidade ("750 ml"), então só "unidade" ganha o s.
+    const QString unidades = p->unidadeBase == QStringLiteral("unidade")
+                                 ? QStringLiteral("unidades")
+                                 : p->unidadeBase;
+    const QString emb = fator > 1
+        ? tr("%1 (%2 %3)").arg(nomeEmb).arg(fator).arg(unidades)
+        : nomeEmb;
+    if (custo > rende) {
+        out[QStringLiteral("nivel")] = QStringLiteral("alto");
+        out[QStringLiteral("mensagem")] =
+            tr("Custo maior que o preço de venda: %1 por %2, que vendida rende %3. "
+               "Confira o valor e a embalagem.")
+                .arg(Money::format(custo), emb, Money::format(rende));
+    } else if (custo * 10 < rende) {
+        out[QStringLiteral("nivel")] = QStringLiteral("baixo");
+        out[QStringLiteral("mensagem")] =
+            tr("Custo muito baixo: %1 por %2, que vendida rende %3. "
+               "Confira se não é o custo de uma unidade só.")
+                .arg(Money::format(custo), emb, Money::format(rende));
+    }
+    return out;
+}
+
 bool AppBackend::registrarEntrada(int produtoId, int embalagemId, int qtdEmb,
                                   const QString &custoTexto, const QString &observacao,
                                   const QString &validade, const QString &codigoLote)
@@ -1373,26 +1542,34 @@ bool AppBackend::registrarEntrada(int produtoId, int embalagemId, int qtdEmb,
         return false;
     }
 
-    int fator = 1;
-    const auto p = m_produtoRepo.obter(produtoId);
-    if (p) {
-        for (const Embalagem &e : p->embalagens) {
-            if (e.id == embalagemId) {
-                fator = e.fator > 0 ? e.fator : 1;
-                break;
-            }
-        }
+    // Tudo que pode recusar a entrada é conferido ANTES de gravar. A validade
+    // era conferida depois: a mercadoria entrava, a tela mostrava erro, e quem
+    // tentava de novo dava entrada duas vezes.
+    if (!dataIsoValidaOuVazia(validade)) {
+        m_erro = tr("Validade inválida. Use o formato dd/mm/aaaa.");
+        return false;
     }
+    // Fator do cadastro, e só de embalagem deste produto (igual à compra e à
+    // venda). Antes, embalagem desconhecida virava fator 1 em silêncio.
+    int fator = 1;
+    if (!_fatorDoCadastro(produtoId, embalagemId, 0, &fator, /*avisarDivergencia=*/false))
+        return false;
     const qint64 qtdBase = static_cast<qint64>(qtdEmb) * fator;
 
     // Custo informado é por embalagem; converte para custo por unidade base em
     // MILÉSIMOS de centavo (×1000 antes de dividir pelo fator, p/ não perder ml).
+    // Vazio = mantém o custo. Escrito mas ilegível ("4,5O") é recusado: antes
+    // era ignorado e a mercadoria entrava sem custo sem ninguém saber.
     qint64 custoUnitBaseMilli = -1;
     const QString ct = custoTexto.trimmed();
     if (!ct.isEmpty()) {
         const auto cents = Money::parse(ct);
-        if (cents && fator > 0)
-            custoUnitBaseMilli = *cents * 1000 / fator;
+        if (!cents || *cents < 0) {
+            m_erro = tr("Custo inválido. Escreva só o valor, como 62,90 "
+                        "(ou deixe vazio para manter o custo).");
+            return false;
+        }
+        custoUnitBaseMilli = *cents * 1000 / fator;
     }
 
     if (!m_estoqueRepo.registrarEntradaMilli(produtoId, qtdBase, custoUnitBaseMilli,
@@ -1405,10 +1582,6 @@ bool AppBackend::registrarEntrada(int produtoId, int embalagemId, int qtdEmb,
     // prazo curto. Informada, vira um lote e passa a ser cobrada na tela de
     // Vencimento. Se o lote falhar, a entrada NÃO é desfeita — a mercadoria
     // realmente entrou; o aviso vai para o log.
-    if (!dataIsoValidaOuVazia(validade)) {
-        m_erro = tr("Validade inválida. Use o formato dd/mm/aaaa.");
-        return false;
-    }
     if (!validade.trimmed().isEmpty()) {
         if (!m_loteRepo.registrar(produtoId, qtdBase, validade.trimmed(), codigoLote))
             qWarning("Entrada gravada, mas o lote falhou: %s",
@@ -1455,8 +1628,9 @@ QVariantList AppBackend::divergenciasDeLote()
     QVariantList lista;
     for (const auto &d : m_loteRepo.divergencias()) {
         QVariantMap m;
-        m[QStringLiteral("produto")] = d.first;
-        m[QStringLiteral("diferenca")] = static_cast<qlonglong>(d.second);
+        m[QStringLiteral("produto")] = d.produto;
+        m[QStringLiteral("diferenca")] = static_cast<qlonglong>(d.diferenca);
+        m[QStringLiteral("unidade")] = d.unidade;
         lista.push_back(m);
     }
     return lista;
@@ -1491,15 +1665,8 @@ bool AppBackend::registrarRetirada(int produtoId, int embalagemId, int qtdEmb,
     }
 
     int fator = 1;
-    const auto p = m_produtoRepo.obter(produtoId);
-    if (p) {
-        for (const Embalagem &e : p->embalagens) {
-            if (e.id == embalagemId) {
-                fator = e.fator > 0 ? e.fator : 1;
-                break;
-            }
-        }
-    }
+    if (!_fatorDoCadastro(produtoId, embalagemId, 0, &fator, /*avisarDivergencia=*/false))
+        return false;
     const qint64 qtdBase = static_cast<qint64>(qtdEmb) * fator;
 
     if (!m_estoqueRepo.registrarSaida(produtoId, qtdBase, motivo, m_usuarioId)) {
@@ -1608,7 +1775,14 @@ QVariantMap AppBackend::finalizarVenda(const QVariantMap &dados)
         LinhaVenda l;
         l.produtoId = im.value(QStringLiteral("produtoId")).toInt();
         l.embalagemId = im.value(QStringLiteral("embalagemId")).toInt();
-        l.fator = im.value(QStringLiteral("fator"), 1).toInt();
+        // O fator sai do cadastro da embalagem, não da tela.
+        if (!_fatorDoCadastro(l.produtoId, l.embalagemId,
+                              im.value(QStringLiteral("fator"), 1).toInt(), &l.fator)) {
+            QVariantMap out;
+            out[QStringLiteral("ok")] = false;
+            out[QStringLiteral("erro")] = m_erro;
+            return out;
+        }
         l.qtdEmbalagem = im.value(QStringLiteral("qtd")).toLongLong();
         l.precoUnit = im.value(QStringLiteral("precoUnit")).toLongLong();
         l.desconto = im.value(QStringLiteral("desconto")).toLongLong();
@@ -1757,6 +1931,7 @@ QVariantMap AppBackend::cancelarVenda(int vendaId, const QString &motivo)
                                    motivo.trimmed()));
     out[QStringLiteral("ok")] = ok;
     out[QStringLiteral("erro")] = ok ? QString() : m_vendaRepo.ultimoErro();
+    out[QStringLiteral("aviso")] = ok ? m_vendaRepo.ultimoAviso() : QString();
     if (ok) {
         recarregarEstoque();
         recarregarProdutos();
@@ -1866,11 +2041,11 @@ QVariantMap AppBackend::fecharCaixa(const QString &dinheiroContadoTexto)
             // A CÓPIA DO BANCO vai junto: é o que tira o backup de dentro do PC.
             // Sem isto, um HD queimado ou um roubo levam os dados junto.
             if (temBackup && m_telegram.enviaBackup()) {
+                // O resultado (enviado ou não) vai para o log quando o
+                // Telegram responder — ver TelegramService::enviarArquivo.
                 m_telegram.enviarArquivo(
                     backup.caminho,
                     QStringLiteral("Backup do sistema — %1").arg(backup.resumo));
-                LogService::registrar(QStringLiteral("Backup enviado ao Telegram: %1")
-                                          .arg(backup.caminho));
             }
         }
     } else {
@@ -1883,6 +2058,13 @@ QVariantMap AppBackend::fecharCaixa(const QString &dinheiroContadoTexto)
 
 QVariantMap AppBackend::fazerBackup()
 {
+    if (!temPermissao(QStringLiteral("gerencia_usuarios"))) {
+        m_erro = tr("Seu usuário não pode fazer backup.");
+        QVariantMap out;
+        out[QStringLiteral("ok")] = false;
+        out[QStringLiteral("erro")] = m_erro;
+        return out;
+    }
     QVariantMap out;
     BackupInfo info;
     if (!m_backupService.criarBackup(&info)) {
@@ -1935,6 +2117,13 @@ QVariantMap AppBackend::conferirArquivoBackup(const QString &caminho)
 
 QVariantMap AppBackend::agendarRestauracao(const QString &caminho)
 {
+    if (!temPermissao(QStringLiteral("gerencia_usuarios"))) {
+        m_erro = tr("Seu usuário não pode restaurar backup.");
+        QVariantMap out;
+        out[QStringLiteral("ok")] = false;
+        out[QStringLiteral("erro")] = m_erro;
+        return out;
+    }
     QVariantMap out;
     const bool ok = m_backupService.agendarRestauracao(caminho);
     out[QStringLiteral("ok")] = ok;
@@ -2005,6 +2194,10 @@ QVariantMap AppBackend::configTelegram()
 void AppBackend::salvarConfigTelegram(const QString &token, const QString &chatId,
                                       bool ativo, bool enviaBackup)
 {
+    if (!temPermissao(QStringLiteral("gerencia_usuarios"))) {
+        m_erro = tr("Seu usuário não pode mudar o Telegram.");
+        return;
+    }
     m_telegram.salvarConfig(token, chatId, ativo, enviaBackup);
 }
 

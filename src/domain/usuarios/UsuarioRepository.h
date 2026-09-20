@@ -24,6 +24,8 @@ public:
     // sentido em update). Login deve ser único.
     bool salvar(Usuario &usuario, const QString &senhaNova);
     bool inativar(int id);
+    // O usuário é Administrador e não há outro Administrador ativo.
+    bool ehUnicoAdministrador(int id);
 
     // Quantos usuários já têm senha definida (para detectar 1º uso).
     int contarComSenha();

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QDate>
 #include <QSqlDatabase>
 #include <QString>
 #include <QVector>
@@ -27,6 +28,19 @@ struct FormaTotal { QString forma; qint64 total = 0; };
 struct ProdutoVendido { QString nome; qint64 qtd = 0; };
 struct ProdutoParado { QString nome; qint64 estoque = 0; };
 
+// Período de um relatório: os últimos `dias` dias contando hoje (dias <= 0 =>
+// só hoje) OU um dia específico, quando `dia` é válido. O dia específico existe
+// para responder "quanto vendi no sábado?" sem precisar abrir 7 dias e fazer
+// conta de cabeça.
+struct Periodo
+{
+    int dias = 0;
+    QDate dia;
+
+    static Periodo ultimosDias(int d) { Periodo p; p.dias = d; return p; }
+    static Periodo doDia(const QDate &d) { Periodo p; p.dia = d; return p; }
+};
+
 // Consultas agregadas para o dashboard e relatórios. Só considera vendas
 // concluídas. Custo/lucro são estimados pelo custo médio ATUAL (o custo no
 // momento da venda não é armazenado).
@@ -37,14 +51,21 @@ public:
 
     DashboardKpis dashboard();
 
-    // dias <= 0 => apenas hoje; senão, últimos `dias` dias.
-    FaturamentoResumo faturamento(int dias);
-    QVector<FormaTotal> vendasPorForma(int dias);
-    QVector<ProdutoVendido> maisVendidos(int dias, int limite);
-    QVector<ProdutoParado> produtosParados(int dias);
+    FaturamentoResumo faturamento(const Periodo &periodo);
+    QVector<FormaTotal> vendasPorForma(const Periodo &periodo);
+    QVector<ProdutoVendido> maisVendidos(const Periodo &periodo, int limite);
+    QVector<ProdutoParado> produtosParados(const Periodo &periodo);
+
+    // Atalhos por número de dias (dias <= 0 => apenas hoje) — o que o Dashboard
+    // e o relatório do celular sempre usaram.
+    FaturamentoResumo faturamento(int dias) { return faturamento(Periodo::ultimosDias(dias)); }
+    QVector<FormaTotal> vendasPorForma(int dias) { return vendasPorForma(Periodo::ultimosDias(dias)); }
+    QVector<ProdutoVendido> maisVendidos(int dias, int limite)
+    { return maisVendidos(Periodo::ultimosDias(dias), limite); }
+    QVector<ProdutoParado> produtosParados(int dias) { return produtosParados(Periodo::ultimosDias(dias)); }
 
 private:
-    static QString filtroPeriodo(int dias, const QString &coluna);
+    static QString filtroPeriodo(const Periodo &periodo, const QString &coluna);
 
     QSqlDatabase m_db;
 };

@@ -17,6 +17,7 @@ private slots:
     void criaFuncionarioComPerfil();
     void loginDuplicadoFalha();
     void inativarBloqueiaLogin();
+    void naoFicaSemAdministrador();
 
 private:
     QTemporaryDir m_dir;
@@ -88,6 +89,26 @@ void TstUsuarioRepository::inativarBloqueiaLogin()
     auto r = repo();
     QVERIFY(r.inativar(m_funcId));
     QVERIFY(!r.autenticar(QStringLiteral("fulano"), QStringLiteral("abcd")).has_value());
+}
+
+// Rebaixar ou desativar o ÚNICO administrador trancava a loja fora de
+// Usuários, Backup e Financeiro. Com outro administrador ativo, pode.
+void TstUsuarioRepository::naoFicaSemAdministrador()
+{
+    auto r = repo();
+    const auto chefe = r.autenticar(QStringLiteral("admin"), QStringLiteral("1234"));
+    QVERIFY(chefe.has_value());
+
+    Usuario rebaixado = *chefe;
+    rebaixado.perfilId = 2;
+    QVERIFY(!r.salvar(rebaixado, QString()));
+    QVERIFY2(r.ultimoErro().contains(QStringLiteral("único administrador")), qUtf8Printable(r.ultimoErro()));
+    QVERIFY(!r.inativar(chefe->id));
+
+    Usuario socio;
+    socio.nome = QStringLiteral("Sócio"); socio.login = QStringLiteral("socio"); socio.perfilId = 1;
+    QVERIFY2(r.salvar(socio, QStringLiteral("4321")), qUtf8Printable(r.ultimoErro()));
+    QVERIFY2(r.salvar(rebaixado, QString()), qUtf8Printable(r.ultimoErro()));
 }
 
 QTEST_MAIN(TstUsuarioRepository)

@@ -2,12 +2,70 @@
 
 #include <QImage>
 #include <QSqlQuery>
-#include <utility>
+#include <QThread>
+#include <QThreadStorage>
 
-ProdutoFotoProvider::ProdutoFotoProvider(QSqlDatabase db)
-    : QQuickImageProvider(QQuickImageProvider::Image)
-    , m_db(std::move(db))
+namespace {
+
+// Conexão de LEITURA que pertence a uma única thread. O QThreadStorage apaga o
+// objeto quando a thread termina, e o destrutor fecha e remove a conexão — sem
+// isso o Qt reclamaria de conexão órfã ao fechar o programa.
+class ConexaoDaThread
 {
+public:
+    explicit ConexaoDaThread(const QString &caminho)
+        : m_nome(QStringLiteral("fotos-thread-%1")
+                     .arg(reinterpret_cast<quintptr>(QThread::currentThreadId())))
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), m_nome);
+        db.setDatabaseName(caminho);
+        // Só lê. O busy timeout cobre o instante em que a thread principal está
+        // gravando a própria foto que vai ser pedida em seguida.
+        db.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY;QSQLITE_BUSY_TIMEOUT=2000"));
+        db.open();
+    }
+
+    ~ConexaoDaThread()
+    {
+        {
+            QSqlDatabase db = QSqlDatabase::database(m_nome, false);
+            if (db.isValid())
+                db.close();
+        }   // a cópia acima precisa morrer antes do removeDatabase
+        QSqlDatabase::removeDatabase(m_nome);
+    }
+
+    QSqlDatabase banco() const { return QSqlDatabase::database(m_nome, false); }
+
+private:
+    const QString m_nome;
+};
+
+QThreadStorage<ConexaoDaThread *> g_conexoes;
+
+}  // namespace
+
+ProdutoFotoProvider::ProdutoFotoProvider(const QSqlDatabase &db)
+    : QQuickImageProvider(QQuickImageProvider::Image)
+    , m_caminhoBanco(db.databaseName())
+{
+}
+
+QByteArray ProdutoFotoProvider::lerFoto(int produtoId)
+{
+    if (!g_conexoes.hasLocalData())
+        g_conexoes.setLocalData(new ConexaoDaThread(m_caminhoBanco));
+
+    const QSqlDatabase db = g_conexoes.localData()->banco();
+    if (!db.isOpen())
+        return {};
+
+    QSqlQuery q(db);
+    q.prepare(QStringLiteral("SELECT foto FROM produtos WHERE id = :id"));
+    q.bindValue(QStringLiteral(":id"), produtoId);
+    if (!q.exec() || !q.next())
+        return {};
+    return q.value(0).toByteArray();
 }
 
 QImage ProdutoFotoProvider::requestImage(const QString &id, QSize *size, const QSize &requestedSize)
@@ -19,13 +77,7 @@ QImage ProdutoFotoProvider::requestImage(const QString &id, QSize *size, const Q
     if (!ok || produtoId <= 0)
         return {};
 
-    QSqlQuery q(m_db);
-    q.prepare(QStringLiteral("SELECT foto FROM produtos WHERE id = :id"));
-    q.bindValue(QStringLiteral(":id"), produtoId);
-    if (!q.exec() || !q.next())
-        return {};
-
-    const QByteArray dados = q.value(0).toByteArray();
+    const QByteArray dados = lerFoto(produtoId);
     if (dados.isEmpty())
         return {};   // sem foto: a tela mostra o espaço vazio, não um erro
 

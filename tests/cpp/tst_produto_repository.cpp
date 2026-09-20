@@ -16,6 +16,8 @@ private slots:
     void buscaPorCodigoBarras();
     void atualizaRemovendoEmbalagem();
     void inativaSomeDaLista();
+    void fatorDeEmbalagemConferido();
+    void inativoNaoVendePeloCodigo();
 
 private:
     QTemporaryDir m_dir;
@@ -132,6 +134,64 @@ void TstProdutoRepository::inativaSomeDaLista()
     const auto lista = r.listar();
     for (const Produto &x : lista)
         QVERIFY(x.id != m_produtoId);
+}
+
+// Na loja, caixinhas e fardos foram salvos com o fator 1 que a linha nova
+// trazia e venderam assim por dias. Fator 0 ("não informado") e duas
+// embalagens com o mesmo fator e preços diferentes são recusados.
+void TstProdutoRepository::fatorDeEmbalagemConferido()
+{
+    auto r = repo();
+    const auto emb = [](const char *nome, int fator, qint64 preco) {
+        Embalagem e; e.nome = QString::fromUtf8(nome); e.fator = fator; e.precoVenda = preco;
+        return e;
+    };
+
+    Produto semFator;
+    semFator.nome = QStringLiteral("Sem fator");
+    semFator.embalagens = {emb("Unidade", 1, 450), emb("Caixinha", 0, 4800)};
+    QVERIFY(!r.salvar(semFator));
+    QVERIFY2(r.ultimoErro().contains(QStringLiteral("Informe o fator")), qUtf8Printable(r.ultimoErro()));
+
+    // O caso da ORIGINAL 350 ML na loja: caixinha com fator 1 a R$ 64,00.
+    Produto duplicado;
+    duplicado.nome = QStringLiteral("Original teste");
+    duplicado.embalagens = {emb("Unidade", 1, 550), emb("CAIXINHA", 1, 6400)};
+    QVERIFY(!r.salvar(duplicado));
+    QVERIFY2(r.ultimoErro().contains(QStringLiteral("mesmo fator")), qUtf8Printable(r.ultimoErro()));
+    for (const Produto &x : r.listar(QStringLiteral("Original teste")))
+        QFAIL("produto com fator errado foi gravado");
+
+    // Mesmo fator e mesmo preço é legítimo (dois códigos para a mesma lata).
+    Produto doisCodigos;
+    doisCodigos.nome = QStringLiteral("Dois codigos");
+    doisCodigos.embalagens = {emb("Lata", 1, 450), emb("Lata (outro código)", 1, 450)};
+    QVERIFY2(r.salvar(doisCodigos), qUtf8Printable(r.ultimoErro()));
+}
+
+// Produto desativado não pode continuar saindo no PDV pelo bipe, e o código
+// dele fica livre para o produto que o substituir.
+void TstProdutoRepository::inativoNaoVendePeloCodigo()
+{
+    auto r = repo();
+    Produto velho;
+    velho.nome = QStringLiteral("Produto velho");
+    Embalagem e; e.nome = QStringLiteral("Unidade"); e.fator = 1; e.codigoBarras = QStringLiteral("789000");
+    velho.embalagens = {e};
+    QVERIFY2(r.salvar(velho), qUtf8Printable(r.ultimoErro()));
+    QVERIFY(r.buscarPorCodigoBarras(QStringLiteral("789000")).has_value());
+
+    QVERIFY(r.inativar(velho.id));
+    QVERIFY(!r.buscarPorCodigoBarras(QStringLiteral("789000")).has_value());
+
+    Produto novo;
+    novo.nome = QStringLiteral("Produto novo");
+    Embalagem e2; e2.nome = QStringLiteral("Unidade"); e2.fator = 1; e2.codigoBarras = QStringLiteral("789000");
+    novo.embalagens = {e2};
+    QVERIFY2(r.salvar(novo), qUtf8Printable(r.ultimoErro()));
+    const auto achado = r.buscarPorCodigoBarras(QStringLiteral("789000"));
+    QVERIFY(achado.has_value());
+    QCOMPARE(achado->first.id, novo.id);
 }
 
 QTEST_MAIN(TstProdutoRepository)

@@ -170,7 +170,7 @@ QJsonObject RelatorioMobileService::coletarDados() const
         return a.nome.localeAwareCompare(b.nome) < 0;
     });
     QJsonArray estArr;
-    qint64 valorEstoque = 0;
+    qint64 valorEstoqueMilli = 0;
     int emFalta = 0;
     for (const ItemEstoque &it : itens) {
         QJsonObject o;
@@ -180,12 +180,15 @@ QJsonObject RelatorioMobileService::coletarDados() const
         o[QStringLiteral("custoMedio")] = Money::format(it.custoMedio);
         o[QStringLiteral("baixo")] = (it.quantidade <= it.minimo);
         estArr.append(o);
-        valorEstoque += it.quantidade * it.custoMedio;
+        // Custo exato (milésimos): com o custo por ml truncado em centavos o
+        // estoque de destilados saía centenas de reais menor. Saldo negativo é
+        // mercadoria que não existe — não vale nada, em vez de descontar.
+        valorEstoqueMilli += qMax(Q_INT64_C(0), it.quantidade) * it.custoMedioMilli;
         if (it.quantidade <= it.minimo)
             ++emFalta;
     }
     dados[QStringLiteral("estoque")] = estArr;
-    dados[QStringLiteral("estoqueValor")] = Money::format(valorEstoque);
+    dados[QStringLiteral("estoqueValor")] = Money::format((valorEstoqueMilli + 500) / 1000);
     dados[QStringLiteral("estoqueEmFalta")] = emFalta;
     dados[QStringLiteral("estoqueItens")] = itens.size();
 

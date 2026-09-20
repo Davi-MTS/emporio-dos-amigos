@@ -299,13 +299,41 @@ bool BackupService::aplicarRestauracaoPendente(const QString &dbPath, QString *e
         return false;
     }
 
-    // Substitui o banco vivo pela cópia (removendo os sidecars do WAL).
-    QFile::remove(dbPath);
+    // Troca em três passos, sem nunca ficar sem banco. Antes o banco vivo era
+    // APAGADO e só depois a cópia era feita: se a cópia falhasse (antivírus,
+    // disco cheio, pen drive removido) o sistema abria com um banco vazio,
+    // pedindo para criar o administrador — a loja "perdia tudo".
+    //  1) copia o backup para um arquivo ao lado; falhou, nada foi tocado;
+    //  2) tira o banco atual do caminho (renomeia, não apaga);
+    //  3) põe a cópia no lugar; falhou, devolve o banco atual.
+    QFile::remove(marc);   // roda uma vez só, dê certo ou não
+    const QString novo = dbPath + QStringLiteral(".restaurando");
+    const QString anterior = dbPath + QStringLiteral(".anterior");
+    QFile::remove(novo);
+    if (!QFile::copy(backupPath, novo)) {
+        QFile::remove(novo);
+        if (erro)
+            *erro = QStringLiteral("Falha ao copiar o backup; o banco atual foi mantido.");
+        return false;
+    }
+    QFile::remove(anterior);
+    if (QFileInfo::exists(dbPath) && !QFile::rename(dbPath, anterior)) {
+        QFile::remove(novo);
+        if (erro)
+            *erro = QStringLiteral("O banco atual está em uso; restauração não aplicada.");
+        return false;
+    }
+    if (!QFile::rename(novo, dbPath)) {
+        QFile::rename(anterior, dbPath);
+        QFile::remove(novo);
+        if (erro)
+            *erro = QStringLiteral("Falha ao pôr o backup no lugar; o banco atual foi mantido.");
+        return false;
+    }
+    // O WAL e o SHM eram do banco antigo: aplicados ao novo, o corromperiam.
+    // O estado antigo está salvo no backup de emergência feito ao agendar.
     QFile::remove(dbPath + QStringLiteral("-wal"));
     QFile::remove(dbPath + QStringLiteral("-shm"));
-    const bool ok = QFile::copy(backupPath, dbPath);
-    QFile::remove(marc);
-    if (!ok && erro)
-        *erro = QStringLiteral("Falha ao restaurar (copiar o arquivo do backup).");
-    return ok;
+    QFile::remove(anterior);
+    return true;
 }
