@@ -167,17 +167,6 @@ ResumoVencimento LoteRepository::resumo()
     return r;
 }
 
-qint64 LoteRepository::totalEmLotes(int produtoId)
-{
-    QSqlQuery q(m_db);
-    q.prepare(QStringLiteral(
-        "SELECT COALESCE(SUM(quantidade), 0) FROM lotes WHERE produto_id = :pid"));
-    q.bindValue(QStringLiteral(":pid"), produtoId);
-    if (!q.exec() || !q.next())
-        return 0;
-    return q.value(0).toLongLong();
-}
-
 QVector<DivergenciaLote> LoteRepository::divergencias()
 {
     QVector<DivergenciaLote> lista;

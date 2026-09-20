@@ -108,7 +108,10 @@ void TstCaixaRepository::resumoConfereEsperado()
     // Vendido = 5,00 + 60,00 = 65,00 (NÃO 70,00: o cliente entregou 10,00 na
     // primeira venda e levou 5,00 de troco — isso não é venda).
     QCOMPARE(r.totalVendas(), qint64(6500));
-    QCOMPARE(r.totalRecebidoPorForma(), qint64(7000));
+    // O que foi ENTREGUE por forma soma 70,00: o dinheiro inclui o troco. É por
+    // isso que o total vendido não pode sair da soma dos pagamentos.
+    QCOMPARE(r.vendasDinheiro + r.vendasPix + r.vendasDebito + r.vendasCredito + r.vendasFiado,
+             qint64(7000));
     // 10000 + 1000 - 500 + 2000 - 500 + 3000 = 15000
     QCOMPARE(r.dinheiroEsperado(), qint64(15000));
 }

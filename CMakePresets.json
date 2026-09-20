@@ -9,7 +9,7 @@
         {
             "name": "windows-debug",
             "displayName": "Windows (Debug)",
-            "description": "Build de desenvolvimento. Defina a variável de ambiente CMAKE_PREFIX_PATH apontando para a sua instalação do Qt 6 (ex.: C:/Qt/6.8.0/msvc2022_64).",
+            "description": "Build de desenvolvimento. Defina a variável de ambiente CMAKE_PREFIX_PATH apontando para a sua instalação do Qt 6 (ex.: C:/Qt/6.8.3/mingw_64 - este projeto compila com MinGW).",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/build/windows-debug",
             "cacheVariables": {

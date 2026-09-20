@@ -35,8 +35,8 @@ O script compila em modo de produção, junta o Qt e gera:
 
 | Saída | O que é |
 | --- | --- |
-| `deploy/pacote/` | Pasta pronta para copiar (~1.300 arquivos) — **versionada; comite depois de regerar** |
-| `deploy/Emporio-dos-Amigos.zip` | A mesma coisa compactada (~26 MB) |
+| `deploy/pacote/` | Pasta pronta para copiar — **versionada; comite depois de regerar** |
+| `deploy/Emporio-dos-Amigos.zip` | A mesma coisa compactada |
 
 Se o Qt estiver em outro caminho:
 
@@ -46,6 +46,15 @@ powershell -ExecutionPolicy Bypass -File .\deploy\empacotar.ps1 -Qt "D:\Qt\6.8.3
 
 **O pacote é autossuficiente:** leva o Qt junto. No PC da loja **não precisa
 instalar Qt, .NET, Java nem nada**.
+
+**O que o script põe e o que ele tira.** Junto com o Qt vão as DLLs do
+**OpenSSL** (`libssl-3-x64.dll`, `libcrypto-3-x64.dll`, vindas do Git for
+Windows) e o plugin `tls/qopensslbackend.dll`: sem eles o Telegram não conecta
+no Windows 10 mais antigo, que é o da loja — o script **para com erro** se não
+os encontrar (use `-OpenSSL <pasta>` para apontar outro caminho). Na direção
+contrária, o script remove o que o sistema nunca usa: os estilos do Qt que não
+são o **Fusion**, o depurador de QML e os drivers de PostgreSQL, ODBC e Mimer
+(o banco é SQLite). São cerca de 15 MB a menos por pacote.
 
 ---
 

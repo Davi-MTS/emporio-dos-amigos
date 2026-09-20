@@ -104,6 +104,40 @@ $sslLic = Join-Path (Split-Path -Parent $OpenSSL) "share\licenses\openssl\LICENS
 if (Test-Path $sslLic) { Copy-Item $sslLic (Join-Path $Saida "LICENSE-OpenSSL.txt") -Force }
 else { Write-Warning "Licenca do OpenSSL nao encontrada em $sslLic - inclua LICENSE-OpenSSL.txt a mao." }
 
+# --- 3d. Tira o que o sistema nunca usa ------------------------------------
+# O windeployqt copia TODOS os estilos do Qt Quick Controls, o depurador de QML
+# e todos os drivers de banco. O sistema usa o estilo Fusion (definido no
+# main.cpp) e SQLite, e o pacote de producao nao depura nada. Eram 15 MB e ~800
+# arquivos de peso morto em cada pacote -- e a pasta vai versionada no Git, ou
+# seja, esse peso entrava no historico a cada atualizacao.
+#
+# Verificado: com estes itens fora, o sistema abre e roda igual. Se um dia o
+# estilo mudar no main.cpp, ajuste a lista de $estilosFora junto.
+$estiloEmUso = "Fusion"
+$estilosFora = @("FluentWinUI3", "Imagine", "Material", "Universal", "Windows")
+$inuteis = @()
+foreach ($e in $estilosFora) {
+    $inuteis += Join-Path $Saida "qml\QtQuick\Controls\$e"
+    $inuteis += Join-Path $Saida "Qt6QuickControls2$e.dll"
+    $inuteis += Join-Path $Saida "Qt6QuickControls2${e}StyleImpl.dll"
+}
+$inuteis += Join-Path $Saida "qmltooling"                    # depurador de QML
+$inuteis += Join-Path $Saida "generic"                       # toque TUIO
+foreach ($drv in @("qsqlpsql.dll", "qsqlodbc.dll", "qsqlmimer.dll")) {
+    $inuteis += Join-Path $Saida "sqldrivers\$drv"           # o banco e SQLite
+}
+$tirados = 0
+foreach ($caminho in $inuteis) {
+    if (Test-Path $caminho) { Remove-Item -Recurse -Force $caminho; $tirados++ }
+}
+Write-Host "       $tirados itens desnecessarios removidos (estilo em uso: $estiloEmUso)"
+
+# Conferencia: sem isto, um erro de digitacao na lista acima removeria o estilo
+# que o sistema USA e o pacote so quebraria na loja.
+$estiloVivo = Join-Path $Saida "qml\QtQuick\Controls\$estiloEmUso"
+if (-not (Test-Path $estiloVivo)) { throw "O estilo $estiloEmUso sumiu do pacote - nao entregue assim." }
+if (-not (Test-Path (Join-Path $Saida "sqldrivers\qsqlite.dll"))) { throw "Faltou o driver do SQLite no pacote." }
+
 # Instruções para quem vai instalar na loja.
 @"
 EMPORIO DOS AMIGOS - Sistema de Gestao

@@ -18,7 +18,7 @@ na sidebar). Ver `docs/design-ui.md` e `docs/mockup-ui.html`.
 | Telas | Dashboard, PDV, **Caixa**, Produtos, Estoque, **Vencimento**, Vendas, Compras, Clientes, Financeiro, Relatórios, Usuários, Backup |
 | Testes | **28 executáveis** no CTest, todos verdes: 312 casos de regra + `tst_qml` (110 casos de interface) |
 | Migrations | **0001–0018** aplicadas |
-| Entrega | `deploy/empacotar.ps1` → pasta autossuficiente + zip (~26 MB), sem console |
+| Entrega | `deploy/empacotar.ps1` → pasta autossuficiente + zip, sem console e sem os extras do Qt |
 | Repositório | `github.com/Davi-MTS/emporio-dos-amigos` (público; pacote pronto versionado em `deploy/pacote/`) |
 
 **Fora do PDV/estoque, o que existe:** produto composto (copão) com receita por
@@ -997,3 +997,40 @@ nunca menor que o total da venda, troco nunca maior que o dinheiro recebido, e
 lista (como aviso) as embalagens de mesmo fator com preços diferentes.
 Rodado sobre o backup de 17/09: tudo verde, com os 6 avisos de cadastro
 (4 produtos) já conhecidos.
+
+### Faxina do que estava versionado (feito)
+
+Varredura pedida pelo dono depois do commit da auditoria: procurar lixo no que
+está no repositório. Nada de banco, backup, zip, cache ou binário indevido; todo
+`.cpp`/`.h`/`.qml`/teste está registrado no CMake; sem duplicata, sem arquivo
+vazio, sem TODO pendente, sem segredo. O que sobrou foi isto:
+
+**O pacote levava ~15 MB que o sistema nunca usa.** O `windeployqt` copia TODOS
+os estilos do Qt Quick Controls, o depurador de QML e todos os drivers de banco.
+O sistema usa **Fusion** (`main.cpp`) e **SQLite**. `empacotar.ps1` agora remove,
+depois do deploy: os estilos FluentWinUI3/Imagine/Material/Universal/Windows
+(pasta QML + `Qt6QuickControls2<estilo>.dll` + `...StyleImpl.dll`), `qmltooling`,
+`generic` (toque TUIO) e os drivers psql/odbc/mimer. **Duas conferências** no fim
+do script param a entrega se o estilo em uso ou o driver do SQLite sumirem —
+erro de digitação na lista só apareceria na loja.
+- Medido numa cópia: 78,1 MB → 62,7 MB, e o sistema abre e roda igual.
+- Isso pesa duas vezes: a pasta vai versionada, então cada atualização do pacote
+  levava esse excesso para o histórico do Git (hoje 39 MB, 15 pacotes commitados).
+
+**Código morto removido** (nenhum uso fora do próprio teste):
+`AppBackend::divergenciasDeLote()` (era a ponte para o aviso que o dono mandou
+tirar), `ResumoCaixa::totalRecebidoPorForma()` e `LoteRepository::totalEmLotes()`
+— este virou helper dentro de `tst_lotes`, onde é a única coisa que pergunta.
+A regra `LoteRepository::divergencias()` continua, com teste: ela é o que sabe
+dizer que estoque e lotes não batem, e um dia a tela pode voltar a mostrar.
+
+**Documentação que tinha envelhecido:** `docs/modelo-de-dados.md` parava na
+migration `0015` (faltavam `0016`, `0017` e `0018`, incluindo a coluna
+`qtd_pendente_custo`); `docs/instalacao.md` não dizia que o pacote leva OpenSSL
+nem o que o script tira; `CMakePresets.json` dava exemplo de caminho do MSVC num
+projeto que compila com MinGW.
+
+**Observação sem conclusão:** numa das medições, abrir o sistema duas vezes matou
+a instância que já estava aberta (código `0xC0000602`). Repetido duas vezes
+depois, as duas instâncias conviveram. Não há evidência para chamar de defeito —
+fica anotado para olhar se acontecer na loja.

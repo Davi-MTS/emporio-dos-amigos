@@ -1623,19 +1623,6 @@ QVariantMap AppBackend::resumoVencimento()
     return m;
 }
 
-QVariantList AppBackend::divergenciasDeLote()
-{
-    QVariantList lista;
-    for (const auto &d : m_loteRepo.divergencias()) {
-        QVariantMap m;
-        m[QStringLiteral("produto")] = d.produto;
-        m[QStringLiteral("diferenca")] = static_cast<qlonglong>(d.diferenca);
-        m[QStringLiteral("unidade")] = d.unidade;
-        lista.push_back(m);
-    }
-    return lista;
-}
-
 bool AppBackend::registrarInventario(int produtoId, int novaQtdBase, const QString &motivo)
 {
     // Ajuste de inventário reescreve o saldo sem nota nenhuma: é por onde some

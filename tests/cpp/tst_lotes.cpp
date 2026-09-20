@@ -43,6 +43,16 @@ private:
     ProdutoRepository prod() { return ProdutoRepository(m_db.connection()); }
     EstoqueRepository estoque() { return EstoqueRepository(m_db.connection()); }
     LoteRepository lotes() { return LoteRepository(m_db.connection()); }
+    // Soma dos lotes do produto. Vive no teste: em produção ninguém pergunta
+    // isso — o estoque é a fonte da verdade e o lote só diz o que vence antes.
+    qint64 totalEmLotes()
+    {
+        QSqlQuery q(m_db.connection());
+        q.prepare(QStringLiteral(
+            "SELECT COALESCE(SUM(quantidade), 0) FROM lotes WHERE produto_id = :p"));
+        q.bindValue(QStringLiteral(":p"), m_produtoId);
+        return (q.exec() && q.next()) ? q.value(0).toLongLong() : -1;
+    }
     QString emDias(int dias) const
     {
         return QDate::currentDate().addDays(dias).toString(Qt::ISODate);
@@ -87,7 +97,7 @@ void TstLotes::entradaComValidadeCriaLote()
                                     QStringLiteral("L-NOVO")));
 
     QCOMPARE(estoque().item(m_produtoId).quantidade, qint64(30));
-    QCOMPARE(lotes().totalEmLotes(m_produtoId), qint64(30));
+    QCOMPARE(totalEmLotes(), qint64(30));
 
     const auto lista = lotes().listar(-1);
     QCOMPARE(lista.size(), 2);
@@ -141,7 +151,7 @@ void TstLotes::loteZeradoSomeDaLista()
     QCOMPARE(lista.size(), 1);
     QCOMPARE(lista.at(0).codigo, QStringLiteral("L-NOVO"));
     QCOMPARE(lista.at(0).quantidade, qint64(18));
-    QCOMPARE(lotes().totalEmLotes(m_produtoId), qint64(18));
+    QCOMPARE(totalEmLotes(), qint64(18));
     QCOMPARE(estoque().item(m_produtoId).quantidade, qint64(18));
 }
 
@@ -186,7 +196,7 @@ void TstLotes::entradaSemValidadeApareceComoDivergencia()
 // justamente no caminho que a loja usa todo dia.
 void TstLotes::compraComValidadeCriaLote()
 {
-    const qint64 antes = lotes().totalEmLotes(m_produtoId);
+    const qint64 antes = totalEmLotes();
 
     QVariantMap item;
     item[QStringLiteral("produtoId")] = m_produtoId;
@@ -206,7 +216,7 @@ void TstLotes::compraComValidadeCriaLote()
     QVERIFY2(r.value(QStringLiteral("ok")).toBool(),
              qUtf8Printable(r.value(QStringLiteral("erro")).toString()));
 
-    QCOMPARE(lotes().totalEmLotes(m_produtoId), antes + 24);
+    QCOMPARE(totalEmLotes(), antes + 24);
 
     bool achou = false;
     for (const Lote &l : lotes().listar(-1)) {

@@ -41,6 +41,9 @@ Esquema das tabelas, dividido em 3 blocos. Este documento acompanha o schema
 | `0013` | `produtos.dose_de_produto_id` e `dose_quantidade` — dose como produto próprio, ligado à garrafa |
 | `0014` | `produtos.foto` vira BLOB (a coluna antiga guardava caminho de arquivo e nunca foi usada) |
 | `0015` | índice de `lotes(produto_id, data_validade)` — a tabela existia desde o início e passou a ser usada |
+| `0016` | `produto_composicao.produto_padrao_id` e `travada` — o copão tem uma composição padrão, e o preço se ajusta na troca |
+| `0017` | `movimentacoes_estoque.qtd_pendente_custo` — quantas unidades da saída foram vendidas **sem estoque**; a compra seguinte acerta o custo delas |
+| `0018` | `criado_em` de produtos, clientes e usuários convertido para **hora local** (a `0009` só tratou venda, compra e caixa) |
 
 ---
 
@@ -126,6 +129,10 @@ Histórico de todas as movimentações (entrada, saída, ajuste, inventário/que
 - **custo_unit** (int, milésimos de centavo, opcional)  — nas saídas de venda,
   guarda o custo do produto **no momento da venda**. Sem isto, uma compra mais
   cara depois recalcularia o lucro de vendas passadas.
+- **qtd_pendente_custo** (int, migration `0017`)  — nas saídas de venda, quantas
+  unidades saíram **além do saldo** (o PDV vende sem estoque). O custo delas é
+  provisório: quando a mercadoria entra com custo, `acertarCustoPendente` troca
+  o custo dessas unidades pelo da compra, das vendas mais antigas para as novas.
 
 **Aviso de estoque baixo:** consulta — `estoque.quantidade_atual <= produtos.estoque_minimo`.
 

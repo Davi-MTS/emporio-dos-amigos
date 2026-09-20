@@ -65,9 +65,6 @@ public:
 
     ResumoVencimento resumo();
 
-    // Soma dos lotes de um produto (para avisar quando divergir do estoque).
-    qint64 totalEmLotes(int produtoId);
-
     // Produtos cuja soma de lotes não bate com o estoque. Acontece quando parte
     // entrou sem validade, ou depois de um ajuste de inventário — que mexe no
     // saldo mas não sabe de qual remessa tirar.

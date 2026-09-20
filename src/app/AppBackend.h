@@ -132,9 +132,6 @@ public:
     // Lotes com saldo, do que vence primeiro. dias < 0 = todos.
     Q_INVOKABLE QVariantList lotes(int dias = -1);
     Q_INVOKABLE QVariantMap resumoVencimento();
-    // Produtos em que a soma dos lotes não bate com o estoque (entrada sem
-    // validade informada, ou ajuste de inventário).
-    Q_INVOKABLE QVariantList divergenciasDeLote();
     // qtdEmb embalagens de `embalagemId` (0 = unidade base). custoTexto vazio
     // mantém o custo médio atual.
     Q_INVOKABLE bool registrarEntrada(int produtoId, int embalagemId, int qtdEmb,

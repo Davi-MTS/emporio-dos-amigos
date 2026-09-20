@@ -26,10 +26,6 @@ struct ResumoCaixa
     // (que volta como troco) e inflaria o total.
     qint64 totalVendas() const { return totalVendido; }
 
-    // Soma do que foi entregue/registrado por forma (dinheiro inclui o troco).
-    qint64 totalRecebidoPorForma() const {
-        return vendasDinheiro + vendasPix + vendasDebito + vendasCredito + vendasFiado;
-    }
     // Dinheiro que deve estar na gaveta.
     qint64 dinheiroEsperado() const {
         return abertura + vendasDinheiro - troco + suprimentos - sangrias + recebimentos;
