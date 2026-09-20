@@ -1034,3 +1034,22 @@ projeto que compila com MinGW.
 a instância que já estava aberta (código `0xC0000602`). Repetido duas vezes
 depois, as duas instâncias conviveram. Não há evidência para chamar de defeito —
 fica anotado para olhar se acontecer na loja.
+
+### Mensagens curtas (feito)
+
+Pedido do dono: *"quero que essas mensagens sejam breves, tipo: custo pode estar
+errado"*. As mensagens de tela viraram **uma linha**, lida de relance no meio do
+atendimento, mantendo só os números que deixam decidir:
+
+| Antes | Agora |
+| --- | --- |
+| "Custo muito baixo: R$ 3,00 por Caixinha (12 unidades), que vendida rende R$ 54,00. Confira se não é o custo de uma unidade só." | "Custo pode estar errado: R$ 3,00 por Caixinha (12 unidades), que rende R$ 54,00." |
+| "Informe o fator da embalagem "FARDO": quantas unidades cabem nela (unidade avulsa = 1, caixinha de 12 latas = 12)." | "Informe o fator de "FARDO": quantas unidades cabem nela." |
+| "Abra o caixa antes de cancelar esta venda: R$ 18,00 precisa sair da gaveta…" | "Abra o caixa: R$ 18,00 precisa sair da gaveta." |
+| "Seu usuário não pode X." (18 mensagens) | "Sem permissão para X." |
+| "Custo inválido. Escreva só o valor, como 62,90 (ou deixe vazio…)" | "Custo inválido. Ex.: 62,90 (vazio mantém o custo)." |
+
+Regra para as próximas: **uma linha, o número que importa, sem repetir o que o
+botão já diz**. Os testes que conferiam o texto antigo foram ajustados (o
+`tst_custo_aviso.qml` agora procura "pode estar errado") e as imagens do
+relatório foram regeradas — elas mostram as mensagens.

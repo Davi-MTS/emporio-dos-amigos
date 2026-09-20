@@ -366,9 +366,7 @@ bool VendaRepository::cancelarVenda(int vendaId, const QString &motivo, int usua
     // da gaveta sem aparecer em conferência nenhuma (e a tela dizia que
     // "estorna no caixa"). Pede para abrir o caixa antes.
     if (devolver > 0 && sessaoAbertaId <= 0) {
-        m_erro = QStringLiteral("Abra o caixa antes de cancelar esta venda: %1 precisa sair "
-                                "da gaveta para devolver ao cliente, e com o caixa fechado essa "
-                                "saída não entraria em conferência nenhuma.").arg(fmt(devolver));
+        m_erro = QStringLiteral("Abra o caixa: %1 precisa sair da gaveta.").arg(fmt(devolver));
         return false;
     }
 
@@ -503,8 +501,7 @@ bool VendaRepository::cancelarVenda(int vendaId, const QString &motivo, int usua
     }
     m_erro.clear();
     if (devolver > 0)
-        m_aviso = QStringLiteral("Saíram %1 da gaveta (sangria) para devolver ao cliente.")
-                      .arg(fmt(devolver));
+        m_aviso = QStringLiteral("Saíram %1 da gaveta para devolver ao cliente.").arg(fmt(devolver));
     return true;
 }
 

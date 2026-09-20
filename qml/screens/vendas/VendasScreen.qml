@@ -331,7 +331,7 @@ Rectangle {
                         if (r.ok && r.aviso && r.aviso.length > 0) {
                             // Fica aberto mostrando a sangria lançada.
                             detalheDialog.cancelada = true;
-                            detalheDialog.aviso = qsTr("Venda cancelada. ") + r.aviso;
+                            detalheDialog.aviso = qsTr("Cancelada. ") + r.aviso;
                             tela.carregar();
                         } else if (r.ok) { detalheDialog.close(); tela.carregar(); }
                         else erroDet.text = r.erro;

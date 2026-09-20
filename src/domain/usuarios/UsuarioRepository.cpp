@@ -102,8 +102,7 @@ bool UsuarioRepository::salvar(Usuario &usuario, const QString &senhaNova)
     // Tirar o perfil de Administrador do ÚNICO administrador deixava a loja
     // sem ninguém capaz de entrar em Usuários, Backup e Financeiro.
     if (usuario.id > 0 && usuario.perfilId != 1 && ehUnicoAdministrador(usuario.id)) {
-        m_erro = QStringLiteral("Este é o único administrador. Promova outro usuário a "
-                                "Administrador antes de mudar o perfil deste.");
+        m_erro = QStringLiteral("É o único administrador. Promova outro antes.");
         return false;
     }
 
@@ -153,7 +152,7 @@ bool UsuarioRepository::ehUnicoAdministrador(int id)
 bool UsuarioRepository::inativar(int id)
 {
     if (ehUnicoAdministrador(id)) {
-        m_erro = QStringLiteral("Este é o único administrador e não pode ser desativado.");
+        m_erro = QStringLiteral("É o único administrador — não dá para desativar.");
         return false;
     }
     QSqlQuery q(m_db);

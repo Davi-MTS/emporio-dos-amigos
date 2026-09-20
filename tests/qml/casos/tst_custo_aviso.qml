@@ -65,7 +65,7 @@ TestCase {
         var dlg = abrirCompraComCaixinha("3,00");
         var aviso = findChild(dlg.contentItem, "avisoCusto");
         verify(aviso.visible, "o aviso não apareceu para custo de 1 lata na caixinha");
-        verify(aviso.text.indexOf("muito baixo") >= 0, aviso.text);
+        verify(aviso.text.indexOf("pode estar errado") >= 0, aviso.text);
 
         var antes = App.estoqueDisponivel(produtoId);
         var botao = findChild(dlg, "registrarCompra");
@@ -119,7 +119,7 @@ TestCase {
 
         var aviso = findChild(dlg, "avisoCustoEntrada");
         verify(aviso.visible, "o aviso não apareceu para custo da caixinha na lata");
-        verify(aviso.text.indexOf("maior que o preço de venda") >= 0, aviso.text);
+        verify(aviso.text.indexOf("pode estar errado") >= 0, aviso.text);
 
         var antes = App.estoqueDisponivel(produtoId);
         var botao = findChild(dlg, "confirmarMovimento");

@@ -204,7 +204,7 @@ QVariantMap AppBackend::novoUsuario()
 bool AppBackend::salvarUsuario(const QVariantMap &dados, const QString &senha)
 {
     if (!temPermissao(QStringLiteral("gerencia_usuarios"))) {
-        m_erro = tr("Seu usuário não pode cadastrar usuários.");
+        m_erro = tr("Sem permissão para cadastrar usuários.");
         return false;
     }
     Usuario u;
@@ -224,7 +224,7 @@ bool AppBackend::salvarUsuario(const QVariantMap &dados, const QString &senha)
 bool AppBackend::inativarUsuario(int id)
 {
     if (!temPermissao(QStringLiteral("gerencia_usuarios"))) {
-        m_erro = tr("Seu usuário não pode desativar usuários.");
+        m_erro = tr("Sem permissão para desativar usuários.");
         return false;
     }
     if (id == m_usuarioId) {
@@ -305,7 +305,7 @@ QVariantMap AppBackend::novoFornecedor()
 bool AppBackend::salvarFornecedor(const QVariantMap &dados)
 {
     if (!temPermissao(QStringLiteral("ve_financeiro"))) {
-        m_erro = tr("Seu usuário não pode cadastrar fornecedores.");
+        m_erro = tr("Sem permissão para cadastrar fornecedores.");
         return false;
     }
     Fornecedor f;
@@ -339,8 +339,7 @@ bool AppBackend::_fatorDoCadastro(int produtoId, int embalagemId, int fatorDaTel
     }
     const auto doCadastro = m_produtoRepo.fatorDaEmbalagem(produtoId, embalagemId);
     if (!doCadastro) {
-        m_erro = tr("A embalagem escolhida não pertence a este produto. "
-                    "Escolha a embalagem de novo.");
+        m_erro = tr("Essa embalagem não é deste produto. Escolha a embalagem de novo.");
         return false;
     }
     // A tela manda o fator só por conveniência; o que vale é o cadastro. Se
@@ -359,7 +358,7 @@ bool AppBackend::_fatorDoCadastro(int produtoId, int embalagemId, int fatorDaTel
 QVariantMap AppBackend::registrarCompra(const QVariantMap &dados)
 {
     if (!temPermissao(QStringLiteral("ve_financeiro"))) {
-        m_erro = tr("Seu usuário não pode registrar compras.");
+        m_erro = tr("Sem permissão para registrar compras.");
         QVariantMap out;
         out[QStringLiteral("ok")] = false;
         out[QStringLiteral("erro")] = m_erro;
@@ -628,7 +627,7 @@ QVariantMap AppBackend::resumoFinanceiro()
 bool AppBackend::pagarConta(int id, const QString &forma)
 {
     if (!temPermissao(QStringLiteral("ve_financeiro"))) {
-        m_erro = tr("Seu usuário não pode pagar contas.");
+        m_erro = tr("Sem permissão para pagar contas.");
         return false;
     }
     // Lê valor/descrição antes de pagar (para lançar a sangria, se em dinheiro).
@@ -722,7 +721,7 @@ QVariantMap AppBackend::estornarPagamento(int id)
     out[QStringLiteral("ok")] = false;
 
     if (!temPermissao(QStringLiteral("ve_financeiro"))) {
-        out[QStringLiteral("erro")] = tr("Seu usuário não pode estornar pagamentos.");
+        out[QStringLiteral("erro")] = tr("Sem permissão para estornar.");
         m_erro = out.value(QStringLiteral("erro")).toString();
         return out;
     }
@@ -789,7 +788,7 @@ QVariantMap AppBackend::excluirDespesa(int id)
     out[QStringLiteral("ok")] = false;
 
     if (!temPermissao(QStringLiteral("ve_financeiro"))) {
-        out[QStringLiteral("erro")] = tr("Seu usuário não pode excluir despesas.");
+        out[QStringLiteral("erro")] = tr("Sem permissão para excluir despesas.");
         m_erro = out.value(QStringLiteral("erro")).toString();
         return out;
     }
@@ -862,7 +861,7 @@ bool AppBackend::criarDespesa(const QString &descricao, const QString &valorText
                               const QString &vencimento)
 {
     if (!temPermissao(QStringLiteral("ve_financeiro"))) {
-        m_erro = tr("Seu usuário não pode lançar despesas.");
+        m_erro = tr("Sem permissão para lançar despesas.");
         return false;
     }
     const auto v = Money::parse(valorTexto);
@@ -1046,7 +1045,7 @@ QVariantList AppBackend::produtosParaOrigemDose(int excluirId)
 int AppBackend::criarCategoria(const QString &nome)
 {
     if (!temPermissao(QStringLiteral("edita_produto"))) {
-        m_erro = tr("Seu usuário não pode criar categorias.");
+        m_erro = tr("Sem permissão para criar categorias.");
         return 0;
     }
     const int id = m_produtoRepo.criarCategoria(nome);
@@ -1226,7 +1225,7 @@ bool AppBackend::salvarProduto(const QVariantMap &dados)
     // A tela já desabilita os botões, mas a trava real fica aqui: assim vale
     // para qualquer caminho e não depende de a UI ter lembrado de conferir.
     if (!temPermissao(QStringLiteral("edita_produto"))) {
-        m_erro = tr("Seu usuário não pode cadastrar ou alterar produtos.");
+        m_erro = tr("Sem permissão para alterar produtos.");
         return false;
     }
 
@@ -1284,7 +1283,7 @@ bool AppBackend::salvarProduto(const QVariantMap &dados)
 bool AppBackend::inativarProduto(int id)
 {
     if (!temPermissao(QStringLiteral("edita_produto"))) {
-        m_erro = tr("Seu usuário não pode inativar produtos.");
+        m_erro = tr("Sem permissão para inativar produtos.");
         return false;
     }
     if (!m_produtoRepo.inativar(id)) {
@@ -1303,7 +1302,7 @@ QVariantMap AppBackend::definirFotoProduto(int produtoId, const QString &caminho
     out[QStringLiteral("ok")] = false;
 
     if (!temPermissao(QStringLiteral("edita_produto"))) {
-        out[QStringLiteral("erro")] = tr("Seu usuário não pode alterar produtos.");
+        out[QStringLiteral("erro")] = tr("Sem permissão para alterar produtos.");
         return out;
     }
     if (produtoId <= 0) {
@@ -1321,9 +1320,8 @@ QVariantMap AppBackend::definirFotoProduto(int produtoId, const QString &caminho
         const QString ext = QFileInfo(caminhoArquivo).suffix().toLower();
         if (ext == QLatin1String("heic") || ext == QLatin1String("heif")) {
             out[QStringLiteral("erro")] =
-                tr("Foto de iPhone no formato HEIC, que o sistema não abre. "
-                   "No celular: Ajustes → Câmera → Formatos → Mais Compatível. "
-                   "As fotos novas já saem em JPEG.");
+                tr("Foto HEIC do iPhone. No celular: Ajustes → Câmera → Formatos → "
+                   "Mais Compatível.");
         } else {
             out[QStringLiteral("erro")] =
                 tr("Não consegui ler a imagem (%1).").arg(leitor.errorString());
@@ -1340,7 +1338,7 @@ QVariantMap AppBackend::colarFotoProduto(int produtoId)
     out[QStringLiteral("ok")] = false;
 
     if (!temPermissao(QStringLiteral("edita_produto"))) {
-        out[QStringLiteral("erro")] = tr("Seu usuário não pode alterar produtos.");
+        out[QStringLiteral("erro")] = tr("Sem permissão para alterar produtos.");
         return out;
     }
     if (produtoId <= 0) {
@@ -1402,7 +1400,7 @@ QVariantMap AppBackend::_gravarFoto(int produtoId, const QImage &original)
 bool AppBackend::removerFotoProduto(int produtoId)
 {
     if (!temPermissao(QStringLiteral("edita_produto"))) {
-        m_erro = tr("Seu usuário não pode alterar produtos.");
+        m_erro = tr("Sem permissão para alterar produtos.");
         return false;
     }
     if (!m_produtoRepo.removerFoto(produtoId)) {
@@ -1517,17 +1515,17 @@ QVariantMap AppBackend::avaliarCusto(int produtoId, int embalagemId, const QStri
     const QString emb = fator > 1
         ? tr("%1 (%2 %3)").arg(nomeEmb).arg(fator).arg(unidades)
         : nomeEmb;
+    // Mensagem de uma linha: o operador lê de relance, no meio do atendimento.
+    // Os dois números (o que pagou × o que rende) são o que deixa ele decidir.
     if (custo > rende) {
         out[QStringLiteral("nivel")] = QStringLiteral("alto");
         out[QStringLiteral("mensagem")] =
-            tr("Custo maior que o preço de venda: %1 por %2, que vendida rende %3. "
-               "Confira o valor e a embalagem.")
+            tr("Custo pode estar errado: %1 por %2, que rende %3.")
                 .arg(Money::format(custo), emb, Money::format(rende));
     } else if (custo * 10 < rende) {
         out[QStringLiteral("nivel")] = QStringLiteral("baixo");
         out[QStringLiteral("mensagem")] =
-            tr("Custo muito baixo: %1 por %2, que vendida rende %3. "
-               "Confira se não é o custo de uma unidade só.")
+            tr("Custo pode estar errado: %1 por %2, que rende %3.")
                 .arg(Money::format(custo), emb, Money::format(rende));
     }
     return out;
@@ -1538,7 +1536,7 @@ bool AppBackend::registrarEntrada(int produtoId, int embalagemId, int qtdEmb,
                                   const QString &validade, const QString &codigoLote)
 {
     if (!temPermissao(QStringLiteral("recebe_mercadoria"))) {
-        m_erro = tr("Seu usuário não pode dar entrada de mercadoria.");
+        m_erro = tr("Sem permissão para dar entrada.");
         return false;
     }
 
@@ -1546,7 +1544,7 @@ bool AppBackend::registrarEntrada(int produtoId, int embalagemId, int qtdEmb,
     // era conferida depois: a mercadoria entrava, a tela mostrava erro, e quem
     // tentava de novo dava entrada duas vezes.
     if (!dataIsoValidaOuVazia(validade)) {
-        m_erro = tr("Validade inválida. Use o formato dd/mm/aaaa.");
+        m_erro = tr("Validade inválida (dd/mm/aaaa).");
         return false;
     }
     // Fator do cadastro, e só de embalagem deste produto (igual à compra e à
@@ -1565,8 +1563,7 @@ bool AppBackend::registrarEntrada(int produtoId, int embalagemId, int qtdEmb,
     if (!ct.isEmpty()) {
         const auto cents = Money::parse(ct);
         if (!cents || *cents < 0) {
-            m_erro = tr("Custo inválido. Escreva só o valor, como 62,90 "
-                        "(ou deixe vazio para manter o custo).");
+            m_erro = tr("Custo inválido. Ex.: 62,90 (vazio mantém o custo).");
             return false;
         }
         custoUnitBaseMilli = *cents * 1000 / fator;
@@ -1628,7 +1625,7 @@ bool AppBackend::registrarInventario(int produtoId, int novaQtdBase, const QStri
     // Ajuste de inventário reescreve o saldo sem nota nenhuma: é por onde some
     // mercadoria sem deixar rastro. Só quem tem "ajusta_estoque".
     if (!temPermissao(QStringLiteral("ajusta_estoque"))) {
-        m_erro = tr("Seu usuário não pode ajustar o estoque por inventário.");
+        m_erro = tr("Sem permissão para inventário.");
         return false;
     }
 
@@ -1647,7 +1644,7 @@ bool AppBackend::registrarRetirada(int produtoId, int embalagemId, int qtdEmb,
 {
     // Retirada tira mercadoria fora da venda (quebra, consumo, brinde).
     if (!temPermissao(QStringLiteral("ajusta_estoque"))) {
-        m_erro = tr("Seu usuário não pode registrar retirada de estoque.");
+        m_erro = tr("Sem permissão para retirada.");
         return false;
     }
 
@@ -1683,8 +1680,7 @@ bool AppBackend::abrirCaixa(const QString &valorAberturaTexto)
     if (!t.isEmpty()) {
         const auto v = Money::parse(t);
         if (!v || *v < 0) {
-            m_erro = tr("Troco inicial inválido. Escreva só o valor, como 100,00 "
-                        "(ou deixe vazio para abrir sem troco).");
+            m_erro = tr("Troco inicial inválido. Ex.: 100,00 (vazio abre sem troco).");
             return false;
         }
         valor = *v;
@@ -1831,9 +1827,8 @@ QVariantMap AppBackend::finalizarVenda(const QVariantMap &dados)
             if (calculado > 0 && l.precoUnit != calculado) {
                 QVariantMap out;
                 out[QStringLiteral("ok")] = false;
-                out[QStringLiteral("erro")] = tr("O preço de \"%1\" foi alterado (calculado: %2). "
-                                                 "Seu usuário não pode mudar preço. "
-                                                 "Chame o responsável.")
+                out[QStringLiteral("erro")] = tr("Sem permissão para mudar preço de \"%1\" "
+                                                 "(calculado: %2). Chame o responsável.")
                                                   .arg(pr->nome, Money::format(calculado));
                 m_erro = out.value(QStringLiteral("erro")).toString();
                 return out;
@@ -1851,8 +1846,7 @@ QVariantMap AppBackend::finalizarVenda(const QVariantMap &dados)
         if (desconto > 0 || descontoItens > 0) {
             QVariantMap out;
             out[QStringLiteral("ok")] = false;
-            out[QStringLiteral("erro")] = tr("Seu usuário não pode dar desconto. "
-                                             "Chame o responsável.");
+            out[QStringLiteral("erro")] = tr("Sem permissão para desconto. Chame o responsável.");
             m_erro = out.value(QStringLiteral("erro")).toString();
             return out;
         }
@@ -1902,7 +1896,7 @@ QVariantMap AppBackend::cancelarVenda(int vendaId, const QString &motivo)
     QVariantMap out;
     if (!temPermissao(QStringLiteral("pode_cancelar_venda"))) {
         out[QStringLiteral("ok")] = false;
-        out[QStringLiteral("erro")] = QStringLiteral("Você não tem permissão para cancelar vendas.");
+        out[QStringLiteral("erro")] = QStringLiteral("Sem permissão para cancelar vendas.");
         return out;
     }
     if (motivo.trimmed().isEmpty()) {
@@ -1991,8 +1985,7 @@ QVariantMap AppBackend::fecharCaixa(const QString &dinheiroContadoTexto)
     if (!v || *v < 0) {
         QVariantMap erro;
         erro[QStringLiteral("ok")] = false;
-        erro[QStringLiteral("erro")] = tr("Valor contado inválido. Escreva só o valor, "
-                                          "como 250,00.");
+        erro[QStringLiteral("erro")] = tr("Valor contado inválido. Ex.: 250,00.");
         m_erro = erro.value(QStringLiteral("erro")).toString();
         return erro;
     }
@@ -2046,7 +2039,7 @@ QVariantMap AppBackend::fecharCaixa(const QString &dinheiroContadoTexto)
 QVariantMap AppBackend::fazerBackup()
 {
     if (!temPermissao(QStringLiteral("gerencia_usuarios"))) {
-        m_erro = tr("Seu usuário não pode fazer backup.");
+        m_erro = tr("Sem permissão para fazer backup.");
         QVariantMap out;
         out[QStringLiteral("ok")] = false;
         out[QStringLiteral("erro")] = m_erro;
@@ -2105,7 +2098,7 @@ QVariantMap AppBackend::conferirArquivoBackup(const QString &caminho)
 QVariantMap AppBackend::agendarRestauracao(const QString &caminho)
 {
     if (!temPermissao(QStringLiteral("gerencia_usuarios"))) {
-        m_erro = tr("Seu usuário não pode restaurar backup.");
+        m_erro = tr("Sem permissão para restaurar backup.");
         QVariantMap out;
         out[QStringLiteral("ok")] = false;
         out[QStringLiteral("erro")] = m_erro;
@@ -2182,7 +2175,7 @@ void AppBackend::salvarConfigTelegram(const QString &token, const QString &chatI
                                       bool ativo, bool enviaBackup)
 {
     if (!temPermissao(QStringLiteral("gerencia_usuarios"))) {
-        m_erro = tr("Seu usuário não pode mudar o Telegram.");
+        m_erro = tr("Sem permissão para mudar o Telegram.");
         return;
     }
     m_telegram.salvarConfig(token, chatId, ativo, enviaBackup);

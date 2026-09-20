@@ -30,9 +30,9 @@ ApplicationWindow {
     title: "Empório dos Amigos — não foi possível abrir"
     Column {
         anchors.fill: parent; anchors.margins: 24; spacing: 14
-        Label { text: "O sistema não conseguiu abrir o banco de dados."; font.pixelSize: 18; font.bold: true; width: parent.width; wrapMode: Text.WordWrap }
+        Label { text: "Não consegui abrir o banco de dados."; font.pixelSize: 18; font.bold: true; width: parent.width; wrapMode: Text.WordWrap }
         Label { text: motivoFalha; width: parent.width; wrapMode: Text.WordWrap }
-        Label { text: "Nada foi apagado. Feche este aviso e tente abrir de novo. Se continuar, envie o arquivo sistema.log desta pasta para o suporte:
+        Label { text: "Nada foi apagado. Tente abrir de novo. Se continuar, mande o sistema.log desta pasta:
 " + pastaLog; width: parent.width; wrapMode: Text.WordWrap }
         Button { text: "Fechar"; onClicked: Qt.quit() }
     }

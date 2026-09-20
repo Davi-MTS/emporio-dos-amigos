@@ -166,7 +166,7 @@
 
 <section>
   <h2>As correções, uma a uma</h2>
-  <p class="chamada">Cada imagem abaixo é a tela do programa de verdade, fotografada com o sistema rodando — não é desenho.</p>
+  <p class="chamada">Cada imagem abaixo é a tela do programa de verdade, fotografada com o sistema rodando — não é desenho. Os avisos cabem em uma linha, para serem lidos de relance no meio do atendimento.</p>
 
   <article class="correcao">
     <p class="indice">Correção 1 · Cadastro</p>
@@ -177,7 +177,7 @@
     </div>
     <figure>
       <img src="relatorio/img/fix-01-fator-obrigatorio.png" alt="Tela de Produtos com a embalagem FARDO sem fator e a mensagem pedindo o fator">
-      <figcaption>Tentativa de salvar o FARDO sem fator: <b>“Informe o fator da embalagem ‘FARDO’: quantas unidades cabem nela (unidade avulsa = 1, caixinha de 12 latas = 12).”</b></figcaption>
+      <figcaption>Tentativa de salvar o FARDO sem fator: <b>“Informe o fator de ‘FARDO’: quantas unidades cabem nela.”</b></figcaption>
     </figure>
     <p class="prova">Verificado por <code>tst_produto_repository::fatorDeEmbalagemConferido</code> e <code>tst_correcoes.qml</code> — o teste falha com o código antigo.</p>
   </article>
@@ -191,7 +191,7 @@
     </div>
     <figure>
       <img src="relatorio/img/fix-02-fator-ambiguo.png" alt="Mensagem recusando duas embalagens com o mesmo fator e preços diferentes">
-      <figcaption><b>“As embalagens ‘Unidade’ e ‘FARDO’ estão com o mesmo fator (1) e preços diferentes. Confira o fator: uma caixinha de 12 tem fator 12, não 1.”</b></figcaption>
+      <figcaption><b>“‘Unidade’ e ‘FARDO’ com o mesmo fator (1) e preços diferentes. Confira o fator.”</b></figcaption>
     </figure>
   </article>
 
@@ -204,11 +204,11 @@
     </div>
     <figure>
       <img src="relatorio/img/fix-03-aviso-custo-compra.png" alt="Compra com aviso de custo muito baixo e botão Registrar mesmo assim">
-      <figcaption>Caixinha de 12 lançada a R$ 3,00: <b>“Custo muito baixo: R$ 3,00 por Caixinha (12 unidades), que vendida rende R$ 54,00.”</b> O botão vira <b>“Registrar mesmo assim”</b>.</figcaption>
+      <figcaption>Caixinha de 12 lançada a R$ 3,00: <b>“Custo pode estar errado: R$ 3,00 por Caixinha (12 unidades), que rende R$ 54,00.”</b> O botão vira <b>“Registrar mesmo assim”</b>.</figcaption>
     </figure>
     <figure>
       <img src="relatorio/img/fix-05-aviso-custo-entrada.png" alt="Entrada de estoque com aviso de custo maior que o preço de venda">
-      <figcaption>O mesmo na Entrada de estoque, no caso inverso: <b>“Custo maior que o preço de venda: R$ 52,00 por Unidade, que vendida rende R$ 4,50.”</b></figcaption>
+      <figcaption>O mesmo na Entrada de estoque, no caso inverso: <b>“Custo pode estar errado: R$ 52,00 por Unidade, que rende R$ 4,50.”</b></figcaption>
     </figure>
     <p class="prova">Verificado por <code>tst_custo_aviso.qml</code> (6 casos) e pela bateria geral — no banco da loja, essa faixa pegou exatamente os custos errados e nenhum custo certo.</p>
   </article>
@@ -249,7 +249,7 @@
     </div>
     <figure>
       <img src="relatorio/img/fix-07-desativar-cliente.png" alt="Confirmação de desativar cliente mostrando a dívida">
-      <figcaption><b>“Ele ainda deve R$ 45,00. A dívida continua no Financeiro → A receber, mas não aparece mais nesta tela.”</b></figcaption>
+      <figcaption><b>“Deve R$ 45,00 — a dívida fica no Financeiro → A receber.”</b></figcaption>
     </figure>
   </article>
 
@@ -262,7 +262,7 @@
     </div>
     <figure>
       <img src="relatorio/img/fix-08-cancelar-fiado-pago.png" alt="Venda cancelada com aviso de que R$ 18,00 saíram da gaveta">
-      <figcaption><b>“Venda cancelada. Saíram R$ 18,00 da gaveta (sangria) para devolver ao cliente.”</b></figcaption>
+      <figcaption><b>“Cancelada. Saíram R$ 18,00 da gaveta para devolver ao cliente.”</b></figcaption>
     </figure>
     <p class="prova">Junto veio outra trava: cancelar venda de <b>outro dia com o caixa fechado</b> tirava dinheiro da gaveta sem registro em turno nenhum. Agora o sistema pede para abrir o caixa antes. Venda paga só em Pix ou cartão cancela normalmente.</p>
   </article>

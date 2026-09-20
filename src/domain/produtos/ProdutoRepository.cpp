@@ -400,10 +400,9 @@ bool ProdutoRepository::salvarEmbalagens(Produto &produto)
     for (const Embalagem &e : produto.embalagens) {
         if (e.fator <= 0) {
             const QString cabem = produto.unidadeBase == QStringLiteral("unidade")
-                                      ? QStringLiteral("quantas unidades cabem nela")
-                                      : QStringLiteral("quantos %1 cabem nela").arg(produto.unidadeBase);
-            m_erro = QStringLiteral("Informe o fator da embalagem \"%1\": %2 "
-                                    "(unidade avulsa = 1, caixinha de 12 latas = 12).")
+                                      ? QStringLiteral("unidades")
+                                      : produto.unidadeBase;
+            m_erro = QStringLiteral("Informe o fator de \"%1\": quantas %2 cabem nela.")
                          .arg(e.nome, cabem);
             return false;
         }
@@ -413,9 +412,8 @@ bool ProdutoRepository::salvarEmbalagens(Produto &produto)
             const Embalagem &a = produto.embalagens.at(i);
             const Embalagem &b = produto.embalagens.at(j);
             if (a.fator == b.fator && a.precoVenda != b.precoVenda) {
-                m_erro = QStringLiteral("As embalagens \"%1\" e \"%2\" estão com o mesmo fator "
-                                        "(%3) e preços diferentes. Confira o fator: uma "
-                                        "caixinha de 12 tem fator 12, não 1.")
+                m_erro = QStringLiteral("\"%1\" e \"%2\" com o mesmo fator (%3) e preços "
+                                        "diferentes. Confira o fator.")
                              .arg(a.nome, b.nome).arg(a.fator);
                 return false;
             }

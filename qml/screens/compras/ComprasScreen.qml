@@ -217,8 +217,7 @@ Rectangle {
                 }
                 if (estranhos.length > 0) {
                     custoConferido = true;
-                    erroCompra.text = qsTr("Custo fora do normal em: %1. Confira os avisos acima; se estiver certo, clique em “Registrar mesmo assim”.")
-                                      .arg(estranhos.join(", "));
+                    erroCompra.text = qsTr("Confira o custo de: %1.").arg(estranhos.join(", "));
                     return;
                 }
             }
