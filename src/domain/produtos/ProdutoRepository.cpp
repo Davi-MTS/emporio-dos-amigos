@@ -399,11 +399,7 @@ bool ProdutoRepository::salvarEmbalagens(Produto &produto)
     //    barras para a mesma unidade.)
     for (const Embalagem &e : produto.embalagens) {
         if (e.fator <= 0) {
-            const QString cabem = produto.unidadeBase == QStringLiteral("unidade")
-                                      ? QStringLiteral("unidades")
-                                      : produto.unidadeBase;
-            m_erro = QStringLiteral("Informe o fator de \"%1\": quantas %2 cabem nela.")
-                         .arg(e.nome, cabem);
+            m_erro = QStringLiteral("Informe o fator de \"%1\"").arg(e.nome);
             return false;
         }
     }
@@ -412,9 +408,8 @@ bool ProdutoRepository::salvarEmbalagens(Produto &produto)
             const Embalagem &a = produto.embalagens.at(i);
             const Embalagem &b = produto.embalagens.at(j);
             if (a.fator == b.fator && a.precoVenda != b.precoVenda) {
-                m_erro = QStringLiteral("\"%1\" e \"%2\" com o mesmo fator (%3) e preços "
-                                        "diferentes. Confira o fator.")
-                             .arg(a.nome, b.nome).arg(a.fator);
+                m_erro = QStringLiteral("\"%1\" e \"%2\" com o mesmo fator")
+                             .arg(a.nome, b.nome);
                 return false;
             }
         }

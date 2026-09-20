@@ -247,7 +247,7 @@ Rectangle {
             var txt = ("" + e.precoTexto).trim();
             var cents = txt.length === 0 ? 0 : App.parseDinheiro(txt);
             if (cents < 0) {
-                erroLabel.text = qsTr("Preço inválido em \"%1\". Ex.: 4,50.").arg(e.nome);
+                erroLabel.text = qsTr("Preço inválido em \"%1\"").arg(e.nome);
                 abasProduto.currentIndex = 1;
                 return;
             }

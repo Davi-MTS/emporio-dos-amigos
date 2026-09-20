@@ -22,11 +22,11 @@ ResultadoVenda VendaRepository::registrarVenda(int sessaoId, int clienteId,
     ResultadoVenda res;
 
     if (sessaoId <= 0) {
-        res.erro = QStringLiteral("Nenhum caixa aberto.");
+        res.erro = QStringLiteral("Nenhum caixa aberto");
         return res;
     }
     if (itens.isEmpty()) {
-        res.erro = QStringLiteral("A venda não tem itens.");
+        res.erro = QStringLiteral("Venda sem itens");
         return res;
     }
     // Quantidade zero ou negativa DEVOLVERIA mercadoria ao estoque como se
@@ -34,18 +34,18 @@ ResultadoVenda VendaRepository::registrarVenda(int sessaoId, int clienteId,
     // regra que protege o estoque e o caixa fica aqui.
     for (const LinhaVenda &l : itens) {
         if (l.qtdEmbalagem <= 0 || l.precoUnit < 0 || l.desconto < 0) {
-            res.erro = QStringLiteral("Item da venda com quantidade ou valor inválido.");
+            res.erro = QStringLiteral("Quantidade ou valor inválido");
             return res;
         }
     }
     for (const PagamentoVenda &p : pagamentos) {
         if (p.valor <= 0) {
-            res.erro = QStringLiteral("Pagamento com valor inválido.");
+            res.erro = QStringLiteral("Pagamento inválido");
             return res;
         }
     }
     if (descontoGeral < 0) {
-        res.erro = QStringLiteral("Desconto inválido.");
+        res.erro = QStringLiteral("Desconto inválido");
         return res;
     }
 
@@ -68,7 +68,7 @@ ResultadoVenda VendaRepository::registrarVenda(int sessaoId, int clienteId,
             temFiado = true;
     }
     if (temFiado && clienteId <= 0) {
-        res.erro = QStringLiteral("Venda no fiado exige um cliente.");
+        res.erro = QStringLiteral("Fiado exige cliente");
         return res;
     }
     if (temFiado) {
@@ -96,16 +96,16 @@ ResultadoVenda VendaRepository::registrarVenda(int sessaoId, int clienteId,
                 saldo = q.value(0).toLongLong();
         }
         if (limite <= 0) {
-            res.erro = QStringLiteral("Cliente sem limite de fiado.");
+            res.erro = QStringLiteral("Cliente sem limite de fiado");
             return res;
         }
         if (saldo + fiadoTotal > limite) {
-            res.erro = QStringLiteral("Limite de fiado excedido.");
+            res.erro = QStringLiteral("Limite de fiado excedido");
             return res;
         }
     }
     if (pago < total) {
-        res.erro = QStringLiteral("Pagamento insuficiente.");
+        res.erro = QStringLiteral("Pagamento insuficiente");
         return res;
     }
 
@@ -179,7 +179,7 @@ ResultadoVenda VendaRepository::registrarVenda(int sessaoId, int clienteId,
         if (composto && l.insumos.isEmpty()) {
             // Composto sem receita resolvida é erro: não dá para adivinhar qual
             // produto sai do estoque.
-            res.erro = QStringLiteral("Escolha os insumos do produto composto.");
+            res.erro = QStringLiteral("Escolha os insumos");
             m_db.rollback();
             return res;
         }
@@ -316,11 +316,11 @@ bool VendaRepository::cancelarVenda(int vendaId, const QString &motivo, int usua
         q.prepare(QStringLiteral("SELECT status, sessao_id FROM vendas WHERE id = :id"));
         q.bindValue(QStringLiteral(":id"), vendaId);
         if (!q.exec() || !q.next()) {
-            m_erro = QStringLiteral("Venda não encontrada.");
+            m_erro = QStringLiteral("Venda não encontrada");
             return false;
         }
         if (q.value(0).toString() != QStringLiteral("concluida")) {
-            m_erro = QStringLiteral("Esta venda já foi cancelada.");
+            m_erro = QStringLiteral("Venda já cancelada");
             return false;
         }
         sessaoDaVenda = q.value(1).toInt();
@@ -366,7 +366,7 @@ bool VendaRepository::cancelarVenda(int vendaId, const QString &motivo, int usua
     // da gaveta sem aparecer em conferência nenhuma (e a tela dizia que
     // "estorna no caixa"). Pede para abrir o caixa antes.
     if (devolver > 0 && sessaoAbertaId <= 0) {
-        m_erro = QStringLiteral("Abra o caixa: %1 precisa sair da gaveta.").arg(fmt(devolver));
+        m_erro = QStringLiteral("Abra o caixa para cancelar");
         return false;
     }
 
@@ -501,7 +501,7 @@ bool VendaRepository::cancelarVenda(int vendaId, const QString &motivo, int usua
     }
     m_erro.clear();
     if (devolver > 0)
-        m_aviso = QStringLiteral("Saíram %1 da gaveta para devolver ao cliente.").arg(fmt(devolver));
+        m_aviso = QStringLiteral("Saíram %1 da gaveta").arg(fmt(devolver));
     return true;
 }
 

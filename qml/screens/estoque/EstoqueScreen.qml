@@ -510,7 +510,7 @@ Rectangle {
                         var ok;
                         if (tabs.currentIndex === 0 && movDialog.temAvisoCusto && !movDialog.custoConferido) {
                             movDialog.custoConferido = true;
-                            erro.text = qsTr("Confira o custo acima.");
+                            erro.text = qsTr("Confira o custo");
                             return;
                         }
                         if (tabs.currentIndex === 0)

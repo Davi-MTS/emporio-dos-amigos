@@ -346,8 +346,7 @@ Rectangle {
                 wrapMode: Text.WordWrap
                 color: Theme.warning
                 font.pixelSize: Theme.fontSm
-                text: qsTr("Deve %1 — a dívida fica no Financeiro → A receber.")
-                      .arg(App.formatarDinheiro(confirmarDesativar.saldo))
+                text: qsTr("Ainda deve %1").arg(App.formatarDinheiro(confirmarDesativar.saldo))
             }
             RowLayout {
                 Layout.fillWidth: true

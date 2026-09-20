@@ -128,7 +128,7 @@ void TstMensagens::mensagemDoProprioSistemaPassaIntacta()
     u[QStringLiteral("login")] = QStringLiteral("dono");
     u[QStringLiteral("perfilId")] = 2;
     QVERIFY(!m_app->salvarUsuario(u, QStringLiteral("senha12345")));
-    QCOMPARE(m_app->ultimoErro(), QStringLiteral("Já existe um usuário com esse login."));
+    QCOMPARE(m_app->ultimoErro(), QStringLiteral("Login já existe"));
 }
 
 // Datas no banco sao SEMPRE ISO: e assim que o SQLite compara. Uma conta
@@ -140,7 +140,9 @@ void TstMensagens::dataForaDoPadraoNaoEntraNoBanco()
     QVERIFY2(!m_app->criarDespesa(QStringLiteral("Aluguel"), QStringLiteral("100,00"),
                                   QStringLiteral("20260829")),
              "data colada nao pode entrar");
-    QVERIFY(m_app->ultimoErro().contains(QStringLiteral("dd/mm/aaaa")));
+    // A mensagem é curta ("Vencimento inválido"): o formato aceito está escrito
+    // no próprio campo da tela, com máscara dd/mm/aaaa.
+    QCOMPARE(m_app->ultimoErro(), QStringLiteral("Vencimento inválido"));
 
     // Data que nao existe.
     QVERIFY(!m_app->criarDespesa(QStringLiteral("Aluguel"), QStringLiteral("100,00"),

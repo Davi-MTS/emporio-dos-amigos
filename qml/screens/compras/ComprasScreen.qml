@@ -217,7 +217,7 @@ Rectangle {
                 }
                 if (estranhos.length > 0) {
                     custoConferido = true;
-                    erroCompra.text = qsTr("Confira o custo de: %1.").arg(estranhos.join(", "));
+                    erroCompra.text = qsTr("Confira o custo");
                     return;
                 }
             }

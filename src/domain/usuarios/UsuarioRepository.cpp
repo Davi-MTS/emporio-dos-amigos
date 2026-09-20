@@ -91,18 +91,18 @@ std::optional<Usuario> UsuarioRepository::obter(int id)
 bool UsuarioRepository::salvar(Usuario &usuario, const QString &senhaNova)
 {
     if (usuario.nome.trimmed().isEmpty() || usuario.login.trimmed().isEmpty()) {
-        m_erro = QStringLiteral("Nome e login são obrigatórios.");
+        m_erro = QStringLiteral("Informe nome e login");
         return false;
     }
     if (usuario.id == 0 && senhaNova.isEmpty()) {
-        m_erro = QStringLiteral("Defina uma senha para o novo usuário.");
+        m_erro = QStringLiteral("Informe a senha");
         return false;
     }
 
     // Tirar o perfil de Administrador do ÚNICO administrador deixava a loja
     // sem ninguém capaz de entrar em Usuários, Backup e Financeiro.
     if (usuario.id > 0 && usuario.perfilId != 1 && ehUnicoAdministrador(usuario.id)) {
-        m_erro = QStringLiteral("É o único administrador. Promova outro antes.");
+        m_erro = QStringLiteral("É o único administrador");
         return false;
     }
 
@@ -128,7 +128,7 @@ bool UsuarioRepository::salvar(Usuario &usuario, const QString &senhaNova)
     q.bindValue(QStringLiteral(":login"), usuario.login.trimmed());
     if (!q.exec()) {
         m_erro = q.lastError().text().contains(QStringLiteral("UNIQUE"))
-                     ? QStringLiteral("Já existe um usuário com esse login.")
+                     ? QStringLiteral("Login já existe")
                      : q.lastError().text();
         return false;
     }
@@ -152,7 +152,7 @@ bool UsuarioRepository::ehUnicoAdministrador(int id)
 bool UsuarioRepository::inativar(int id)
 {
     if (ehUnicoAdministrador(id)) {
-        m_erro = QStringLiteral("É o único administrador — não dá para desativar.");
+        m_erro = QStringLiteral("É o único administrador");
         return false;
     }
     QSqlQuery q(m_db);

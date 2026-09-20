@@ -73,7 +73,7 @@ TestCase {
         wait(0);
         compare(App.estoqueDisponivel(produtoId), antes, "gravou sem conferir o custo");
         verify(dlg.opened);
-        verify(findChild(dlg, "erroCompra").text.indexOf("Zzz Aviso Custo Lata") >= 0);
+        verify(findChild(dlg, "erroCompra").text.indexOf("Confira o custo") >= 0);
         compare(botao.text, "Registrar mesmo assim");
 
         botao.clicked();

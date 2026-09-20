@@ -1037,19 +1037,30 @@ fica anotado para olhar se acontecer na loja.
 
 ### Mensagens curtas (feito)
 
-Pedido do dono: *"quero que essas mensagens sejam breves, tipo: custo pode estar
-errado"*. As mensagens de tela viraram **uma linha**, lida de relance no meio do
-atendimento, mantendo só os números que deixam decidir:
+Pedido do dono, em duas rodadas. Na primeira eu encurtei pela metade e ele
+devolveu: *"ao invés de 'Custo pode estar errado: R$ 3,00 por Caixinha (12
+unidades), que rende R$ 54,00', eu quero: 'Custo pode estar errado'"*. Ou seja:
+**o recado, e nada mais**.
 
-| Antes | Agora |
+| Onde | Mensagem |
 | --- | --- |
-| "Custo muito baixo: R$ 3,00 por Caixinha (12 unidades), que vendida rende R$ 54,00. Confira se não é o custo de uma unidade só." | "Custo pode estar errado: R$ 3,00 por Caixinha (12 unidades), que rende R$ 54,00." |
-| "Informe o fator da embalagem "FARDO": quantas unidades cabem nela (unidade avulsa = 1, caixinha de 12 latas = 12)." | "Informe o fator de "FARDO": quantas unidades cabem nela." |
-| "Abra o caixa antes de cancelar esta venda: R$ 18,00 precisa sair da gaveta…" | "Abra o caixa: R$ 18,00 precisa sair da gaveta." |
-| "Seu usuário não pode X." (18 mensagens) | "Sem permissão para X." |
-| "Custo inválido. Escreva só o valor, como 62,90 (ou deixe vazio…)" | "Custo inválido. Ex.: 62,90 (vazio mantém o custo)." |
+| Compra e Entrada | "Custo pode estar errado" · "Confira o custo" |
+| Cadastro | "Informe o fator de \"FARDO\"" · "\"Unidade\" e \"FARDO\" com o mesmo fator" · "Preço inválido em \"Unidade\"" |
+| Entrada | "Custo inválido" · "Validade inválida" · "Essa embalagem não é deste produto" |
+| Caixa | "Troco inicial inválido" · "Valor contado inválido" · "Abra o caixa para cancelar" · "Saíram R$ 18,00 da gaveta" |
+| Venda | "Fiado exige cliente" · "Pagamento insuficiente" · "Escolha os insumos" · "Informe o motivo" |
+| Permissão | "Sem permissão para registrar compras" (mesmo molde nas 18) |
+| Usuários | "É o único administrador" · "Login já existe" |
 
-Regra para as próximas: **uma linha, o número que importa, sem repetir o que o
-botão já diz**. Os testes que conferiam o texto antigo foram ajustados (o
-`tst_custo_aviso.qml` agora procura "pode estar errado") e as imagens do
-relatório foram regeradas — elas mostram as mensagens.
+**A regra:** o aviso diz o que olhar; o valor digitado, a embalagem escolhida e
+o botão ("Registrar mesmo assim") já estão na tela, ao lado. Repeti-los na
+mensagem é ruído no meio do atendimento. Instrução de formato também sai — o
+campo de data já tem máscara `dd/mm/aaaa`.
+
+Onde o valor **não** está na tela, ele fica: "Saíram R$ 18,00 da gaveta" é o
+único jeito de o operador saber quanto saiu, e "Ainda deve R$ 45,00" é o que
+faz pensar duas vezes antes de desativar o cliente.
+
+Os testes que conferiam o texto antigo foram ajustados (`tst_custo_aviso.qml`
+procura "pode estar errado"; `tst_mensagens` compara os textos novos) e as
+imagens do relatório foram regeradas — elas mostram as mensagens na tela.
