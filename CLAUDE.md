@@ -16,8 +16,8 @@ na sidebar). Ver `docs/design-ui.md` e `docs/mockup-ui.html`.
 | | |
 | --- | --- |
 | Telas | Dashboard, PDV, **Caixa**, Produtos, Estoque, **Vencimento**, Vendas, Compras, Clientes, Financeiro, Relatórios, Usuários, Backup |
-| Testes | **23 executáveis** no CTest, todos verdes (22 de regra + `tst_qml`, com 70 casos de interface) |
-| Migrations | **0001–0016** aplicadas |
+| Testes | **28 executáveis** no CTest, todos verdes: 312 casos de regra + `tst_qml` (110 casos de interface) |
+| Migrations | **0001–0018** aplicadas |
 | Entrega | `deploy/empacotar.ps1` → pasta autossuficiente + zip (~26 MB), sem console |
 | Repositório | `github.com/Davi-MTS/emporio-dos-amigos` (público; pacote pronto versionado em `deploy/pacote/`) |
 
@@ -73,6 +73,14 @@ NF-e por XML (aguardando um XML real de exemplo); desconto em %.
   gravado (em `venda_itens.qtd_unidade_base` e `compra_itens.qtd_unidade_base`)
   e o que baixa do estoque é SEMPRE em unidade base.
 - "Quantas caixas fechadas tenho?" é cálculo (total ÷ fator), não é armazenado.
+- **O fator vem SEMPRE do cadastro**, nunca da tela: compra, venda, entrada e
+  retirada recebem a embalagem escolhida e leem o fator de `produto_embalagens`
+  (`ProdutoRepository::fatorDaEmbalagem`). Embalagem de outro produto é recusada.
+- **O cadastro confere o fator** (`ProdutoRepository::salvarEmbalagens`): fator
+  0 ("não informado", como nasce a linha nova) é recusado, e duas embalagens com
+  o **mesmo fator e preços diferentes** também — foi assim que a loja vendeu
+  caixinha baixando 1 lata. Mesmo fator e mesmo preço é aceito (dois códigos
+  de barras para a mesma unidade).
 - Custo também vive na unidade base (`estoque.custo_medio_unitario`); custo da
   caixa é derivado. Fonte única de verdade para custo e margem.
 - **Escala do custo por unidade = MILÉSIMOS de centavo (centavos × 1000)** —
@@ -727,3 +735,265 @@ tela abre a fila, cabe em 760×560) e quatro casos em `tst_foto_produto`.
 **Regressão pega pelos testes de tela:** a linha de filtros nova do Financeiro
 não cabia na janela restaurada e empurrava a lista 79 px para fora — virou
 `Flow`, que quebra a linha em vez de estourar.
+
+### Dois bugs de produção, relatados da loja (feito)
+
+**1. O sistema FECHAVA INTEIRO ao pôr foto num produto.** Regressão introduzida
+pela correção do `temFoto` (commit `40e440c`): com a lista enxergando as fotos,
+cada linha passou a pedir miniatura. `FotoProduto.qml` usa `asynchronous: true`,
+e com isso o Qt chama `ProdutoFotoProvider::requestImage` numa **thread
+separada** (documentação do `QQuickImageProvider`: *"may be called by multiple
+threads"*). O provider usava a conexão de banco da thread principal — e uma
+conexão do Qt SQL só pode ser usada pela thread que a criou. Ao gravar a foto, a
+lista recarregava na principal enquanto as miniaturas eram lidas na outra: as
+duas mexiam juntas no driver e o processo caía (segfault, sem mensagem).
+- **Correção:** o provider não guarda conexão, só o caminho do arquivo; cada
+  thread abre a sua, **somente leitura**, via `QThreadStorage` (o destrutor fecha
+  e remove a conexão quando a thread termina). O banco está em WAL, então leitor
+  e escritor convivem.
+- **REGRA:** nada fora da thread principal usa `db.connection()`. Hoje o único
+  código em outra thread é o image provider.
+- Junto: na fila de fotos, o clique no candidato passou a ser `Qt.callLater` —
+  `atribuir()` esvazia `candidatos` e destruía o delegate de dentro do próprio
+  `onClicked`.
+- Coberto por `tst_foto_concorrencia` (duas threads pedindo miniaturas enquanto a
+  principal grava) e `tst_fotos.qml::test_gravar_fotos_com_a_lista_carregando_miniaturas`
+  (a ProdutosScreen de verdade). **Verificado nos dois: o provider antigo cai 3 de
+  3 (exit 139); o novo passa.**
+
+**2. O lucro do Dashboard "caía de uma vez e depois voltava a subir".** O PDV
+deixa vender sem estoque (só avisa), e numa loja começando o saldo fica negativo.
+`EstoqueRepository::aplicarEntrada` calculava a média ponderada com `qtd_atual`
+negativa: vendeu 20, comprou 24 a R$ 3,00 → divisor 4 → cada unidade passava a
+"custar" **R$ 18,00**. As vendas seguintes gravavam esse custo (travado em
+`movimentacoes_estoque.custo_unit`), davam prejuízo e o lucro despencava; a
+compra seguinte diluía a média e ele voltava.
+- **Correção:** com saldo ≤ 0, o novo custo é o custo da entrada — as unidades
+  negativas já foram vendidas e não carregam custo. Saldo positivo segue a média
+  ponderada de sempre. É o único lugar do sistema que recalcula o custo médio
+  (compra e entrada manual passam por ele).
+- Coberto por `tst_custo_estoque_negativo` (verificado: `1800000` antes,
+  `300000` depois).
+- **Limite:** corrige daqui para frente. Custos já gravados errados no banco da
+  loja continuam lá, e as entradas manuais **não guardam o custo** na
+  movimentação — então não dá para recalcular o histórico inteiro; só as
+  compras (`compra_itens.custo_unit`) têm o custo de origem.
+
+### Filtro do Estoque por situação (feito)
+
+Barra de filtro na tela de Estoque: **Todos · Zerados · Baixo · OK**, cada botão
+com a quantidade de produtos naquela situação ("Zerados 4").
+- O filtro mora no **`EstoqueListModel`** (`Q_PROPERTY filtroStatus` +
+  `contagem`), não na tela, por dois motivos: usa a MESMA regra do selo da coluna
+  Status (`statusDe`), então filtro e selo nunca discordam; e sobrevive às
+  recargas — dar entrada num produto "Zerado" recarrega a lista e ele sai do
+  filtro sozinho. `setItens` guarda a lista inteira (`m_todos`) e filtra para
+  `m_itens`; a contagem é sobre a lista inteira (respeita a busca por nome).
+- Regra: zerado = saldo ≤ 0 (inclui **negativo**), baixo = até o mínimo, ok = acima.
+- Valor desconhecido vira "todos"; a tela desliga o filtro no
+  `Component.onDestruction` (o model é um só para o app).
+- A mensagem de lista vazia passou a respeitar o contexto: com filtro ou busca
+  ligados dizia "Nenhum produto cadastrado", o que faria o dono achar que perdeu
+  o cadastro.
+- Barra virou `Flow` (busca 260 + filtro 400 + dica cabem numa linha em 1280 px;
+  na janela restaurada quebram a linha).
+- Coberto por `tests/qml/casos/tst_estoque_filtro.qml` (contagem, filtro × selo,
+  botão da tela, sobrevive à entrada, sair desliga, valor inválido).
+
+### Relatório de um dia específico (feito)
+
+Seletor de Relatórios: **Hoje · 7 dias · 30 dias · Outro dia**. "Outro dia" mostra
+um botão com o dia ("seg., 14/09/2026") que abre um **calendário**
+(`components/CalendarioPopup.qml`, sobre `MonthGrid` + `DayOfWeekRow` do Qt Quick
+Controls, locale pt_BR). Abre em **ontem** — hoje já tem botão próprio — e não
+deixa escolher dia futuro nem avançar para um mês inteiro à frente.
+- **Datas por inteiros:** o `date` do `MonthGrid` pode vir em UTC e, em hora
+  local (UTC−3), vira o dia anterior. O calendário monta o ISO com
+  dia/mês/ano do delegate.
+- **Dois defeitos pegos pela captura de tela, não pelos testes:** (1) o
+  `MonthGrid` não informa a própria altura e as 6 linhas saíam sobrepostas —
+  agora `Layout.preferredHeight`; (2) os dias de fora do mês estavam com
+  `visible: false`, e a grade do Qt não reserva lugar para item invisível: o mês
+  inteiro escorregava de coluna (14/09/2026, segunda, aparecia no sábado). Agora
+  `opacity: 0`. Os dois viraram teste (`tst_relatorios_dia.qml`); o da coluna foi
+  verificado falhando com o código antigo.
+- `RelatorioRepository` ganhou `struct Periodo { int dias; QDate dia; }`: com
+  `dia` válido o filtro vira `date(coluna) = 'yyyy-MM-dd'` (a data sai de
+  `QDate`, nunca de texto digitado). As funções por `int dias` continuam como
+  atalhos — Dashboard, relatório do celular e testes não mudaram.
+- O filtro vale para receita (`vendas.data`) **e** custo
+  (`movimentacoes_estoque.data`): com só um dos dois, o lucro do dia misturaria
+  a receita de um dia com o custo de outro. Coberto por
+  `tst_relatorio_repository::diaEspecifico`.
+- `AppBackend::relatorio*Dia(isoDia)`; a conversão para QML foi fatorada em
+  helpers únicos (`mapaFaturamento`, `listaFormas`...). A tela só recarrega com
+  a data completa. Coberto por `tests/qml/casos/tst_relatorios_dia.qml`.
+
+**Aviso de divergência de lote REMOVIDO da aba Vencimento** (decisão do dono:
+não quer avisos desse tipo). `LoteRepository::divergencias()` segue existindo e
+testado (agora devolve `DivergenciaLote` com a unidade), só não é exibido.
+
+### Venda sem estoque não deixa mais o lucro errado (feito)
+
+Decisão do dono: **o PDV continua vendendo sem estoque** (não trava o balcão).
+O problema era o custo dessas unidades: a venda gravava o custo médio do instante
+e ele ficava travado para sempre. Produto que nunca tinha entrado saía com custo
+**zero** (lucro de 100%) mesmo depois da compra lançada; e com custo anterior, as
+unidades a descoberto ficavam com o custo velho em vez do da compra que chegou.
+
+- Migration `0017`: `movimentacoes_estoque.qtd_pendente_custo` — quantas unidades
+  de cada saída de venda foram vendidas **além do saldo**.
+- `VendaRepository`: lê o saldo antes de baixar e anota a falta. O custo médio de
+  agora fica como **provisório** dessas unidades.
+- `EstoqueRepository::acertarCustoPendente`, chamado por `aplicarEntrada` (compra
+  e entrada manual) quando o saldo está negativo e a entrada tem custo: cobre no
+  máximo `min(entrada, −saldo)` unidades, das vendas mais antigas para as novas.
+  Saída inteira pendente → troca o custo; parte dela → **divide a linha** (a parte
+  acertada vira uma saída própria, mesma venda e mesma data, com o custo da
+  compra). Dividir em vez de fazer média evita erro de centavos no lucro. A soma
+  das quantidades não muda, então saldo × movimentações continua batendo.
+- `cancelarVenda` zera o pendente da venda cancelada: senão a compra seguinte
+  acertaria uma venda que não vale e a verdadeira ficaria no provisório.
+- **Limites:** entrada **sem custo** e **inventário** não acertam nada (não há
+  custo para dar). Vendas anteriores à `0017` ficam com pendente 0 — não dá para
+  reconstruir quais saíram sem estoque.
+- Coberto por `tst_custo_estoque_negativo` (4 casos novos, verificados falhando
+  antes: custo 0 em vez de 15,00; 45,00 em vez de 50,00). Migration testada sobre
+  cópia de banco com dados: movimentações e saldo inalterados, `integrity_check` ok.
+
+### Auditoria do banco da loja — Fase A (feito)
+
+Backup real da loja (17/09) analisado **somente leitura**. Os dados da loja
+**não** foram corrigidos (decisão do dono); só o código.
+
+**A1 — O fator da embalagem vinha da tela.** `registrarCompra` e
+`finalizarVenda` recebiam `embalagemId` **e** `fator` separados e acreditavam
+no fator. Na loja: um BOX de 20 palheiros entrou com fator errado (custo por
+unidade ×20), uma caixinha de 12 vendida por R$ 48,00 baixou 1 lata. O dono
+compensava no inventário (+285, −22), mas o custo ficava errado.
+- `ProdutoRepository::fatorDaEmbalagem(produtoId, embalagemId)` — só devolve se
+  a embalagem for DESTE produto. `AppBackend::_fatorDoCadastro` usa isso nos dois
+  caminhos; `embalagemId = 0` (copão) vale fator 1.
+- Fator da tela diferente do cadastro vira **`qWarning` no `sistema.log`**.
+- **A3 — a causa NÃO era a tela** (corrigido na auditoria seguinte): o PDV e o
+  cadastro foram reproduzidos e gravam o fator certo. Os registros errados
+  vieram do **cadastro**: a embalagem nova nascia com fator 1, o dono criava
+  "BOX"/"CAIXINHA", punha o preço e salvava sem mudar o fator, vendia/comprava
+  e corrigia dias depois (compra do MONSTER 1 minuto após criar o produto). Por
+  isso o A1 sozinho não resolvia. A trava está no cadastro (ver "Conceito
+  central").
+- Coberto por `tst_fator_embalagem` (tela mentindo fator 1 na compra e na venda,
+  embalagem de outro produto, sem embalagem).
+
+**A2 — Aviso de custo fora do normal** (Compras e Estoque → Entrada).
+`AppBackend::avaliarCusto(produtoId, embalagemId, custoTexto)` compara o custo
+digitado com quanto a embalagem **rende** vendida pelo preço da menor
+embalagem com preço: acima disso = `alto`, abaixo de 10% = `baixo`. No banco da
+loja essa faixa pegou exatamente os custos errados (custo da lata na caixa ou o
+contrário) e nenhum certo. **Só avisa**: o primeiro clique mostra o aviso e
+troca o botão para "… mesmo assim"; mudar custo/embalagem zera a conferência.
+Sem preço de venda ou sem custo, não avisa. Coberto por
+`tst_fator_embalagem::avaliarCusto` e `tests/qml/casos/tst_custo_aviso.qml`.
+
+**A5 — Data de cadastro em hora local.** A `0009` esqueceu `criado_em` de
+produtos, clientes e usuários (DEFAULT `datetime('now')` = UTC). Migration
+`0018` converte o histórico; os INSERTs gravam `datetime('now','localtime')`
+explicitamente (o DEFAULT do schema continua UTC — mudar exigiria recriar as
+tabelas, então **todo INSERT novo nessas tabelas precisa passar o criado_em**).
+Testada sobre cópia do banco da loja: 304 produtos, `integrity_check` ok.
+Coberto por `tst_migrations` (conversão e cadastro novo).
+
+**A6 — OpenSSL no pacote (Telegram na loja).** O PC da loja é Windows 10 1709
+(build 16299); o TLS do Windows (schannel) do Qt 6.8 não abre conexão lá
+("não foi possível criar um canal seguro"). `empacotar.ps1` agora copia
+`libssl-3-x64.dll` + `libcrypto-3-x64.dll` (OpenSSL 3, do Git for Windows —
+parâmetro `-OpenSSL`), `tls/qopensslbackend.dll` e `LICENSE-OpenSSL.txt`, e
+**para com erro** se faltar algo. As DLLs só dependem de DLLs do sistema.
+Verificado numa cópia do pacote com PATH limpo: backend `openssl`,
+`api.telegram.org` responde 200. **Não verificado no PC da loja** — confirmar lá.
+- O script também passou a desligar **explicitamente** testes e a ferramenta do
+  manual no Release (o cache de `build\release` guardava `ON`), e
+  `DISTRIBUIDORA_BUILD_TOOLS` agora é `OFF` por padrão.
+
+**Fora da Fase A:** contagem cega do caixa (A7) — excluída pelo dono.
+
+### Auditoria completa do sistema (feito)
+
+Leitura de todo o backend e das telas principais, com cada suspeita conferida
+no backup da loja (somente leitura) e, quando preciso, reproduzida em teste
+descartável. Corrigido **só o que é erro**; regra de negócio ficou como estava.
+
+| Erro | Correção | Teste |
+| --- | --- | --- |
+| Embalagem nova nascia com **fator 1** e o cadastro aceitava caixinha com fator 1 (4 produtos da loja assim hoje) | Linha nova começa em 0; salvar recusa fator 0 e mesmo fator com preço diferente | `tst_produto_repository::fatorDeEmbalagemConferido`, `tst_correcoes.qml` |
+| Compra **sugeria custo errado em produto de ml** (custo por ml truncado em centavos: Black Stone R$ 10,00 × R$ 18,99) | `ItemEstoque.custoMedioMilli` (exato); `custoMedio` agora arredonda e é só exibição | `tst_correcoes.qml`, `tst_compra_repository` |
+| Valor do estoque no relatório do celular ~R$ 213 menor, e saldo negativo descontando | Soma em milésimos, só saldo positivo | — |
+| **Histórico de fiado nunca aparecia** em Clientes (`vendas.data_hora` não existe) | `vendas.data` | `tst_cliente_repository::historicoFiadoEnxergaAsVendas` |
+| Cancelar venda **fiado já paga** deixava o recebido sem devolução (venda nº 3 da loja) | O já pago sai da gaveta como sangria | `tst_venda_repository::cancelamentoDevolveFiadoJaPago` |
+| Cancelar venda de outro turno **com o caixa fechado**: dinheiro saía sem registro | Recusa e pede para abrir o caixa (venda só em pix/cartão cancela normal) | `::cancelamentoComCaixaFechado` |
+| **Restaurar backup apagava o banco antes de copiar** | Copia ao lado → renomeia o atual → troca; falhou, o atual fica | `tst_backup_service::restauracaoQueFalhaMantemOBanco` |
+| Log dizia **"Backup enviado ao Telegram"** no início do envio, mesmo quando falhava | Resultado real no `finished` (enviado / NÃO enviado + motivo) | — |
+| Custo médio **0 (desconhecido) entrava na média** e inflava o lucro | Com custo 0, a entrada define o custo | `tst_custo_estoque_negativo::estoqueSemCustoNaoEntraNaMedia` |
+| Entrada de estoque: custo ilegível ignorado, embalagem de outro produto virava fator 1, **validade conferida depois de gravar** | Tudo conferido antes; mesma fonte de fator da compra/venda | — |
+| Preço ilegível no cadastro virava **R$ 0,00** | Recusado com mensagem | `tst_correcoes.qml` |
+| Salvar produto pela tela **apagava o custo de compra** das embalagens | A tela devolve o custo carregado | `tst_correcoes.qml` |
+| Desativar cliente sem confirmação (dívida some da tela) | Diálogo de confirmação com o saldo | `tst_correcoes.qml` |
+| Dava para **ficar sem nenhum administrador** | Recusa rebaixar/desativar o único admin | `tst_usuario_repository::naoFicaSemAdministrador` |
+| "Mais vendidos" **somava ml com unidade** (PARATUDO 1800 em 1º) | Quantidade na menor embalagem | `tst_relatorio_repository::maisVendidosNaoMisturaMlComUnidade` |
+| Banco que não abre: **o sistema fechava sem mensagem** | Janela com o motivo e a pasta do log | — |
+| Produto desativado **continuava vendendo pelo bipe** e prendia o código | Busca só ativos; desativar libera os códigos | `::inativoNaoVendePeloCodigo` |
+| Dashboard contava **dose** como produto em falta | Exclui dose | — |
+| Permissões só na tela em compras, fornecedores, pagar conta, despesa, usuários, backup, Telegram | Conferidas também no `AppBackend` | suíte (`tst_permissoes`) |
+| Venda aceitava quantidade/valor negativo pelo backend | Recusa | — |
+
+**Não mexido (regra da loja, decisão do dono):** fiado sem vencimento (o
+indicador de "atrasado" depende de um prazo que só o dono define); Esc que
+cancela a venda no PDV; custo 0 aceito na entrada (pode ser bonificação).
+**Sem correção possível:** cancelamento não devolve ao lote de validade — o
+sistema não registra de qual lote cada venda saiu.
+
+**Cadastro da loja com fator errado HOJE** (dado, não código — não corrigido):
+ORIGINAL 350 ML (CAIXINHA fator 1, R$ 64,00), IMPERIO ULTRA LONG NECK 275 ML,
+PALHEIRO TERRA TOMBADA UVA (3 embalagens fator 1), PRESIDENTE 900ML. Com a trava
+nova, esses produtos só salvam depois de o fator ser corrigido na tela.
+
+### Bateria de verificação geral (feito)
+
+Pedido do dono depois da auditoria: *"garanta que esteja perfeito, faça 100
+testes verificando tudo o que for possível"*. São **104 verificações novas**,
+escritas a partir do que foi combinado ao longo do projeto inteiro — não só do
+código como ele está hoje.
+
+**`tests/cpp/tst_verificacao_geral.cpp` (98 casos)** passa pelo `AppBackend`, o
+mesmo caminho das telas, num banco novo por execução: dinheiro (parse/formato,
+"1OO" recusado), usuários e permissões (funcionário barrado no backend em
+produto, compra, conta, despesa e backup), cadastro e embalagem (fator
+obrigatório, fator ambíguo recusado, código de barras), fator sempre do cadastro
+(venda, compra, entrada e retirada, inclusive com a tela mentindo), estoque e
+custo (média ponderada, saldo negativo, custo pendente acertado pela compra,
+custo 0 = desconhecido, inventário, retirada), custo exato em ml, aviso de custo
+fora do normal, venda (troco só em dinheiro, pix a mais, insuficiente, qtd/valor
+inválidos, desconto sem permissão, fiado e limite), cancelamento (mesmo turno,
+estoque, fiado aberto, fiado já pago, caixa fechado, motivo e permissão), caixa
+(abertura ilegível, sangria, suprimento, recebimento de fiado, diferença no
+fechamento), financeiro (despesa, sangria ao pagar, estorno, exclusão,
+recebimento parcial, conta de compra), clientes (histórico, FIFO, resumo),
+relatórios (dia, cancelada fora da conta, dia específico, mais vendidos, dose
+fora do "em falta", hora local na venda e no cadastro), copão e dose, validade
+com FEFO, backup (criar, recusar arquivo que não é backup, retenção), fotos
+(redução a 320 px, HEIC com recado claro) e o registro do cancelamento no log.
+
+**`tests/cpp/tst_banco_real.cpp` (6 casos)** roda as invariantes sobre uma
+**cópia** do banco de verdade — o banco da loja **não** entra no repositório:
+
+```
+DISTRIBUIDORA_BANCO_REAL=/caminho/para/copia.db ./tst_banco_real.exe
+```
+
+Sem a variável, o teste é pulado. Ele aplica as migrations na cópia e confere:
+`integrity_check`, `foreign_key_check`, nenhuma data de cadastro no futuro,
+**saldo de estoque = soma das movimentações** em todos os produtos, pagamento
+nunca menor que o total da venda, troco nunca maior que o dinheiro recebido, e
+lista (como aviso) as embalagens de mesmo fator com preços diferentes.
+Rodado sobre o backup de 17/09: tudo verde, com os 6 avisos de cadastro
+(4 produtos) já conhecidos.

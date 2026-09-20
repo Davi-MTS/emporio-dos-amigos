@@ -1,0 +1,371 @@
+<title>Auditoria do Empório dos Amigos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap">
+<style>
+  :root {
+    --ground: #F7F4EF;
+    --surface: #FFFFFF;
+    --surface-2: #F1ECE4;
+    --ink: #1C1913;
+    --ink-2: #6A6155;
+    --linha: #E3DCD1;
+    --laranja: #B8480F;
+    --verde: #2C6B47;
+    --ambar: #96650F;
+    --vermelho: #A63524;
+    --display: "Fraunces", Georgia, serif;
+    --corpo: "Archivo", "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0D0B08;
+      --surface: #16130E;
+      --surface-2: #1E1A13;
+      --ink: #EFEAE1;
+      --ink-2: #9E9587;
+      --linha: #2C2820;
+      --laranja: #F0742E;
+      --verde: #63C48C;
+      --ambar: #D8AE5C;
+      --vermelho: #E8877A;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0D0B08;
+    --surface: #16130E;
+    --surface-2: #1E1A13;
+    --ink: #EFEAE1;
+    --ink-2: #9E9587;
+    --linha: #2C2820;
+    --laranja: #F0742E;
+    --verde: #63C48C;
+    --ambar: #D8AE5C;
+    --vermelho: #E8877A;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--corpo);
+    font-size: 16px;
+    line-height: 1.65;
+    padding-block: 0 72px;
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  .env { max-width: 1040px; margin: 0 auto; }
+  .texto { max-width: 66ch; }
+
+  header.capa {
+    border-bottom: 3px solid var(--ink);
+    padding-block: 48px 20px;
+    margin-bottom: 40px;
+  }
+  .etiqueta {
+    font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase;
+    font-weight: 700; color: var(--laranja); margin: 0 0 10px;
+  }
+  h1 {
+    font-family: var(--display); font-weight: 700; font-size: clamp(30px, 5vw, 46px);
+    line-height: 1.08; margin: 0 0 14px; text-wrap: balance; letter-spacing: -0.01em;
+  }
+  .subcapa { color: var(--ink-2); margin: 0 0 22px; max-width: 60ch; }
+  .ficha { display: flex; flex-wrap: wrap; gap: 8px 28px; font-size: 14px; color: var(--ink-2); }
+  .ficha b { color: var(--ink); font-weight: 600; }
+
+  h2 {
+    font-family: var(--display); font-weight: 700; font-size: clamp(22px, 3.2vw, 30px);
+    line-height: 1.15; margin: 56px 0 6px; text-wrap: balance;
+  }
+  h2 + .chamada { color: var(--ink-2); margin: 0 0 24px; max-width: 62ch; }
+  h3 { font-size: 18px; font-weight: 700; margin: 0 0 6px; }
+  p { margin: 0 0 14px; }
+  a { color: var(--laranja); }
+
+  .numeros { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin: 28px 0 8px; }
+  .numero { background: var(--surface); border: 1px solid var(--linha); border-radius: 10px; padding: 16px 18px; }
+  .numero .n { font-family: var(--display); font-size: 30px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+  .numero .r { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-2); margin-top: 8px; font-weight: 600; }
+
+  .correcao { border-top: 1px solid var(--linha); padding-top: 28px; margin-top: 36px; }
+  .correcao:first-of-type { border-top: 0; }
+  .indice { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: var(--laranja); text-transform: uppercase; }
+  .par { display: grid; gap: 10px 26px; grid-template-columns: 1fr; margin: 14px 0 18px; }
+  @media (min-width: 720px) { .par { grid-template-columns: 1fr 1fr; } }
+  .caixa { background: var(--surface); border: 1px solid var(--linha); border-radius: 10px; padding: 14px 16px; }
+  .caixa.antes { border-left: 3px solid var(--vermelho); }
+  .caixa.depois { border-left: 3px solid var(--verde); }
+  .caixa .rot { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); margin-bottom: 4px; }
+  .caixa p { margin: 0; font-size: 15px; }
+
+  figure { margin: 18px 0 0; }
+  figure img { display: block; width: 100%; max-width: 100%; border-radius: 10px; border: 1px solid var(--linha); }
+  figcaption { font-size: 13px; color: var(--ink-2); margin-top: 8px; }
+  figcaption b { color: var(--ink); font-weight: 600; }
+
+  .prova { font-size: 13px; color: var(--ink-2); margin-top: 10px; }
+  .prova code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12px; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; color: var(--ink); }
+
+  .rolagem { overflow-x: auto; margin: 18px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; min-width: 520px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--linha); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-2); }
+  tbody tr:last-child td { border-bottom: 0; }
+
+  ul { margin: 0 0 14px; padding-left: 20px; }
+  li { margin-bottom: 7px; }
+
+  .aviso { background: var(--surface); border: 1px solid var(--linha); border-left: 3px solid var(--ambar); border-radius: 10px; padding: 16px 18px; margin: 20px 0; }
+  .aviso h3 { color: var(--ambar); }
+
+  footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--linha); font-size: 14px; color: var(--ink-2); }
+</style>
+
+<div class="env">
+
+<header class="capa">
+  <p class="etiqueta">Empório dos Amigos · Sistema de gestão</p>
+  <h1>O que foi encontrado e o que foi corrigido</h1>
+  <p class="subcapa">Revisão completa do sistema depois de três semanas de uso na loja, conferida contra o banco de dados real e documentada com as telas do próprio programa.</p>
+  <div class="ficha">
+    <span><b>20 de setembro de 2026</b></span>
+    <span>Base da análise: <b>backup da loja de 17/09</b></span>
+    <span>Correções: <b>20</b></span>
+    <span>Situação: <b>aguardando sua validação</b></span>
+  </div>
+</header>
+
+<section>
+  <h2>Resumo</h2>
+  <p class="chamada">O essencial em um minuto de leitura.</p>
+  <div class="texto">
+    <p>Li o sistema inteiro — a parte que calcula (vendas, caixa, estoque, compras, financeiro, clientes, produtos, validade, usuários, backup, Telegram, relatórios) e as telas principais. Cada suspeita foi conferida <strong>no banco de dados real da loja</strong>, aberto somente para leitura, e o que não dava para provar lendo o código eu reproduzi rodando o programa.</p>
+    <p>Foram corrigidos <strong>20 erros</strong>. Três coisas eu deixei como estão porque são <strong>decisão sua</strong>, não defeito. Uma não tem correção possível hoje, e eu explico por quê.</p>
+    <p>O sistema compila limpo, abre normalmente e passa em <strong>todos os testes</strong>.</p>
+  </div>
+
+  <div class="numeros">
+    <div class="numero"><div class="n">20</div><div class="r">erros corrigidos</div></div>
+    <div class="numero"><div class="n">422</div><div class="r">verificações automáticas</div></div>
+    <div class="numero"><div class="n">28</div><div class="r">conjuntos de teste</div></div>
+    <div class="numero"><div class="n">0</div><div class="r">falhas</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>A origem do problema do fator</h2>
+  <p class="chamada">O defeito que mais custou dinheiro, e que eu tinha diagnosticado errado no começo.</p>
+  <div class="texto">
+    <p>Cada embalagem tem um <strong>fator</strong>: quantas unidades ela contém. Caixinha de 12 latas tem fator 12. É esse número que diz quanto baixar do estoque e quanto custa cada unidade.</p>
+    <p>Na loja, três compras e duas vendas foram gravadas com a embalagem certa e o fator errado. Uma caixinha vendida por R$ 48,00 baixou <strong>1 lata</strong> do estoque; um box de 20 palheiros entrou como se fossem 15 unidades soltas, ao preço do box. Você compensou na mão, no inventário (+285 e −22), mas o custo continuou errado.</p>
+    <p>No primeiro relatório eu disse que a tela estava trocando o fator. <strong>Estava errado.</strong> Reproduzi o PDV e o cadastro: os dois gravam certo. A causa era o <strong>cadastro</strong> — toda embalagem nova nascia já preenchida com fator 1. Você criava "BOX" ou "CAIXINHA", ajustava o preço, salvava sem mexer no fator, vendia assim por dias, e corrigia depois. As datas confirmam: a compra do MONSTER foi registrada <strong>um minuto</strong> depois de o produto ser criado.</p>
+    <p>Por isso a correção não está no PDV: está no cadastro, que agora não deixa isso passar.</p>
+  </div>
+</section>
+
+<section>
+  <h2>As correções, uma a uma</h2>
+  <p class="chamada">Cada imagem abaixo é a tela do programa de verdade, fotografada com o sistema rodando — não é desenho.</p>
+
+  <article class="correcao">
+    <p class="indice">Correção 1 · Cadastro</p>
+    <h3>Embalagem nova não nasce mais com fator 1</h3>
+    <div class="par">
+      <div class="caixa antes"><div class="rot">Como era</div><p>A linha nova já vinha com fator 1. Salvava calado, e a caixinha passava a baixar 1 lata por venda.</p></div>
+      <div class="caixa depois"><div class="rot">Como ficou</div><p>Nasce vazia e o sistema recusa salvar enquanto o fator não for informado, explicando o que é o fator.</p></div>
+    </div>
+    <figure>
+      <img src="relatorio/img/fix-01-fator-obrigatorio.png" alt="Tela de Produtos com a embalagem FARDO sem fator e a mensagem pedindo o fator">
+      <figcaption>Tentativa de salvar o FARDO sem fator: <b>“Informe o fator da embalagem ‘FARDO’: quantas unidades cabem nela (unidade avulsa = 1, caixinha de 12 latas = 12).”</b></figcaption>
+    </figure>
+    <p class="prova">Verificado por <code>tst_produto_repository::fatorDeEmbalagemConferido</code> e <code>tst_correcoes.qml</code> — o teste falha com o código antigo.</p>
+  </article>
+
+  <article class="correcao">
+    <p class="indice">Correção 2 · Cadastro</p>
+    <h3>Duas embalagens com o mesmo fator e preços diferentes são recusadas</h3>
+    <div class="par">
+      <div class="caixa antes"><div class="rot">Como era</div><p>Dava para ter "Unidade" e "CAIXINHA" ambas com fator 1, uma a R$ 4,50 e a outra a R$ 64,00. É o que está hoje em quatro produtos da loja.</p></div>
+      <div class="caixa depois"><div class="rot">Como ficou</div><p>A mesma quantidade não pode ter dois preços: o sistema recusa e aponta qual fator conferir. Mesmo fator com o mesmo preço continua valendo (dois códigos de barras para a mesma lata).</p></div>
+    </div>
+    <figure>
+      <img src="relatorio/img/fix-02-fator-ambiguo.png" alt="Mensagem recusando duas embalagens com o mesmo fator e preços diferentes">
+      <figcaption><b>“As embalagens ‘Unidade’ e ‘FARDO’ estão com o mesmo fator (1) e preços diferentes. Confira o fator: uma caixinha de 12 tem fator 12, não 1.”</b></figcaption>
+    </figure>
+  </article>
+
+  <article class="correcao">
+    <p class="indice">Correção 3 · Compras e Estoque</p>
+    <h3>Aviso quando o custo está fora do normal</h3>
+    <div class="par">
+      <div class="caixa antes"><div class="rot">Como era</div><p>Custo da lata lançado na caixinha (ou o contrário) entrava calado, e o lucro daquele produto ficava errado para sempre.</p></div>
+      <div class="caixa depois"><div class="rot">Como ficou</div><p>O sistema compara o custo com o quanto a embalagem rende vendida e avisa. Não impede — pede um segundo clique, porque pode ser promoção.</p></div>
+    </div>
+    <figure>
+      <img src="relatorio/img/fix-03-aviso-custo-compra.png" alt="Compra com aviso de custo muito baixo e botão Registrar mesmo assim">
+      <figcaption>Caixinha de 12 lançada a R$ 3,00: <b>“Custo muito baixo: R$ 3,00 por Caixinha (12 unidades), que vendida rende R$ 54,00.”</b> O botão vira <b>“Registrar mesmo assim”</b>.</figcaption>
+    </figure>
+    <figure>
+      <img src="relatorio/img/fix-05-aviso-custo-entrada.png" alt="Entrada de estoque com aviso de custo maior que o preço de venda">
+      <figcaption>O mesmo na Entrada de estoque, no caso inverso: <b>“Custo maior que o preço de venda: R$ 52,00 por Unidade, que vendida rende R$ 4,50.”</b></figcaption>
+    </figure>
+    <p class="prova">Verificado por <code>tst_custo_aviso.qml</code> (6 casos) e pela bateria geral — no banco da loja, essa faixa pegou exatamente os custos errados e nenhum custo certo.</p>
+  </article>
+
+  <article class="correcao">
+    <p class="indice">Correção 4 · Compras</p>
+    <h3>O custo sugerido nos destilados estava errado</h3>
+    <div class="par">
+      <div class="caixa antes"><div class="rot">Como era</div><p>Em produto medido em ml, a conta do custo por mililitro era cortada em centavos. A Compra sugeria <b>R$ 10,00</b> para a garrafa de Black Stone que custou <b>R$ 18,99</b>. Aceitar a sugestão gravava o custo errado.</p></div>
+      <div class="caixa depois"><div class="rot">Como ficou</div><p>A conta usa o valor exato. Afeta os 22 produtos em ml do seu cadastro.</p></div>
+    </div>
+    <figure>
+      <img src="relatorio/img/fix-04-custo-sugerido-ml.png" alt="Compra sugerindo R$ 74,00 para a garrafa de gin">
+      <figcaption>Gin que entrou a R$ 74,00 a garrafa: a Compra agora sugere <b>R$ 74,00</b>. Com o defeito antigo, sugeriria R$ 67,50.</figcaption>
+    </figure>
+    <p class="prova">O mesmo arredondamento fazia o <b>valor do estoque</b> no relatório do celular sair cerca de R$ 213 menor, e o estoque negativo era descontado como se fosse mercadoria. Os dois foram corrigidos.</p>
+  </article>
+
+  <article class="correcao">
+    <p class="indice">Correção 5 · Clientes</p>
+    <h3>O histórico do fiado nunca aparecia</h3>
+    <div class="par">
+      <div class="caixa antes"><div class="rot">Como era</div><p>Última compra, último pagamento, contas em aberto e conta mais antiga: sempre em branco. A consulta procurava uma informação com o nome errado e falhava calada.</p></div>
+      <div class="caixa depois"><div class="rot">Como ficou</div><p>A linha aparece no cliente aberto, junto com quanto ainda cabe no limite.</p></div>
+    </div>
+    <figure>
+      <img src="relatorio/img/fix-06-historico-fiado.png" alt="Ficha do cliente mostrando última compra fiado e limite disponível">
+      <figcaption><b>“Ainda cabe R$ 155,00 no limite. Última compra fiado: 20/09/2026 · Último pagamento: —”</b></figcaption>
+    </figure>
+  </article>
+
+  <article class="correcao">
+    <p class="indice">Correção 6 · Clientes</p>
+    <h3>Desativar cliente agora pede confirmação</h3>
+    <div class="par">
+      <div class="caixa antes"><div class="rot">Como era</div><p>O clique desativava na hora. Se o cliente devia, a dívida sumia desta tela e continuava só no Financeiro.</p></div>
+      <div class="caixa depois"><div class="rot">Como ficou</div><p>Pergunta antes e mostra quanto ele ainda deve e para onde a dívida vai.</p></div>
+    </div>
+    <figure>
+      <img src="relatorio/img/fix-07-desativar-cliente.png" alt="Confirmação de desativar cliente mostrando a dívida">
+      <figcaption><b>“Ele ainda deve R$ 45,00. A dívida continua no Financeiro → A receber, mas não aparece mais nesta tela.”</b></figcaption>
+    </figure>
+  </article>
+
+  <article class="correcao">
+    <p class="indice">Correção 7 · Vendas e caixa</p>
+    <h3>Cancelar venda no fiado já paga devolve o dinheiro</h3>
+    <div class="par">
+      <div class="caixa antes"><div class="rot">Como era</div><p>O cliente pagava o fiado, a venda era cancelada, e o valor recebido ficava registrado como pago numa venda que não existe mais — sem devolução nenhuma. Aconteceu de verdade na sua venda nº 3.</p></div>
+      <div class="caixa depois"><div class="rot">Como ficou</div><p>O valor já pago sai da gaveta como sangria, e a tela conta quanto saiu.</p></div>
+    </div>
+    <figure>
+      <img src="relatorio/img/fix-08-cancelar-fiado-pago.png" alt="Venda cancelada com aviso de que R$ 18,00 saíram da gaveta">
+      <figcaption><b>“Venda cancelada. Saíram R$ 18,00 da gaveta (sangria) para devolver ao cliente.”</b></figcaption>
+    </figure>
+    <p class="prova">Junto veio outra trava: cancelar venda de <b>outro dia com o caixa fechado</b> tirava dinheiro da gaveta sem registro em turno nenhum. Agora o sistema pede para abrir o caixa antes. Venda paga só em Pix ou cartão cancela normalmente.</p>
+  </article>
+
+  <article class="correcao">
+    <p class="indice">Correção 8 · Relatórios</p>
+    <h3>"Mais vendidos" não mistura mais mililitro com unidade</h3>
+    <div class="par">
+      <div class="caixa antes"><div class="rot">Como era</div><p>A lista somava mililitros junto com unidades: PARATUDO aparecia em primeiro com "1800" (que são 1,8 litro), na frente de cigarros com 250 maços vendidos.</p></div>
+      <div class="caixa depois"><div class="rot">Como ficou</div><p>Cada produto é contado na menor embalagem dele: garrafa conta como garrafa.</p></div>
+    </div>
+    <figure>
+      <img src="relatorio/img/fix-09-mais-vendidos.png" alt="Relatório de mais vendidos com o gin contando 2 garrafas">
+      <figcaption>Duas garrafas de gin aparecem como <b>2</b>, e não como 1500. Antes elas lideravam a lista.</figcaption>
+    </figure>
+  </article>
+</section>
+
+<section>
+  <h2>As outras correções</h2>
+  <p class="chamada">Erros que não têm uma tela para fotografar — estão na parte que calcula ou na proteção dos dados.</p>
+  <div class="rolagem">
+    <table>
+      <thead>
+        <tr><th style="width:38%">O que acontecia</th><th>Como ficou</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><b>Restaurar backup apagava o banco antes de copiar.</b> Se a cópia falhasse (antivírus, pen drive tirado, disco cheio), o sistema abria vazio pedindo para criar o administrador.</td><td>Copia ao lado, só então troca. Se falhar, o banco atual continua intacto.</td></tr>
+        <tr><td><b>O registro dizia "backup enviado ao Telegram"</b> no instante em que o envio começava — mesmo quando falhava, como acontecia na loja.</td><td>Registra o resultado real: enviado, ou não enviado com o motivo.</td></tr>
+        <tr><td><b>Produto sem custo entrava na média</b> como se fosse de graça, e o lucro saía inflado. São 7 produtos assim no seu cadastro.</td><td>Custo zero é tratado como desconhecido: a primeira compra define o custo.</td></tr>
+        <tr><td><b>Entrada de estoque</b> ignorava custo digitado errado, aceitava embalagem de outro produto e só conferia a validade <b>depois</b> de gravar — quem tentava de novo dava entrada duas vezes.</td><td>Tudo conferido antes de gravar, com a mesma regra de fator da compra e da venda.</td></tr>
+        <tr><td><b>Preço digitado errado no cadastro</b> (ex.: "4,5O" com a letra O) virava R$ 0,00 em silêncio, e o produto passava a sair de graça no PDV.</td><td>Recusado, com mensagem dizendo como escrever.</td></tr>
+        <tr><td><b>Salvar um produto apagava o custo de compra</b> das embalagens.</td><td>O custo é preservado.</td></tr>
+        <tr><td><b>Dava para ficar sem nenhum administrador</b> — bastava rebaixar ou desativar o único que existia, e ninguém mais entraria em Usuários, Backup e Financeiro.</td><td>O sistema recusa enquanto não houver outro administrador.</td></tr>
+        <tr><td><b>Produto desativado continuava vendendo pelo bipe</b>, e o código de barras dele ficava preso: cadastrar o substituto dava erro apontando um produto que a busca não mostra.</td><td>Não vende mais, e o código fica livre para o produto novo.</td></tr>
+        <tr><td><b>Se o banco não abrisse, o sistema fechava sem dizer nada</b> — na loja, o programa simplesmente não abria.</td><td>Mostra uma janela com o motivo e o caminho do arquivo de registro para o suporte.</td></tr>
+        <tr><td><b>O Dashboard contava "dose" como produto em falta</b>, divergindo da tela de Estoque.</td><td>Dose não tem estoque próprio: fica fora da conta.</td></tr>
+        <tr><td><b>Permissões conferidas só na tela</b> em compras, fornecedores, pagar conta, despesa, usuários, backup e Telegram.</td><td>Conferidas também por baixo, onde a recusa vale de verdade.</td></tr>
+        <tr><td><b>Quantidade ou valor negativo</b> era aceito pelo sistema por baixo da tela.</td><td>Recusado.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>O que eu não mexi</h2>
+  <p class="chamada">Não é defeito: é decisão sua. Se quiser mudar qualquer uma, é só dizer.</p>
+  <div class="texto">
+    <ul>
+      <li><strong>Fiado sem data de vencimento.</strong> O sistema tem o aviso de "atrasado", mas ele nunca aparece porque nenhuma venda no fiado recebe prazo. Definir o prazo (30 dias? o mês seguinte?) é decisão de negócio.</li>
+      <li><strong>Esc cancela a venda no PDV</strong>, sem confirmar. Foi assim que combinamos o atalho.</li>
+      <li><strong>Custo R$ 0,00 aceito na entrada</strong>, porque pode ser bonificação do fornecedor.</li>
+      <li><strong>O PDV continua vendendo sem estoque</strong> — sua decisão, para não travar o balcão. O lucro dessas vendas já foi corrigido antes.</li>
+    </ul>
+  </div>
+  <div class="aviso">
+    <h3>Um caso sem correção possível</h3>
+    <p>Cancelar uma venda devolve a mercadoria ao estoque, mas <strong>não devolve ao lote de validade</strong>, porque o sistema não registra de qual lote cada venda saiu. Para corrigir seria preciso guardar essa ligação em toda venda, o que muda o jeito de gravar. Fica anotado; não é urgente.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Como isso foi verificado</h2>
+  <p class="chamada">Teste que não roda sozinho não serve: todos rodam a cada compilação.</p>
+  <div class="texto">
+    <p>São <strong>422 verificações automáticas</strong>, em 28 conjuntos, todas passando. Delas, <strong>104 foram escritas agora</strong>, a partir de tudo o que combinamos desde o começo do projeto.</p>
+    <p>Nas correções mais importantes eu fiz questão de conferir que o teste <strong>falha com o código antigo</strong> — senão ele não prova nada.</p>
+  </div>
+  <div class="rolagem">
+    <table>
+      <thead><tr><th style="width:32%">O que</th><th>O que cobre</th></tr></thead>
+      <tbody>
+        <tr><td><b>312 verificações de regra</b></td><td>Dinheiro, embalagem e fator, estoque e custo, venda, cancelamento, caixa, fiado, financeiro, relatórios, validade, backup, fotos e permissões.</td></tr>
+        <tr><td><b>110 verificações de tela</b></td><td>Abrem as telas de verdade, inclusive na janela pequena, e conferem avisos, filtros e os fluxos de confirmação.</td></tr>
+        <tr><td><b>6 verificações no banco real</b></td><td>Rodam sobre uma <b>cópia</b> do seu backup: integridade, saldo de estoque igual à soma das movimentações, pagamento nunca menor que o total da venda, troco nunca maior que o dinheiro recebido. Todas passaram. O banco da loja não entra no repositório.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="prova">As imagens deste relatório também são geradas por programa (<code>tools/capturar_telas</code>), abrindo as telas reais e montando cada cena. Se uma tela mudar, a imagem sai diferente na próxima geração — ela não envelhece escondido.</p>
+</section>
+
+<section>
+  <h2>O que depende de você</h2>
+  <p class="chamada">Três pontos que eu não posso resolver sozinho.</p>
+  <div class="texto">
+    <ol>
+      <li><strong>Quatro produtos com o fator errado hoje.</strong> ORIGINAL 350 ML (caixinha com fator 1 a R$ 64,00), IMPERIO ULTRA LONG NECK 275 ML, PALHEIRO TERRA TOMBADA UVA (três embalagens com fator 1) e PRESIDENTE 900ML. Enquanto não forem corrigidos na tela de Produtos, as vendas deles baixam o estoque errado. Eu não alterei seus dados.</li>
+      <li><strong>Telegram no PC da loja.</strong> O pacote novo leva o OpenSSL junto, que é o que faltava naquele Windows. Testei aqui com sucesso, mas só dá para confirmar rodando lá.</li>
+      <li><strong>O arquivo de registro (sistema.log).</strong> Depois de alguns dias com a versão nova, ele mostra se alguma tela ainda manda fator diferente do cadastro. Hoje eu não tenho evidência de que isso aconteça.</li>
+    </ol>
+  </div>
+</section>
+
+<section>
+  <h2>Próximo passo</h2>
+  <div class="texto">
+    <p>Nada disso foi enviado ainda. Assim que você validar este relatório, eu faço o commit de tudo — correções, testes, imagens e esta documentação — e a partir daí a gente combina a atualização do GitHub, o pacote novo e o pen drive.</p>
+  </div>
+</section>
+
+<footer>
+  Empório dos Amigos · Relatório de auditoria e correções · 20 de setembro de 2026.<br>
+  Imagens geradas a partir das telas do próprio sistema. Dados de exemplo; o banco da loja foi usado apenas para leitura.
+</footer>
+
+</div>

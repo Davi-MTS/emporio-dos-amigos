@@ -1,0 +1,871 @@
+<title>Manual do Empório dos Amigos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&display=swap">
+
+<style>
+/* ---------------------------------------------------------------------------
+   A paleta e as fontes vêm do próprio sistema (qml/theme/Theme.qml): preto e
+   laranja, Fraunces nos títulos, Archivo no texto. O manual precisa parecer
+   com o programa que ele ensina.
+   --------------------------------------------------------------------------- */
+:root {
+  --ground:      #F5F3F0;
+  --surface:     #FFFFFF;
+  --ink:         #1E1B15;
+  --ink-soft:    #56504A;
+  --ink-mute:    #736C61;
+  --line:        #E7E2DB;
+  --line-strong: #D8D2C8;
+  --accent:      #C24E12;
+  --accent-soft: #F7E9DD;
+  --good:        #2E7D51;
+  --bad:         #BC3B2A;
+  --shot-frame:  #241F19;
+
+  --f-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --f-body:    "Archivo", "Segoe UI", system-ui, sans-serif;
+
+  --measure: 66ch;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #0A0908;
+    --surface:     #131110;
+    --ink:         #EFEAE1;
+    --ink-soft:    #C4BCAF;
+    --ink-mute:    #9A9285;
+    --line:        #2A271F;
+    --line-strong: #3A362C;
+    --accent:      #F0742E;
+    --accent-soft: #2A1E12;
+    --good:        #63C48C;
+    --bad:         #E8877A;
+    --shot-frame:  #2A271F;
+  }
+}
+:root[data-theme="dark"] {
+  --ground:      #0A0908;
+  --surface:     #131110;
+  --ink:         #EFEAE1;
+  --ink-soft:    #C4BCAF;
+  --ink-mute:    #9A9285;
+  --line:        #2A271F;
+  --line-strong: #3A362C;
+  --accent:      #F0742E;
+  --accent-soft: #2A1E12;
+  --good:        #63C48C;
+  --bad:         #E8877A;
+  --shot-frame:  #2A271F;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 16px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ------------------------------------------------------------------ cabeçalho */
+.capa {
+  background: #000000;
+  color: #F2EEE7;
+  padding: 3.5rem 2rem 3rem;
+  border-bottom: 3px solid #F0742E;
+}
+.capa-int { max-width: 62rem; margin: 0 auto; }
+.marca {
+  font-size: .72rem;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: #F0742E;
+  font-weight: 600;
+  margin: 0 0 .9rem;
+}
+.capa h1 {
+  font-family: var(--f-display);
+  font-weight: 600;
+  font-size: clamp(2.1rem, 5.5vw, 3.3rem);
+  line-height: 1.06;
+  margin: 0 0 1rem;
+  text-wrap: balance;
+}
+.capa .linha-fina {
+  margin: 0;
+  max-width: 48ch;
+  color: #B9B1A4;
+  font-size: 1.05rem;
+}
+.capa-meta {
+  margin-top: 2rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid #2A271F;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.6rem;
+  font-size: .82rem;
+  color: #8B8474;
+}
+.capa-meta b { color: #F2EEE7; font-weight: 600; }
+
+/* ------------------------------------------------------------------- estrutura */
+.folha {
+  max-width: 62rem;
+  margin: 0 auto;
+  padding: 0 2rem 5rem;
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr);
+  gap: 3rem;
+  align-items: start;
+}
+@media (max-width: 60rem) {
+  .folha { grid-template-columns: minmax(0, 1fr); gap: 0; padding: 0 1.1rem 3rem; }
+}
+
+/* ------------------------------------------------------------------------ TOC */
+.sumario {
+  position: sticky;
+  top: 1.5rem;
+  padding-top: 2.5rem;
+  font-size: .86rem;
+}
+@media (max-width: 60rem) {
+  .sumario {
+    position: static;
+    padding: 1.5rem 0 .5rem;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 1rem;
+  }
+}
+.sumario h2 {
+  font-size: .68rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  font-weight: 600;
+  margin: 0 0 .8rem;
+}
+.sumario ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .08rem; }
+.sumario a {
+  display: block;
+  padding: .3rem .55rem;
+  color: var(--ink-soft);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  border-radius: 0 4px 4px 0;
+  transition: color .12s, background .12s, border-color .12s;
+}
+.sumario a:hover, .sumario a:focus-visible {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-left-color: var(--accent);
+}
+.sumario .sub { padding-left: 1.5rem; font-size: .82rem; color: var(--ink-mute); }
+
+/* --------------------------------------------------------------------- conteúdo */
+.corpo { padding-top: 2.5rem; min-width: 0; }
+.corpo > section { margin-bottom: 3.5rem; scroll-margin-top: 1.5rem; }
+
+.parte-num {
+  font-size: .68rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--accent);
+  margin: 0 0 .35rem;
+}
+h2.parte {
+  font-family: var(--f-display);
+  font-size: clamp(1.6rem, 3.6vw, 2.1rem);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 0 0 .6rem;
+  text-wrap: balance;
+}
+h3 {
+  font-family: var(--f-display);
+  font-size: 1.3rem;
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 2.4rem 0 .6rem;
+  text-wrap: balance;
+  scroll-margin-top: 1.5rem;
+}
+h3:first-of-type { margin-top: 1.6rem; }
+h4 {
+  font-size: .95rem;
+  font-weight: 700;
+  margin: 1.6rem 0 .4rem;
+  color: var(--ink);
+}
+p { margin: 0 0 .9rem; max-width: var(--measure); color: var(--ink-soft); }
+p.abre { font-size: 1.05rem; color: var(--ink); max-width: 58ch; }
+strong { color: var(--ink); font-weight: 600; }
+a { color: var(--accent); }
+
+ul.solta { margin: 0 0 1rem; padding-left: 1.15rem; max-width: var(--measure); color: var(--ink-soft); }
+ul.solta li { margin-bottom: .35rem; }
+
+/* --------------------------------------------------------------------- passos */
+ol.passos {
+  list-style: none;
+  counter-reset: passo;
+  margin: 1.1rem 0 1.4rem;
+  padding: 0;
+  max-width: var(--measure);
+  display: flex;
+  flex-direction: column;
+  gap: .85rem;
+}
+ol.passos > li {
+  counter-increment: passo;
+  position: relative;
+  padding-left: 2.7rem;
+  color: var(--ink-soft);
+}
+ol.passos > li::before {
+  content: counter(passo);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #FFFFFF;
+  font-size: .82rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* --------------------------------------------------------------------- imagens */
+figure.tela { margin: 1.5rem 0 1.7rem; }
+figure.tela img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  border: 1px solid var(--shot-frame);
+  box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 26px rgba(0,0,0,.10);
+}
+figure.tela figcaption {
+  margin-top: .6rem;
+  font-size: .84rem;
+  color: var(--ink-mute);
+  max-width: var(--measure);
+}
+figure.tela figcaption b { color: var(--ink-soft); font-weight: 600; }
+
+/* --------------------------------------------------------------------- avisos */
+.nota, .aviso, .dica {
+  margin: 1.3rem 0;
+  padding: .95rem 1.1rem;
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+  border-radius: 0 8px 8px 0;
+  max-width: var(--measure);
+  font-size: .93rem;
+  color: var(--ink-soft);
+}
+.nota p, .aviso p, .dica p { margin: 0 0 .5rem; max-width: none; }
+.nota p:last-child, .aviso p:last-child, .dica p:last-child { margin-bottom: 0; }
+.aviso { border-left-color: var(--bad); }
+.dica  { border-left-color: var(--good); }
+.rotulo {
+  display: block;
+  font-size: .66rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: .3rem;
+}
+.aviso .rotulo { color: var(--bad); }
+.dica .rotulo  { color: var(--good); }
+
+/* --------------------------------------------------------------------- teclas */
+kbd {
+  font-family: var(--f-body);
+  font-size: .8em;
+  font-weight: 600;
+  padding: .12em .45em;
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+code {
+  font-family: var(--f-body);
+  font-size: .88em;
+  font-weight: 600;
+  padding: .08em .3em;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* --------------------------------------------------------------------- tabelas */
+.rolagem { overflow-x: auto; margin: 1.2rem 0 1.4rem; }
+table { border-collapse: collapse; width: 100%; min-width: 30rem; font-size: .9rem; }
+th, td { text-align: left; padding: .55rem .7rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+th {
+  font-size: .68rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  font-weight: 600;
+  border-bottom-color: var(--line-strong);
+}
+td { color: var(--ink-soft); }
+td.sim { color: var(--good); font-weight: 600; }
+td.nao { color: var(--bad); font-weight: 600; }
+tbody tr:last-child td { border-bottom: none; }
+
+/* ------------------------------------------------------------------- atalhos */
+dl.atalhos {
+  margin: 1.2rem 0 1.4rem;
+  max-width: var(--measure);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: .45rem 1rem;
+  align-items: baseline;
+  font-size: .93rem;
+}
+dl.atalhos dt { text-align: right; }
+dl.atalhos dd { margin: 0; color: var(--ink-soft); }
+
+/* -------------------------------------------------------------------- imprimir */
+@media print {
+  .sumario { display: none; }
+  .folha { grid-template-columns: 1fr; max-width: none; padding: 0; }
+  .capa { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  h2.parte, h3 { break-after: avoid; }
+  figure.tela, ol.passos > li { break-inside: avoid; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+</style>
+
+<header class="capa">
+  <div class="capa-int">
+    <p class="marca">Empório dos Amigos · Bebidas &amp; Conveniência · 062</p>
+    <h1>Manual do sistema, do começo ao fim do dia</h1>
+    <p class="linha-fina">Tudo o que o sistema faz, na ordem em que você vai usar.</p>
+    <div class="capa-meta">
+      <span><b>Sistema</b> versão 0.1.0</span>
+      <span><b>13</b> telas</span>
+    </div>
+  </div>
+</header>
+
+<div class="folha">
+
+  <nav class="sumario" aria-label="Índice">
+    <h2>Índice</h2>
+    <ol>
+      <li><a href="#comecar">Primeiro acesso</a></li>
+      <li><a href="#dia">O dia a dia</a></li>
+      <li><a href="#abrir" class="sub">Abrir o caixa</a></li>
+      <li><a href="#vender" class="sub">Vender</a></li>
+      <li><a href="#fiado-venda" class="sub">Vender no fiado</a></li>
+      <li><a href="#fechar" class="sub">Fechar o caixa</a></li>
+      <li><a href="#cadastro">Cadastrar produtos</a></li>
+      <li><a href="#produto" class="sub">Produto e embalagens</a></li>
+      <li><a href="#fotos" class="sub">Fotos em lote</a></li>
+      <li><a href="#copao" class="sub">Copão e dose</a></li>
+      <li><a href="#mercadoria">Mercadoria entrando</a></li>
+      <li><a href="#compra" class="sub">Registrar a compra</a></li>
+      <li><a href="#entrada" class="sub">Entrada rápida</a></li>
+      <li><a href="#validade" class="sub">Vencimento</a></li>
+      <li><a href="#dinheiro">O dinheiro</a></li>
+      <li><a href="#contas" class="sub">Contas a pagar</a></li>
+      <li><a href="#clientes" class="sub">Clientes e fiado</a></li>
+      <li><a href="#numeros" class="sub">Entendendo o lucro</a></li>
+      <li><a href="#acompanhar">Acompanhar</a></li>
+      <li><a href="#seguranca">Backup e usuários</a></li>
+      <li><a href="#telegram" class="sub">Relatórios no celular</a></li>
+      <li><a href="#duvidas">Deu problema?</a></li>
+    </ol>
+  </nav>
+
+  <main class="corpo">
+
+    <!-- ============================================================ ABERTURA -->
+    <section id="comecar">
+      <p class="parte-num">Parte 1</p>
+      <h2 class="parte">Primeiro acesso</h2>
+      <p class="abre">O sistema roda direto do computador da loja, sem internet. A internet só é usada para mandar o aviso no celular quando o caixa fecha.</p>
+
+      <h3>Instalar</h3>
+      <ol class="passos">
+        <li>Copie a pasta <strong>Emporio dos Amigos</strong> do pendrive para <strong>C:\Emporio dos Amigos</strong>. Rode a partir do disco, nunca do pendrive.</li>
+        <li>Abra a pasta e clique com o botão direito em <strong>Emporio dos Amigos.exe</strong> → <strong>Enviar para</strong> → <strong>Área de trabalho</strong>. O atalho fica pronto.</li>
+        <li>Se o Windows avisar que não reconhece o programa, clique em <strong>Mais informações</strong> → <strong>Executar assim mesmo</strong>. Isso acontece porque o programa não é assinado; é seguro.</li>
+      </ol>
+
+      <h3>Criar o seu usuário</h3>
+      <p>Na primeira vez, o sistema pede para criar o administrador. Esse é você, e é o único usuário que enxerga tudo.</p>
+
+      <figure class="tela">
+        <img src="__IMG:01-login__" alt="Tela de entrada do sistema, com os campos de usuário e senha sobre o fundo preto e a logo do Empório dos Amigos.">
+        <figcaption><b>Tela de entrada.</b> Depois de criado o administrador, é por aqui que se entra todo dia.</figcaption>
+      </figure>
+
+      <div class="aviso">
+        <span class="rotulo">Guarde a senha</span>
+        <p>Não existe "esqueci minha senha". Se você perder a senha do administrador, não há como entrar no sistema — e os dados ficam presos lá dentro. Anote em algum lugar seguro fora do computador.</p>
+      </div>
+    </section>
+
+    <!-- ================================================================= DIA -->
+    <section id="dia">
+      <p class="parte-num">Parte 2</p>
+      <h2 class="parte">O dia a dia</h2>
+      <p class="abre">Essa é a rotina completa, na ordem: abre o caixa de manhã, vende o dia inteiro, fecha o caixa à noite. Se você só for aprender uma parte do sistema, aprenda esta.</p>
+
+      <h3 id="abrir">Abrir o caixa</h3>
+      <p>O sistema só deixa vender com o caixa aberto. Abrir significa dizer <strong>quanto de dinheiro tem na gaveta</strong> antes de a loja começar a trabalhar — é esse valor que, no fim do dia, vai ser comparado com o que sobrou.</p>
+
+      <figure class="tela">
+        <img src="__IMG:06-caixa__" alt="Aba Caixa mostrando a sessão aberta, o valor de abertura e os botões de sangria, suprimento e fechamento.">
+        <figcaption><b>Aba Caixa.</b> Abertura, sangria, suprimento e fechamento moram todos aqui.</figcaption>
+      </figure>
+
+      <ol class="passos">
+        <li>Clique em <strong>Caixa</strong> na barra da esquerda.</li>
+        <li>Digite o <strong>troco inicial</strong> — o dinheiro que já está na gaveta.</li>
+        <li>Clique em <strong>Abrir caixa</strong>. Pronto, o PDV libera.</li>
+      </ol>
+
+      <h4>Sangria e suprimento</h4>
+      <p><strong>Sangria</strong> é dinheiro que <em>sai</em> da gaveta e não é uma venda: você tirou R$ 200 para levar ao banco, pagou o entregador em espécie. <strong>Suprimento</strong> é o contrário, dinheiro que <em>entra</em> sem ser venda: você colocou mais troco.</p>
+      <p>Sempre lance os dois na hora que acontecem. Se não lançar, o caixa não vai fechar no fim do dia e você vai perder tempo procurando um dinheiro que nunca sumiu.</p>
+
+      <h3 id="vender">Vender</h3>
+      <p>O PDV foi feito para trabalhar <strong>com o leitor de código de barras</strong> e quase sem mouse. O leitor funciona como um teclado: ele digita os números e dá Enter sozinho.</p>
+
+      <figure class="tela">
+        <img src="__IMG:07-pdv__" alt="Tela do PDV vazia, com o campo de leitura em destaque no alto e o painel de pagamento à direita.">
+        <figcaption><b>PDV recém-aberto.</b> O cursor já começa dentro do campo de leitura — é só bipar.</figcaption>
+      </figure>
+
+      <ol class="passos">
+        <li><strong>Bipe o produto.</strong> Ele entra no carrinho. Bipar de novo o mesmo produto aumenta a quantidade.</li>
+        <li>Sem código de barras? Digite parte do nome e escolha na lista que aparece.</li>
+        <li>Para vender mais de um, use o <strong>+</strong> e o <strong>−</strong> na linha, ou digite a quantidade direto.</li>
+        <li>Confira o <strong>TOTAL</strong> à direita.</li>
+        <li>Clique na forma de pagamento: <strong>Dinheiro</strong>, <strong>Pix</strong>, <strong>Débito</strong> ou <strong>Crédito</strong>.</li>
+        <li><kbd>F12</kbd> ou <strong>Finalizar venda</strong>. O estoque baixa sozinho.</li>
+      </ol>
+
+      <figure class="tela">
+        <img src="__IMG:07b-pdv-carrinho__" alt="PDV com três produtos no carrinho, mostrando quantidade, preço, subtotal, o total de R$ 25,40 e a linha Falta.">
+        <figcaption><b>Com o carrinho montado.</b> A linha <b>Falta</b> em vermelho mostra quanto ainda não foi pago. Ela some quando o pagamento cobre o total.</figcaption>
+      </figure>
+
+      <h4>Pagamento dividido</h4>
+      <p>Dá para misturar formas na mesma venda: o cliente paga R$ 20 no Pix e o resto em dinheiro. Clique numa forma, digite o valor, clique na outra. O sistema vai abatendo até zerar.</p>
+
+      <div class="nota">
+        <span class="rotulo">Troco</span>
+        <p>Só <strong>dinheiro</strong> gera troco. Se você lançar R$ 50 no Pix numa venda de R$ 30, o sistema não devolve R$ 20 de troco — porque esse dinheiro não está na gaveta. Ele limita o Pix ao que falta.</p>
+      </div>
+
+      <h4>Desconto</h4>
+      <p><kbd>F4</kbd> abre o campo de desconto, em reais. Só o administrador pode dar desconto; se o funcionário tentar, a venda é recusada com o motivo na tela.</p>
+
+      <h4>Atalhos do PDV</h4>
+      <dl class="atalhos">
+        <dt><kbd>Enter</kbd></dt><dd>adiciona o produto que está no campo</dd>
+        <dt><kbd>F2</kbd></dt><dd>volta o cursor para o campo de busca</dd>
+        <dt><kbd>F4</kbd></dt><dd>desconto</dd>
+        <dt><kbd>F8</kbd></dt><dd>escolher o cliente (necessário para o fiado)</dd>
+        <dt><kbd>F12</kbd></dt><dd>finalizar a venda</dd>
+        <dt><kbd>Esc</kbd></dt><dd>limpar o carrinho e começar de novo</dd>
+      </dl>
+
+      <div class="nota">
+        <span class="rotulo">Errou depois de finalizar?</span>
+        <p>O aviso de venda concluída traz <strong>"Errei — cancelar esta venda"</strong>. Clicando ali, a mercadoria volta ao estoque e o dinheiro sai da conferência do caixa. Depois que esse aviso sumir, o cancelamento fica na aba <strong>Vendas</strong>.</p>
+      </div>
+
+      <h3 id="fiado-venda">Vender no fiado</h3>
+      <p>Fiado é uma forma de pagamento como as outras, com uma condição: <strong>precisa de um cliente escolhido e com limite cadastrado</strong>.</p>
+      <ol class="passos">
+        <li>Monte o carrinho normalmente.</li>
+        <li><kbd>F8</kbd> e escolha o cliente.</li>
+        <li>Clique em <strong>Fiado</strong> e finalize.</li>
+      </ol>
+      <p>O valor vira uma dívida do cliente na aba <strong>Clientes</strong>. Se a dívida passar do limite dele, o sistema recusa a venda e diz o porquê. Cliente com limite <strong>zero</strong> não compra fiado — é assim que se bloqueia alguém sem apagar o cadastro.</p>
+
+      <h3 id="fechar">Fechar o caixa</h3>
+      <p>É a prestação de contas do dia, e é o momento mais importante do sistema. Ele compara <strong>o que deveria ter na gaveta</strong> com <strong>o que você contou de verdade</strong>.</p>
+
+      <ol class="passos">
+        <li>Vá em <strong>Caixa</strong> e clique em <strong>Fechar caixa</strong>.</li>
+        <li>O sistema mostra o resumo por forma de pagamento.</li>
+        <li><strong>Conte o dinheiro da gaveta</strong> e digite o valor contado.</li>
+        <li>A <strong>diferença</strong> aparece na hora. Confirme.</li>
+      </ol>
+
+      <p>A conta que o sistema faz é esta:</p>
+      <div class="nota">
+        <p>troco inicial <strong>+</strong> vendas em dinheiro <strong>−</strong> troco dado <strong>+</strong> suprimentos <strong>+</strong> fiado recebido em dinheiro <strong>−</strong> sangrias <strong>=</strong> o que deve ter na gaveta</p>
+      </div>
+
+      <p>Cartão e Pix aparecem no resumo mas não entram nessa conta — esse dinheiro não está na gaveta, está na maquininha e na conta do banco.</p>
+
+      <div class="dica">
+        <span class="rotulo">O que acontece sozinho ao fechar</span>
+        <p>Fechar o caixa dispara três coisas sem você pedir: <strong>uma cópia de segurança</strong> do banco de dados, <strong>o relatório do dia</strong>, e o <strong>envio dos dois pelo Telegram</strong> para o seu celular. É assim que os dados da loja saem do computador — se o HD queimar, a cópia está no seu celular.</p>
+      </div>
+
+      <div class="aviso">
+        <span class="rotulo">Diferença no caixa</span>
+        <p>Se der diferença, <strong>não conte de novo até anotar o valor</strong>. O sistema grava a diferença no registro, e é olhando o histórico dessas diferenças que você descobre se é erro de troco, sangria não lançada, ou algo pior.</p>
+      </div>
+    </section>
+
+    <!-- =========================================================== CADASTRO -->
+    <section id="cadastro">
+      <p class="parte-num">Parte 3</p>
+      <h2 class="parte">Cadastrar produtos</h2>
+      <p class="abre">Esta é a parte que dá mais trabalho uma vez só. Feita com cuidado, o resto do sistema funciona sozinho.</p>
+
+      <h3 id="produto">Produto e embalagens</h3>
+
+      <figure class="tela">
+        <img src="__IMG:03-produtos__" alt="Tela de Produtos com a lista à esquerda, mostrando nome, categoria, estoque e preço de cada item.">
+        <figcaption><b>Produtos.</b> A busca do topo procura por nome <b>ou</b> por código de barras — dá para bipar o produto para achá-lo.</figcaption>
+      </figure>
+
+      <p>Só o <strong>nome</strong> é obrigatório. Mas dois campos decidem se o estoque vai bater ou não:</p>
+
+      <h4>Unidade base — como você conta esse produto</h4>
+      <p>É a menor unidade em que você quer contar. Para cerveja, <strong>unidade</strong> (uma latinha). Para destilado que você vende em dose, <strong>ml</strong>. O estoque inteiro é guardado nessa unidade e nunca muda depois.</p>
+
+      <h4>Embalagens e o fator</h4>
+      <p>Cada jeito de comprar ou vender o produto é uma embalagem, e o <strong>fator</strong> diz quantas unidades base ela tem:</p>
+      <div class="rolagem">
+        <table>
+          <thead>
+            <tr><th>Produto</th><th>Unidade base</th><th>Embalagem</th><th>Fator</th><th>Quer dizer</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Heineken</td><td>unidade</td><td>Unidade</td><td>1</td><td>uma garrafa</td></tr>
+            <tr><td>Heineken</td><td>unidade</td><td>Caixa</td><td>12</td><td>a caixa tem 12 garrafas</td></tr>
+            <tr><td>Gin Beefeater</td><td>ml</td><td>Garrafa 750 ml</td><td>750</td><td>a garrafa tem 750 ml</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Com isso, comprar 6 caixas de Heineken dá entrada de 72 garrafas, e vender uma garrafa baixa uma. Cada embalagem tem <strong>seu próprio código de barras e seu próprio preço</strong> — o da caixa é diferente do da unidade.</p>
+
+      <h4>Estoque mínimo</h4>
+      <p>Digite quantas <strong>embalagens</strong> você quer ter no mínimo (3 garrafas), e o sistema converte. Quando o saldo cai abaixo disso, o produto aparece em <strong>Produtos em falta</strong> no Dashboard.</p>
+
+      <h3 id="fotos">Fotos em lote</h3>
+      <p>Foto ajuda muito quem está aprendendo os produtos — ela aparece na lista, nas sugestões do PDV e no carrinho. Botão <strong>Fotos em lote</strong>, no alto da tela de Produtos.</p>
+      <ol class="passos">
+        <li>Passe as fotos do celular para uma pasta do computador.</li>
+        <li>Clique em <strong>Escolher pasta…</strong> e escolha a pasta inteira. Também dá para arrastar os arquivos para dentro da janela.</li>
+        <li>A foto aparece grande. <strong>Bipe o produto</strong> que está na foto, ou digite o nome.</li>
+        <li>Ele atribui e já pula para a próxima foto. Repita até acabar.</li>
+      </ol>
+      <p>O botão <strong>Sem foto (n)</strong>, ao lado da busca, mostra só os produtos que ainda faltam — a lista encurta sozinha conforme você trabalha.</p>
+
+      <div class="nota">
+        <span class="rotulo">Foto de iPhone</span>
+        <p>O iPhone grava em HEIC, um formato que o sistema não abre. No celular: <strong>Ajustes → Câmera → Formatos → Mais Compatível</strong>. As fotos novas já saem no formato certo.</p>
+      </div>
+
+      <h3 id="copao">Copão e dose</h3>
+      <p>Dois casos especiais, ambos com uma coisa em comum: <strong>não têm estoque próprio</strong>. O que baixa é a garrafa.</p>
+
+      <h4>Dose</h4>
+      <p>Cadastre a dose como um produto e diga de qual garrafa ela sai e quantos ml tem. Ao vender uma dose de 50 ml, saem 50 ml da garrafa. A dose não aparece na tela de Estoque, porque não existe "estoque de dose" — existe garrafa.</p>
+
+      <h4>Copão (produto composto)</h4>
+      <p>O copão é uma receita <strong>por categoria</strong>: 80 ml de Destilado, 1 Energético, 1 Gelo, 1 Copo. Cada linha tem o item que <strong>vem por padrão</strong>, e o preço que você cadastra vale para essa combinação.</p>
+      <p>Na venda, trocar um item pelo outro <strong>ajusta o preço pela diferença</strong>: se o cliente troca o energético padrão por um Monster que custa R$ 5 a mais, o copão sobe R$ 5 sozinho. A linha da bebida costuma ficar marcada como <strong>"não troca"</strong>, já que existe um copão para cada destilado.</p>
+    </section>
+
+    <!-- ========================================================= MERCADORIA -->
+    <section id="mercadoria">
+      <p class="parte-num">Parte 4</p>
+      <h2 class="parte">Mercadoria entrando</h2>
+      <p class="abre">Existem dois caminhos para dar entrada. Eles não fazem a mesma coisa, e escolher o errado tira o controle do seu dinheiro.</p>
+
+      <h3 id="compra">Registrar a compra</h3>
+      <p><strong>Este é o caminho certo quando você comprou de um fornecedor.</strong> Além de dar entrada no estoque, ele guarda a nota, o fornecedor e — se você marcar — cria a conta a pagar.</p>
+
+      <figure class="tela">
+        <img src="__IMG:05-compras__" alt="Tela de Compras com o histórico de compras registradas e o botão de nova compra.">
+        <figcaption><b>Compras.</b> O histórico guarda fornecedor, data, número da nota e total de cada compra.</figcaption>
+      </figure>
+
+      <ol class="passos">
+        <li><strong>＋ Nova compra</strong>.</li>
+        <li>Escolha o fornecedor. Se ainda não existe, cadastre ali mesmo.</li>
+        <li>Preencha o <strong>número e a data da nota</strong>, quando houver.</li>
+        <li>Busque cada produto, escolha a <strong>embalagem</strong> (caixa ou unidade), a quantidade e <strong>quanto você pagou por embalagem</strong>.</li>
+        <li>Se o produto vence, preencha a <strong>validade</strong> na linha.</li>
+        <li>Marque <strong>gerar conta a pagar</strong> e ponha o vencimento, se for pagar depois.</li>
+        <li>Confirmar.</li>
+      </ol>
+
+      <div class="aviso">
+        <span class="rotulo">Não pule o custo</span>
+        <p>O custo é o que permite ao sistema calcular o seu <strong>lucro</strong>. Produto que entra sem custo aparece depois como se desse 100% de lucro, e o número do Dashboard fica inventado. Leia <a href="#numeros">Entendendo o lucro</a>.</p>
+      </div>
+
+      <h3 id="entrada">Entrada rápida pelo Estoque</h3>
+      <p>Serve para acertos: chegou mercadoria avulsa, você contou e faltava, quebrou uma garrafa. <strong>Não gera compra nem conta a pagar.</strong></p>
+
+      <figure class="tela">
+        <img src="__IMG:04-estoque__" alt="Tela de Estoque listando produtos com quantidade atual, mínimo, custo médio e status.">
+        <figcaption><b>Estoque.</b> Clicar num produto abre as três abas: Entrada, Inventário e Retirada.</figcaption>
+      </figure>
+
+      <ul class="solta">
+        <li><strong>Entrada</strong> — soma ao estoque. O campo de custo é opcional, mas deixá-lo vazio mantém o custo antigo (e se nunca houve custo, fica zero).</li>
+        <li><strong>Inventário</strong> — você contou a prateleira e digita o número certo. O sistema ajusta a diferença.</li>
+        <li><strong>Retirada</strong> — quebra, perda, consumo próprio. Baixa do estoque sem contar como venda.</li>
+      </ul>
+      <p>Toda alteração fica registrada com quem fez e quando. Inventário e Retirada são exclusivos do administrador, justamente porque mudam saldo sem nota.</p>
+
+      <h3 id="validade">Vencimento</h3>
+      <p>Quando você informa a validade na entrada, aquela remessa vira um <strong>lote</strong>. A venda passa a consumir sempre <strong>o lote que vence primeiro</strong>, sem você fazer nada.</p>
+
+      <figure class="tela">
+        <img src="__IMG:11-vencimento__" alt="Aba Vencimento com cartões de resumo e a lista de lotes por prazo.">
+        <figcaption><b>Vencimento.</b> Os cartões separam o que já venceu, o que vence nesta semana e o que vence no mês.</figcaption>
+      </figure>
+
+      <p>A tela também aponta <strong>divergências</strong>: quando o saldo do estoque não bate com a soma dos lotes. Isso acontece quando entrou mercadoria sem validade ou houve inventário. Não é erro do sistema, é aviso de que aquele produto tem parte do estoque sem validade conhecida.</p>
+    </section>
+
+    <!-- =========================================================== DINHEIRO -->
+    <section id="dinheiro">
+      <p class="parte-num">Parte 5</p>
+      <h2 class="parte">O dinheiro</h2>
+
+      <h3 id="contas">Contas a pagar</h3>
+
+      <figure class="tela">
+        <img src="__IMG:10-financeiro__" alt="Tela Financeiro com os cartões de resumo e a lista de contas a pagar em aberto.">
+        <figcaption><b>Financeiro.</b> Contas vencidas aparecem destacadas. O saldo previsto é o que você tem a receber menos o que tem a pagar.</figcaption>
+      </figure>
+
+      <p>As contas chegam aqui de dois jeitos: das compras (quando você marca "gerar conta a pagar") ou de <strong>＋ Nova despesa</strong>, para o que não é mercadoria — aluguel, luz, internet.</p>
+
+      <h4>Pagar</h4>
+      <p>Ao clicar em <strong>Pagar</strong>, você escolhe de onde o dinheiro sai: <strong>Gaveta</strong>, Pix, Débito ou Crédito. O sistema mostra, antes de você confirmar, quanto tem na gaveta agora e quanto vai ficar depois.</p>
+      <p>Pagar pela <strong>Gaveta</strong> lança uma sangria automática no caixa aberto — sem isso o caixa não fecharia à noite. As outras formas baixam a conta mas não mexem na gaveta.</p>
+
+      <div class="nota">
+        <span class="rotulo">Pagou errado?</span>
+        <p>Ligue <strong>Mostrar já pagas</strong>, ache a conta e clique em <strong>Estornar</strong>. Ela volta a ficar aberta e, se tinha saído da gaveta, o dinheiro volta como suprimento no caixa de hoje. Também dá para <strong>Excluir</strong> uma despesa criada por engano.</p>
+      </div>
+
+      <h3 id="clientes">Clientes e fiado</h3>
+
+      <figure class="tela">
+        <img src="__IMG:09-clientes__" alt="Tela de Clientes com o total a receber em fiado e a lista de clientes com o saldo devedor de cada um.">
+        <figcaption><b>Clientes.</b> A faixa do alto resume o fiado da loja inteira: quanto está na rua e quantos clientes devem.</figcaption>
+      </figure>
+
+      <p>O <strong>limite</strong> é o quanto aquela pessoa pode dever. O sistema soma o que ela já deve com a venda nova e recusa se passar. Limite zero significa que ela não compra fiado.</p>
+
+      <h4>Receber</h4>
+      <p>Abra o cliente e clique em <strong>Receber pagamento</strong>. Aceita <strong>pagamento parcial</strong>: se ele deve R$ 300 e paga R$ 100, o sistema abate das contas mais antigas primeiro. Recebimento em dinheiro entra na gaveta e aparece no fechamento.</p>
+
+      <h3 id="numeros">Entendendo o lucro</h3>
+      <p class="abre">Vale um minuto de leitura, porque é o ponto que mais confunde.</p>
+
+      <p><strong>Comprar mercadoria não aparece como despesa em lugar nenhum.</strong> Isso é de propósito: comprar não é gastar, é trocar dinheiro por estoque. Você tinha R$ 500 em dinheiro, agora tem R$ 500 em cerveja na prateleira.</p>
+
+      <p>A despesa nasce <strong>quando a mercadoria é vendida</strong>. Aí o custo daquela garrafa entra como custo daquela venda, e o lucro é a diferença. É por isso que:</p>
+      <ul class="solta">
+        <li>O total das compras não é subtraído do lucro do dia.</li>
+        <li>Comprar mais caro amanhã <strong>não muda</strong> o lucro de uma venda de ontem — o custo fica travado no momento da venda.</li>
+        <li>O que saiu de dinheiro de verdade aparece no <strong>caixa</strong> (sangria) quando você paga a conta, não quando registra a compra.</li>
+      </ul>
+
+      <div class="aviso">
+        <span class="rotulo">Por isso o custo importa</span>
+        <p>Produto cadastrado <strong>sem custo</strong> é contabilizado como custo zero. Toda venda dele aparece como <strong>lucro de 100%</strong>, e o lucro do Dashboard fica maior do que a realidade. Pior: uma entrada sem custo <strong>puxa a média para baixo</strong> e estraga também o custo do que foi comprado direito.</p>
+        <p>Sempre que der entrada, preencha o custo.</p>
+      </div>
+    </section>
+
+    <!-- ========================================================= ACOMPANHAR -->
+    <section id="acompanhar">
+      <p class="parte-num">Parte 6</p>
+      <h2 class="parte">Acompanhar</h2>
+
+      <h3>Dashboard</h3>
+      <figure class="tela">
+        <img src="__IMG:02-dashboard__" alt="Dashboard com os cartões de vendas do dia, lucro estimado, ticket médio e produtos em falta, mais os painéis de mais vendidos e financeiro.">
+        <figcaption><b>Dashboard.</b> É a primeira tela ao entrar. Os cartões <b>Produtos em falta</b> e <b>A receber</b> são atalhos: clicar leva à tela certa.</figcaption>
+      </figure>
+      <p><strong>Ticket médio</strong> é quanto cada venda rende, em média. Se ele cai, você está vendendo para mais gente comprando menos.</p>
+
+      <h3>Relatórios</h3>
+      <figure class="tela">
+        <img src="__IMG:12-relatorios__" alt="Tela de Relatórios com o seletor de período e os cartões de faturamento, lucro, ticket e número de vendas.">
+        <figcaption><b>Relatórios.</b> O seletor no alto troca o período entre hoje, 7 e 30 dias.</figcaption>
+      </figure>
+      <p>Além dos números do período, traz as <strong>formas de pagamento</strong> (quanto entrou por Pix, cartão, dinheiro), os <strong>mais vendidos</strong> e os <strong>produtos parados</strong> — o que está ocupando prateleira e dinheiro sem girar.</p>
+
+      <h3>Vendas e cancelamento</h3>
+      <figure class="tela">
+        <img src="__IMG:08-vendas__" alt="Histórico de vendas com data, valor, forma de pagamento e o botão de cancelar em cada linha.">
+        <figcaption><b>Vendas.</b> O botão de cancelar fica na própria linha. Venda cancelada fica riscada, nunca some.</figcaption>
+      </figure>
+      <p>Cancelar exige um <strong>motivo escrito</strong> e devolve tudo: a mercadoria volta ao estoque, o fiado é cancelado, e o dinheiro sai da conferência do caixa. Se a venda era de um dia já fechado, a saída entra como sangria no caixa de hoje — o turno antigo não é reaberto.</p>
+      <p>Nada é apagado. A venda muda de situação e o histórico continua inteiro.</p>
+    </section>
+
+    <!-- ========================================================== SEGURANÇA -->
+    <section id="seguranca">
+      <p class="parte-num">Parte 7</p>
+      <h2 class="parte">Backup e usuários</h2>
+
+      <h3>Cópia de segurança</h3>
+      <figure class="tela">
+        <img src="__IMG:14-backup__" alt="Tela de Backup com o status da última cópia, a lista de backups, o painel do Telegram e o registro do sistema.">
+        <figcaption><b>Backup.</b> Só o administrador enxerga esta tela.</figcaption>
+      </figure>
+
+      <ul class="solta">
+        <li>A cópia é feita <strong>sozinha ao fechar o caixa</strong>, e o sistema guarda as <strong>5 mais recentes</strong>.</li>
+        <li><strong>Fazer backup agora</strong> força uma cópia na hora.</li>
+        <li><strong>Restaurar</strong> volta o sistema para uma cópia da lista. Antes de trocar, ele salva o estado atual — dá para voltar atrás.</li>
+        <li><strong>Restaurar de um arquivo…</strong> aceita a cópia que chegou pelo Telegram. É este o caminho quando o computador é outro.</li>
+      </ul>
+
+      <h4>Registro do sistema</h4>
+      <p>No fim da tela fica o registro: fechamentos de caixa, cancelamentos e erros. Se algo estranho acontecer, é aqui que está escrito o que foi.</p>
+
+      <h3 id="telegram">Receber os relatórios no celular</h3>
+      <p>Com isto ligado, toda vez que o caixa fecha o seu celular recebe o resumo do dia, o relatório completo e <strong>a própria cópia do banco de dados</strong>. É o que tira os seus dados de dentro de um computador só.</p>
+      <p>Você vai criar um robô (um <em>bot</em>) de graça dentro do próprio Telegram. Leva uns cinco minutos e é uma vez só.</p>
+
+      <h4>Passo 1 — criar o bot no celular</h4>
+      <ol class="passos">
+        <li>Abra o Telegram e procure por <strong>@BotFather</strong> — é o robô oficial que cria os outros. Ele tem um selo azul de verificado.</li>
+        <li>Abra a conversa e mande <strong>/newbot</strong>.</li>
+        <li>Ele pede um <strong>nome</strong>. Pode ser <em>Empório dos Amigos</em>.</li>
+        <li>Depois pede um <strong>usuário</strong>, que precisa terminar em <code>bot</code> e ser único — por exemplo <em>emporio_amigos_062_bot</em>. Se já existir, ele avisa e você tenta outro.</li>
+        <li>Ele responde com o <strong>token</strong>: uma linha comprida parecida com <em>8123456789:AAF…</em>. <strong>Copie essa linha.</strong></li>
+      </ol>
+
+      <div class="aviso">
+        <span class="rotulo">O token é uma senha</span>
+        <p>Quem tiver o token manda mensagem no lugar do seu bot. Não repasse para ninguém e não tire foto dele. Se vazar, mande <strong>/revoke</strong> no @BotFather: o token antigo morre e ele te dá um novo, que você cola no sistema de novo.</p>
+        <p>O token fica gravado só neste computador.</p>
+      </div>
+
+      <h4>Passo 2 — decidir quem recebe</h4>
+      <p>Duas opções. Escolha uma antes de continuar:</p>
+      <ul class="solta">
+        <li><strong>Só você.</strong> Abra a conversa com o bot que você acabou de criar e mande qualquer mensagem, um "oi" serve.</li>
+        <li><strong>Um grupo</strong> (você e o sócio, por exemplo). Crie o grupo no Telegram, <strong>adicione o seu bot</strong> como membro e mande no grupo uma mensagem <strong>começando com barra</strong> — por exemplo <strong>/oi</strong>.</li>
+      </ul>
+
+      <div class="nota">
+        <span class="rotulo">Por que a barra no grupo</span>
+        <p>Dentro de grupos, o Telegram só entrega ao bot as mensagens que começam com <strong>/</strong>. Um "oi" comum ele nem enxerga — e o sistema não vai achar o grupo. Na conversa privada isso não vale: qualquer mensagem serve.</p>
+      </div>
+
+      <h4>Passo 3 — ligar no sistema</h4>
+      <ol class="passos">
+        <li>No sistema, vá em <strong>Backup</strong> e desça até <strong>Aviso no celular (Telegram)</strong>.</li>
+        <li>Cole o token em <strong>Token do bot</strong>.</li>
+        <li>Clique em <strong>Descobrir</strong>, ao lado do campo <strong>Chat / grupo</strong>. Ele procura a conversa onde você acabou de mandar a mensagem e preenche o campo sozinho, mostrando o nome encontrado.</li>
+        <li>Ligue <strong>Enviar automaticamente ao fechar o caixa</strong>.</li>
+        <li>Ligue <strong>Enviar também a cópia de segurança</strong>.</li>
+        <li>Clique em <strong>Enviar teste agora</strong>. A mensagem deve chegar no celular em poucos segundos.</li>
+        <li>Chegou? Clique em <strong>Salvar</strong>. Pronto — a partir do próximo fechamento de caixa é automático.</li>
+      </ol>
+
+      <div class="dica">
+        <span class="rotulo">Não chegou o teste</span>
+        <p><strong>"Chat não encontrado"</strong> — você não mandou a mensagem antes de clicar em Descobrir, ou mandou no grupo sem a barra. Mande <strong>/oi</strong> e clique em Descobrir de novo.</p>
+        <p><strong>Erro de token</strong> — provavelmente veio um espaço junto na hora de copiar. Apague o campo e cole outra vez.</p>
+        <p><strong>Nada acontece</strong> — o computador da loja está sem internet. O sistema continua vendendo normalmente sem internet; só o envio depende dela.</p>
+      </div>
+
+      <div class="aviso">
+        <span class="rotulo">Se desligar, a cópia fica só aqui</span>
+        <p>Com o envio desligado, a única cópia dos seus dados fica no HD da loja. Se ele queimar, acabou. Deixe ligado.</p>
+      </div>
+
+      <h3>Usuários</h3>
+      <figure class="tela">
+        <img src="__IMG:13-usuarios__" alt="Tela de Usuários com a lista de contas e seus perfis.">
+        <figcaption><b>Usuários.</b> Cada pessoa com o seu login — é assim que se sabe quem fez cada venda.</figcaption>
+      </figure>
+
+      <p>Existem dois perfis. O <strong>Funcionário</strong> vende, mas não enxerga o seu dinheiro:</p>
+      <div class="rolagem">
+        <table>
+          <thead><tr><th>O que faz</th><th>Administrador</th><th>Funcionário</th></tr></thead>
+          <tbody>
+            <tr><td>Vender no PDV e abrir/fechar caixa</td><td class="sim">sim</td><td class="sim">sim</td></tr>
+            <tr><td>Consultar produtos</td><td class="sim">sim</td><td class="sim">sim</td></tr>
+            <tr><td>Dar entrada de mercadoria</td><td class="sim">sim</td><td class="sim">sim</td></tr>
+            <tr><td>Atender cliente e fiado</td><td class="sim">sim</td><td class="sim">sim</td></tr>
+            <tr><td>Cadastrar produto e mexer em preço</td><td class="sim">sim</td><td class="nao">não</td></tr>
+            <tr><td>Dar desconto</td><td class="sim">sim</td><td class="nao">não</td></tr>
+            <tr><td>Inventário e retirada de estoque</td><td class="sim">sim</td><td class="nao">não</td></tr>
+            <tr><td>Cancelar venda</td><td class="sim">sim</td><td class="nao">não</td></tr>
+            <tr><td>Ver financeiro, compras e relatórios</td><td class="sim">sim</td><td class="nao">não</td></tr>
+            <tr><td>Usuários e backup</td><td class="sim">sim</td><td class="nao">não</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>O que o funcionário não pode fazer nem aparece na tela dele. E a recusa não é só visual: mesmo forçando por fora, o sistema não deixa passar.</p>
+    </section>
+
+    <!-- ============================================================ DÚVIDAS -->
+    <section id="duvidas">
+      <p class="parte-num">Parte 8</p>
+      <h2 class="parte">Deu problema?</h2>
+
+      <h4>O PDV não deixa vender</h4>
+      <p>O caixa está fechado. Vá em <strong>Caixa</strong> e abra.</p>
+
+      <h4>O caixa não fechou certo</h4>
+      <p>Quase sempre é sangria ou suprimento não lançado, ou conta paga pela gaveta com o caixa já fechado. Confira as movimentações do dia na aba Caixa.</p>
+
+      <h4>Bipei e não achou o produto</h4>
+      <p>Aquele código de barras não está em nenhuma embalagem. Abra o produto em <strong>Produtos</strong> e cadastre o código na embalagem certa — lembre que caixa e unidade têm códigos diferentes.</p>
+
+      <h4>O lucro está estranho</h4>
+      <p>Provavelmente tem produto com custo zero. Veja <a href="#numeros">Entendendo o lucro</a>.</p>
+
+      <h4>A foto não abre</h4>
+      <p>Se for foto de iPhone, é HEIC. Mude o formato no celular para "Mais Compatível". O sistema abre JPG, PNG, BMP e GIF.</p>
+
+      <h4>Preciso mudar de computador</h4>
+      <p>Copie a pasta do programa para o computador novo, abra e use <strong>Restaurar de um arquivo…</strong> na tela de Backup, escolhendo a cópia mais recente que chegou no seu Telegram.</p>
+    </section>
+
+  </main>
+</div>
