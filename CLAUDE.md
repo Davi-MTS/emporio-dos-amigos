@@ -8,6 +8,15 @@ financeiro, compras, clientes (fiado) e relatórios. **Loja única.**
 `resources/images/logo.png` (embutida como `:/images/logo.png`, usada no login e
 na sidebar). Ver `docs/design-ui.md` e `docs/mockup-ui.html`.
 
+**A logo também é o ícone do programa**, em dois lugares que o Windows trata
+separado: o **arquivo .exe** (Explorer, atalho) vem de `resources/images/logo.ico`
+via `resources/app.rc.in` → `app.rc` (gerado pelo CMake com o caminho absoluto
+do .ico, `enable_language(RC)` em `qml/CMakeLists.txt`); a **janela aberta**
+(barra de título/tarefas) vem de `QGuiApplication::setWindowIcon` no `main.cpp`.
+O `.ico` tem 9 tamanhos (16–128 em bitmap 32 bits, 256 em PNG) e foi gerado da
+`logo.png` com o `System.Drawing` do Windows; trocando a logo, gere o `.ico` de
+novo. Conferido extraindo o ícone do próprio .exe e da janela em execução.
+
 ## Estado atual (resumo)
 
 > Sistema **completo e empacotado**. O histórico detalhado de cada fase está no

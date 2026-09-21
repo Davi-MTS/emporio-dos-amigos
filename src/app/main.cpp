@@ -9,6 +9,7 @@
 #include <QFont>
 #include <QFontDatabase>
 #include <QGuiApplication>
+#include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
@@ -46,6 +47,12 @@ int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
     QQuickStyle::setStyle(QStringLiteral("Fusion"));
+
+    // Ícone das JANELAS (barra de título e barra de tarefas com o sistema
+    // aberto). O do arquivo .exe é outra coisa, vem do app.rc. Definido aqui,
+    // antes de qualquer janela, para valer também para a janela de "banco não
+    // abre".
+    QGuiApplication::setWindowIcon(QIcon(QStringLiteral(":/images/logo.png")));
 
     // Fontes da identidade (Archivo p/ UI, Fraunces p/ marca/títulos).
     QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/Archivo-Variable.ttf"));

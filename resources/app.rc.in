@@ -1,0 +1,5 @@
+// Icone do executavel: e o que aparece no Explorer, no atalho da area de
+// trabalho e na barra de tarefas antes de o sistema abrir. IDI_ICON1 e o nome
+// que o Qt usa (documentacao "Setting the Application Icon").
+// Gerado pelo CMake (configure_file) com o caminho absoluto do .ico.
+IDI_ICON1 ICON "@ICONE_APP@"

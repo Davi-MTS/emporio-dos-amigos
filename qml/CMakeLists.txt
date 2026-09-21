@@ -97,6 +97,23 @@ set_target_properties(distribuidora PROPERTIES
     WIN32_EXECUTABLE $<CONFIG:Release>
 )
 
+# Ícone do executável — a logo da marca no Explorer, no atalho da área de
+# trabalho e na barra de tarefas. O .ico (resources/images/logo.ico, vários
+# tamanhos) sai da mesma logo.png das telas. O .rc é gerado com o caminho
+# ABSOLUTO do .ico para não depender de onde o compilador de recursos procura
+# arquivos relativos.
+if(WIN32)
+    enable_language(RC)
+    set(ICONE_APP "${CMAKE_SOURCE_DIR}/resources/images/logo.ico")
+    configure_file("${CMAKE_SOURCE_DIR}/resources/app.rc.in"
+                   "${CMAKE_CURRENT_BINARY_DIR}/app.rc" @ONLY)
+    target_sources(distribuidora PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/app.rc")
+    # O CMake não enxerga o .ico citado DENTRO do .rc: sem isto, trocar o ícone
+    # não recompilaria o recurso.
+    set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/app.rc"
+        PROPERTIES OBJECT_DEPENDS "${ICONE_APP}")
+endif()
+
 # Liga o PLUGIN do módulo (e não só a biblioteca): é ele que inicializa os
 # recursos :/qt/qml/Distribuidora/... para o "import Distribuidora" funcionar.
 target_link_libraries(distribuidora
