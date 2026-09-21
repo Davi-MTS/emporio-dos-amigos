@@ -107,6 +107,54 @@ TestCase {
         verify(linha.insumosLabel.length > 0, "a linha precisa mostrar a receita");
     }
 
+    // A embalagem fica AO LADO do nome, em coluna própria — não empilhada
+    // embaixo dele. E na MESMA posição em toda linha, tenha o produto uma
+    // embalagem (texto) ou várias (seletor): senão as linhas dançam.
+    function test_embalagem_ao_lado_do_nome() {
+        // O carrinho só aparece com o caixa aberto: fechado, a tela mostra o
+        // painel "Caixa fechado" e a lista inteira fica invisível.
+        App.abrirCaixa("50,00");
+        var p = App.novoProduto();
+        p.nome = "Zzz Palheiro Teste";
+        p.categoriaId = categoriaInsumo;
+        p.embalagens = [{ id: 0, nome: "Unidade", fator: 1, codigoBarras: "", preco: 250, custo: -1 },
+                        { id: 0, nome: "Caixinha", fator: 10, codigoBarras: "", preco: 2300, custo: -1 }];
+        verify(App.salvarProduto(p), App.ultimoErro());
+
+        var pdv = novoPdv();
+        pdv.adicionar(App.buscarProdutosPorNome("Zzz Palheiro Teste", true)[0]);
+        pdv.adicionar(item(idSimples));   // esse tem uma embalagem só
+        wait(0);
+        waitForRendering(pdv);   // sem um quadro desenhado o ListView nem cria as linhas
+
+        var lista = findChild(pdv, "listaCarrinho");
+        verify(lista !== null, "não achei o carrinho");
+        compare(lista.count, 2);
+        verify(pdv.mostrarEmbalagem, "a 1160 px a coluna da embalagem tem que caber");
+
+        var xs = [];
+        for (var i = 0; i < 2; i++) {
+            var celula = findChild(lista.itemAtIndex(i), "embalagemCarrinho");
+            verify(celula !== null, "linha " + i + " sem a coluna de embalagem");
+            verify(celula.visible, "a coluna de embalagem sumiu da linha " + i);
+            xs.push(Math.round(celula.mapToItem(lista, 0, 0).x));
+        }
+        compare(xs[1], xs[0], "a coluna tem que começar no mesmo x nas duas linhas");
+
+        // Produto com escolha mostra o seletor; o de uma embalagem, não.
+        var combo0 = findChild(lista.itemAtIndex(0), "comboEmbalagemCarrinho");
+        verify(combo0 !== null && combo0.visible, "produto com 2 embalagens precisa do seletor");
+        var combo1 = findChild(lista.itemAtIndex(1), "comboEmbalagemCarrinho");
+        verify(combo1 === null || !combo1.visible, "com uma embalagem só não há o que escolher");
+
+        // AO LADO: o seletor começa depois de onde o nome termina.
+        var nomeDireita = xs[0];
+        verify(combo0.mapToItem(lista, 0, 0).x >= nomeDireita - 1,
+               "o seletor não está na coluna da embalagem");
+
+        App.fecharCaixa("50,00");
+    }
+
     // Limpar tem que zerar tudo — total, pagamentos e aviso.
     function test_limpar_zera() {
         var pdv = novoPdv();

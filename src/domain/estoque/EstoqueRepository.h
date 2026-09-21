@@ -5,6 +5,8 @@
 #include <QVector>
 #include <QtGlobal>
 
+#include <optional>
+
 // Item de estoque para listagem (uma linha por produto).
 struct ItemEstoque
 {
@@ -20,6 +22,24 @@ struct ItemEstoque
     // truncado, a garrafa de 1 L de R$ 18,99 virava R$ 10,00.
     qint64 custoMedioMilli = 0;
     bool temFoto = false;    // evita pedir imagem de quem não tem
+
+    // Preço de venda por unidade base, em MILÉSIMOS de centavo. Sai da MENOR
+    // embalagem que tem preço (normalmente a unidade), levado para a unidade
+    // base — a mesma referência que o aviso de custo usa, para que os dois
+    // nunca discordem sobre "o preço" de um produto. 0 = produto sem preço.
+    qint64 precoBaseMilli = 0;
+
+    // Margem sobre o PREÇO DE VENDA — não é markup. (preço − custo) ÷ preço:
+    // custo R$ 10,00 e venda R$ 15,00 dá 33,3% (o markup seria 50%). É o número
+    // que o dono usa para saber quanto de cada real vendido sobra.
+    //
+    // Em DÉCIMOS de por cento (333 = 33,3%), para não espalhar double pelo
+    // sistema. Devolve nada quando não há o que calcular: produto sem preço de
+    // venda, ou com custo 0 — que aqui significa DESCONHECIDO (ver
+    // aplicarEntrada), e mostrar 100% de margem nesse caso seria mentira.
+    // Custo acima do preço devolve margem NEGATIVA de propósito: é prejuízo, e
+    // é justamente o que se quer enxergar.
+    std::optional<int> margemDecimos() const;
 };
 
 // Acesso a dados de estoque: listagem, entrada de mercadoria (com custo médio
@@ -67,6 +87,28 @@ public:
 
     QString ultimoErro() const { return m_erro; }
 
+    // Correção de custo (aba "Custo" do Estoque): troca o custo médio do produto
+    // SEM mexer na quantidade. Existe porque não havia volta para um custo
+    // digitado errado na compra — nem cancelar compra existe — e o erro ficava
+    // no lucro para sempre (na loja: palheiro com custo de R$ 17,50 vendido a
+    // R$ 2,00, prejuízo que nunca aconteceu).
+    //
+    // Com `corrigirVendas`, regrava também o custo TRAVADO das vendas feitas
+    // desde a última entrada do produto: é o período em que o custo errado
+    // estava valendo. Antes disso o custo veio de outra entrada e não é tocado.
+    // Só vendas concluídas (cancelada não entra no lucro, não há o que corrigir).
+    //
+    // Deixa rastro: movimentação de quantidade 0 (tipo 'ajuste', origem
+    // 'ajuste_custo') com o custo antigo e o novo. O relatório de lucro só lê
+    // 'saida_venda', então essa linha não mexe em conta nenhuma. Em transação.
+    bool ajustarCusto(int produtoId, qint64 novoCustoMilli, bool corrigirVendas,
+                      int usuarioId, const QString &motivo, int *vendasCorrigidas = nullptr);
+
+    // Quantas vendas concluídas levaram este produto desde a última entrada, e
+    // a data dessa entrada ("" se nunca houve — aí são todas). É exatamente o
+    // conjunto que ajustarCusto corrige: a tela mostra o número ANTES de gravar.
+    int vendasDesdeUltimaEntrada(int produtoId, QString *dataUltimaEntrada = nullptr);
+
 private:
     // Dá custo às unidades que foram VENDIDAS SEM ESTOQUE, usando o custo da
     // mercadoria que chegou. Cobre no máximo `qtdCoberta` unidades, das vendas
@@ -74,6 +116,7 @@ private:
     bool acertarCustoPendente(int produtoId, qint64 qtdCoberta, qint64 custoUnitBaseMilli);
 
     bool garantirLinhaEstoque(int produtoId);
+
 
     QSqlDatabase m_db;
     QString m_erro;

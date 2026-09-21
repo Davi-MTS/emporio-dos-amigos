@@ -144,6 +144,17 @@ public:
     Q_INVOKABLE bool registrarRetirada(int produtoId, int embalagemId, int qtdEmb,
                                        const QString &motivo);
 
+    // Aba "Custo": corrige o custo de um produto que entrou com custo errado,
+    // sem mexer na quantidade. O custo é digitado POR EMBALAGEM (igual à
+    // Entrada) e o fator vem do cadastro. `previaAjusteCusto` responde o que a
+    // tela mostra antes de gravar: custo atual → novo (por unidade base),
+    // margem antes → depois e quantas vendas desde a última entrada seriam
+    // corrigidas. Exige `ajusta_estoque`, a mesma chave de Inventário/Retirada.
+    Q_INVOKABLE QVariantMap previaAjusteCusto(int produtoId, int embalagemId,
+                                              const QString &custoTexto);
+    Q_INVOKABLE bool ajustarCusto(int produtoId, int embalagemId, const QString &custoTexto,
+                                  bool corrigirVendas, const QString &motivo);
+
     // --- PDV / Caixa / Vendas ---
     Q_INVOKABLE bool abrirCaixa(const QString &valorAberturaTexto);
     // Busca por código de barras: retorna { encontrado, produtoId, nome,
@@ -294,6 +305,8 @@ public:
     Q_INVOKABLE QString formatarDinheiro(qlonglong centavos) const;      // "R$ 12,50"
     Q_INVOKABLE QString formatarValor(qlonglong centavos) const;         // "12,50"
     Q_INVOKABLE qlonglong parseDinheiro(const QString &texto) const;     // -1 se inválido
+    // Décimos de por cento -> texto pt-BR: 333 -> "33,3%", -125 -> "-12,5%".
+    Q_INVOKABLE QString formatarPercentual(int decimos) const;
 
     // Traduz o erro técnico numa frase que o operador entende. Fica AQUI, na
     // única porta de saída, em vez de nos ~80 lugares que atribuem m_erro: o
@@ -312,6 +325,11 @@ signals:
 
 private:
     void _definirUsuarioAtual(const Usuario &u);
+    // Margem no Estoque é lucro, e lucro é retaguarda: segue `ve_financeiro`,
+    // a mesma chave que já esconde o painel de dinheiro do Dashboard. Chamado
+    // em toda troca de usuário — entrar como funcionário tem que apagar a
+    // margem da lista que o admin deixou carregada.
+    void _aplicarPermissaoDeMargem();
     // Fator da embalagem escolhida, tirado do CADASTRO. A tela manda o fator
     // junto, mas ele só serve para comparar: quando diverge, fica registrado
     // no sistema.log e vale o do cadastro. false (com m_erro) se a embalagem

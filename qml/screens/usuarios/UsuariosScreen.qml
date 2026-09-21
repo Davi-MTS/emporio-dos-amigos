@@ -78,13 +78,26 @@ Rectangle {
                         onClicked: tela.abrirUsuario(idUsuario)
                         contentItem: RowLayout {
                             spacing: Theme.spacingSm
+                            // fillWidth também nos textos: sem isso a coluna não
+                            // cresce e o perfil fica colado no fim do nome, em
+                            // posição diferente a cada linha (mesmo defeito que
+                            // a lista de Clientes tinha).
                             ColumnLayout {
                                 Layout.fillWidth: true
+                                Layout.minimumWidth: 0
                                 spacing: 0
-                                Text { text: linha.nome; color: Theme.text; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold }
-                                Text { text: "@" + linha.login; color: Theme.textMuted; font.pixelSize: Theme.fontXs }
+                                Text { text: linha.nome; Layout.fillWidth: true; color: Theme.text; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold; elide: Text.ElideRight }
+                                Text { text: "@" + linha.login; Layout.fillWidth: true; color: Theme.textMuted; font.pixelSize: Theme.fontXs; elide: Text.ElideRight }
                             }
                             Text { text: linha.perfil; color: Theme.textMuted; font.pixelSize: Theme.fontMd }
+                        }
+
+                        Rectangle {
+                            objectName: "separadorLinha"
+                            anchors.bottom: parent.bottom
+                            width: parent.width
+                            height: 1
+                            color: Theme.border
                         }
                     }
                     Label {

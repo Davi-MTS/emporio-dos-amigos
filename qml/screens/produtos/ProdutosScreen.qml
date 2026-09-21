@@ -441,6 +441,14 @@ Rectangle {
                                     }
                                 }
                             }
+
+                            Rectangle {
+                                objectName: "separadorLinha"
+                                anchors.bottom: parent.bottom
+                                width: parent.width
+                                height: 1
+                                color: Theme.border
+                            }
                         }
 
                         // Estado vazio
@@ -460,7 +468,15 @@ Rectangle {
 
         // ============================== EDITOR =============================
         Rectangle {
+            // `Layout.minimumWidth` sozinho NÃO encolhe nada: com
+            // `fillWidth` falso o Qt trava o item na largura preferida e o
+            // mínimo vira letra morta — era por isso que, na janela
+            // restaurada, o editor saía 60 px para fora da tela. Com
+            // `fillWidth` + `maximumWidth` ele cresce até 520 e encolhe até
+            // 380 quando a janela aperta.
+            Layout.fillWidth: true
             Layout.preferredWidth: 520
+            Layout.maximumWidth: 520
             Layout.minimumWidth: 380
             Layout.fillHeight: true
             radius: Theme.radius

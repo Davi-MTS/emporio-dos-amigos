@@ -76,6 +76,8 @@ TestCase {
             wait(0);
             compare(App.estoque.rowCount(), 1, "filtro " + casos[i][0]);
             var idx = App.estoque.index(0, 0);
+            // Qt.UserRole (256) + posição do role no enum do EstoqueListModel.
+            // Role novo entra no FIM do enum, senão esta conta muda de alvo.
             compare(App.estoque.data(idx, 257 + 7), casos[i][0],   // StatusRole
                     "o selo da linha não é o do filtro " + casos[i][0]);
         }

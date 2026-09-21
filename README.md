@@ -18,6 +18,10 @@ Desktop nativo em **Qt 6 + QML**, regras de negócio em **C++**, banco **SQLite*
   o estoque baixa os **insumos**, não o copão.
 - **Estoque** — entrada de mercadoria, inventário e retirada (perda/quebra), com
   **custo médio ponderado** e conversão de embalagem (unidade ↔ caixa/fardo).
+  **Margem** sobre o preço de venda por produto (só para quem vê o financeiro),
+  filtros por situação e por faixa de margem, e **correção de custo** lançado
+  errado — por qualquer embalagem, corrigindo junto o lucro das vendas feitas
+  com o custo errado.
 - **Caixa** — abertura, sangria, suprimento e **fechamento conferido** (esperado
   × contado × diferença).
 - **Compras** — fornecedores, entrada por nota fiscal (nº e data), geração de

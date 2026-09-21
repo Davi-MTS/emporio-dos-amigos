@@ -71,7 +71,13 @@ void AppBackend::_definirUsuarioAtual(const Usuario &u)
     const QJsonDocument doc = QJsonDocument::fromJson(u.permissoesJson.toUtf8());
     m[QStringLiteral("permissoes")] = doc.object().toVariantMap();
     m_usuarioAtual = m;
+    _aplicarPermissaoDeMargem();
     emit sessaoUsuarioChanged();
+}
+
+void AppBackend::_aplicarPermissaoDeMargem()
+{
+    m_estoqueModel->setMostrarMargem(temPermissao(QStringLiteral("ve_financeiro")));
 }
 
 bool AppBackend::login(const QString &login, const QString &senha)
@@ -104,6 +110,7 @@ void AppBackend::logout()
 {
     m_usuarioId = 0;
     m_usuarioAtual = QVariantMap();
+    _aplicarPermissaoDeMargem();
     emit sessaoUsuarioChanged();
 }
 
@@ -1421,6 +1428,7 @@ bool AppBackend::produtoTemFoto(int produtoId)
 
 void AppBackend::recarregarEstoque(const QString &filtro)
 {
+    _aplicarPermissaoDeMargem();
     m_estoqueModel->setItens(m_estoqueRepo.listar(filtro));
 }
 
@@ -1436,6 +1444,16 @@ QVariantMap AppBackend::itemEstoque(int produtoId)
     m[QStringLiteral("minimo")] = it.minimo;
     m[QStringLiteral("custoMedio")] = static_cast<qlonglong>(it.custoMedio);
     m[QStringLiteral("custoMedioMilli")] = static_cast<qlonglong>(it.custoMedioMilli);
+    // Preço de referência e margem. A chave "margem" só existe quando há margem
+    // para mostrar (produto com preço e com custo conhecido) — a tela distingue
+    // "não há como calcular" de "margem zero", que são coisas diferentes. E só
+    // para quem vê o financeiro: esconder a coluna na tela sem cortar aqui
+    // deixaria o número a uma linha de QML de distância.
+    m[QStringLiteral("precoBase")] = static_cast<qlonglong>((it.precoBaseMilli + 500) / 1000);
+    if (temPermissao(QStringLiteral("ve_financeiro"))) {
+        if (const std::optional<int> margem = it.margemDecimos())
+            m[QStringLiteral("margem")] = *margem;
+    }
     return m;
 }
 
@@ -1643,6 +1661,135 @@ bool AppBackend::registrarRetirada(int produtoId, int embalagemId, int qtdEmb,
     // Quebra/consumo também tira de uma remessa: sem isto a tela de Vencimento
     // continuaria cobrando mercadoria que não está mais na prateleira.
     m_loteRepo.consumirFefo(produtoId, qtdBase);
+
+    m_erro.clear();
+    recarregarEstoque();
+    recarregarProdutos();
+    return true;
+}
+
+// Custo digitado por EMBALAGEM -> milésimos de centavo por unidade base, com o
+// fator do cadastro. Arredonda em inteiro (nada de double em dinheiro).
+// Devolve 0 quando o texto não é um custo válido.
+static qint64 custoPorUnidadeBaseMilli(const QString &custoTexto, int fator)
+{
+    const std::optional<qint64> centavos = Money::parse(custoTexto);
+    if (!centavos || *centavos <= 0 || fator <= 0)
+        return 0;
+    return (*centavos * 1000 + fator / 2) / fator;
+}
+
+QVariantMap AppBackend::previaAjusteCusto(int produtoId, int embalagemId, const QString &custoTexto)
+{
+    QVariantMap out;
+    const ItemEstoque atual = m_estoqueRepo.item(produtoId);
+    out[QStringLiteral("unidadeBase")] = atual.unidadeBase;
+    out[QStringLiteral("custoAtual")] = static_cast<qlonglong>(atual.custoMedio);
+
+    QString desde;
+    out[QStringLiteral("vendas")] = m_estoqueRepo.vendasDesdeUltimaEntrada(produtoId, &desde);
+    out[QStringLiteral("desde")] = desde.isEmpty()
+        ? QString()
+        : QDateTime::fromString(desde, QStringLiteral("yyyy-MM-dd HH:mm:ss"))
+              .toString(QStringLiteral("dd/MM/yyyy"));
+
+    // Margem só para quem vê o financeiro — a mesma trava da coluna Margem.
+    const bool veMargem = temPermissao(QStringLiteral("ve_financeiro"));
+    if (veMargem) {
+        if (const std::optional<int> m = atual.margemDecimos())
+            out[QStringLiteral("margemAtual")] = *m;
+    }
+
+    int fator = 1;
+    if (!_fatorDoCadastro(produtoId, embalagemId, 0, &fator, /*avisarDivergencia=*/false)) {
+        out[QStringLiteral("valido")] = false;
+        return out;
+    }
+    const qint64 novoMilli = custoPorUnidadeBaseMilli(custoTexto, fator);
+    out[QStringLiteral("valido")] = novoMilli > 0;
+
+    // O custo de CADA embalagem, antes e depois. Todas saem do mesmo custo por
+    // unidade (é o mesmo estoque: a lata do fardo aberto é a lata vendida
+    // avulsa), então mudar uma muda todas — e a tela mostra isso em vez de
+    // deixar o dono adivinhar. Também dá o custo atual da embalagem escolhida,
+    // que o campo mostra enquanto está vazio.
+    const auto porEmbalagem = [](qint64 milliPorUnidade, int f) {
+        return static_cast<qlonglong>((milliPorUnidade * f + 500) / 1000);
+    };
+    out[QStringLiteral("custoAtualEmbalagem")] = porEmbalagem(atual.custoMedioMilli, fator);
+    QVariantList linhas;
+    if (const auto p = m_produtoRepo.obter(produtoId)) {
+        QVector<Embalagem> embs = p->embalagens;
+        std::sort(embs.begin(), embs.end(),
+                  [](const Embalagem &a, const Embalagem &b) { return a.fator < b.fator; });
+        for (const Embalagem &e : std::as_const(embs)) {
+            if (e.fator <= 0)
+                continue;
+            QVariantMap l;
+            l[QStringLiteral("id")] = e.id;
+            l[QStringLiteral("nome")] = e.nome;
+            l[QStringLiteral("fator")] = e.fator;
+            l[QStringLiteral("atual")] = porEmbalagem(atual.custoMedioMilli, e.fator);
+            if (novoMilli > 0)
+                l[QStringLiteral("novo")] = porEmbalagem(novoMilli, e.fator);
+            l[QStringLiteral("escolhida")] = (e.id == embalagemId);
+            linhas.push_back(l);
+        }
+    }
+    out[QStringLiteral("embalagens")] = linhas;
+
+    if (novoMilli <= 0)
+        return out;
+
+    out[QStringLiteral("custoNovo")] = static_cast<qlonglong>((novoMilli + 500) / 1000);
+    if (veMargem) {
+        ItemEstoque depois = atual;
+        depois.custoMedioMilli = novoMilli;
+        if (const std::optional<int> m = depois.margemDecimos())
+            out[QStringLiteral("margemNova")] = *m;
+    }
+    return out;
+}
+
+bool AppBackend::ajustarCusto(int produtoId, int embalagemId, const QString &custoTexto,
+                              bool corrigirVendas, const QString &motivo)
+{
+    // Mexe no lucro de tudo o que esse produto vender dali em diante (e, com a
+    // correção das vendas, no dos dias passados): mesma trava do Inventário.
+    if (!temPermissao(QStringLiteral("ajusta_estoque"))) {
+        m_erro = tr("Sem permissão para ajustar o custo");
+        return false;
+    }
+
+    int fator = 1;
+    if (!_fatorDoCadastro(produtoId, embalagemId, 0, &fator, /*avisarDivergencia=*/false))
+        return false;
+    const qint64 novoMilli = custoPorUnidadeBaseMilli(custoTexto, fator);
+    if (novoMilli <= 0) {
+        m_erro = tr("Custo inválido");
+        return false;
+    }
+
+    const ItemEstoque antes = m_estoqueRepo.item(produtoId);
+    int corrigidas = 0;
+    if (!m_estoqueRepo.ajustarCusto(produtoId, novoMilli, corrigirVendas, m_usuarioId,
+                                    motivo, &corrigidas)) {
+        m_erro = m_estoqueRepo.ultimoErro();
+        return false;
+    }
+
+    // No registro do sistema, como o cancelamento de venda: quem mudou o quê.
+    QString linha = QStringLiteral("Custo de '%1' ajustado por '%2': %3 -> %4 por %5")
+                        .arg(antes.nome,
+                             m_usuarioAtual.value(QStringLiteral("nome")).toString(),
+                             Money::format(antes.custoMedio),
+                             Money::format((novoMilli + 500) / 1000),
+                             antes.unidadeBase);
+    if (corrigirVendas)
+        linha += QStringLiteral("; %1 venda(s) corrigida(s)").arg(corrigidas);
+    if (!motivo.trimmed().isEmpty())
+        linha += QStringLiteral(" — motivo: ") + motivo.trimmed();
+    LogService::registrar(linha);
 
     m_erro.clear();
     recarregarEstoque();
@@ -2202,6 +2349,18 @@ QString AppBackend::formatarDinheiro(qlonglong centavos) const
 QString AppBackend::formatarValor(qlonglong centavos) const
 {
     return Money::formatPlain(centavos);
+}
+
+QString AppBackend::formatarPercentual(int decimos) const
+{
+    // Uma casa decimal: 33,3% diz o que precisa sem virar ruído de contador.
+    // Vírgula, não ponto — o resto do sistema também escreve 12,50.
+    const bool negativo = decimos < 0;
+    const int abs = negativo ? -decimos : decimos;
+    QString texto = QStringLiteral("%1,%2%").arg(abs / 10).arg(abs % 10);
+    if (negativo)
+        texto.prepend(QLatin1Char('-'));
+    return texto;
 }
 
 qlonglong AppBackend::parseDinheiro(const QString &texto) const

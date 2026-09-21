@@ -206,11 +206,15 @@ Rectangle {
                             anchors.leftMargin: Theme.spacingMd
                             anchors.rightMargin: Theme.spacingMd
                             spacing: Theme.spacingSm
+                            // Mesmo caso da lista de Clientes: sem fillWidth nos
+                            // textos a coluna não cresce, e o valor e o botão
+                            // "Receber" andavam conforme o tamanho do nome.
                             ColumnLayout {
                                 Layout.fillWidth: true
+                                Layout.minimumWidth: 0
                                 spacing: 0
-                                Text { text: rr.cliente; color: Theme.text; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold; elide: Text.ElideRight }
-                                Text { text: rr.vencimento ? qsTr("vence ") + rr.vencimento : qsTr("fiado"); color: rr.vencida ? Theme.danger : Theme.textMuted; font.pixelSize: Theme.fontXs }
+                                Text { text: rr.cliente; Layout.fillWidth: true; color: Theme.text; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold; elide: Text.ElideRight }
+                                Text { text: rr.vencimento ? qsTr("vence ") + rr.vencimento : qsTr("fiado"); Layout.fillWidth: true; color: rr.vencida ? Theme.danger : Theme.textMuted; font.pixelSize: Theme.fontXs; elide: Text.ElideRight }
                             }
                             Text { text: App.formatarDinheiro(rr.valor); color: Theme.text; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold }
                             AppButton { kind: "default"; text: qsTr("Receber"); onClicked: receberDialog.abrir(rr.idConta, rr.valor, rr.cliente) }

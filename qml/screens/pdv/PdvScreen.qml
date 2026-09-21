@@ -40,8 +40,16 @@ Rectangle {
     // Com a janela restaurada (fora de tela cheia) as colunas fixas do carrinho
     // não cabem e se sobrepõem: escondemos as menos essenciais primeiro.
     property real larguraCarrinho: 0
-    readonly property bool mostrarPrecoUnit: larguraCarrinho > 470
-    readonly property bool mostrarSubtotal:  larguraCarrinho > 360
+    // A embalagem tem coluna própria, ao LADO do nome. Empilhada embaixo dele
+    // ela empurrava o nome para cima e deixava a linha com cara de formulário;
+    // do lado, o carrinho vira uma tabela e dá para correr o olho pela coluna.
+    readonly property int colEmbalagem: 120
+    readonly property bool mostrarEmbalagem: larguraCarrinho > 430
+    // Os limites abaixo contam com a coluna da embalagem: sem somar os 128 px
+    // dela, o preço e o subtotal ficavam e quem sumia era o NOME do produto —
+    // que é a única coisa que não pode faltar numa linha de carrinho.
+    readonly property bool mostrarPrecoUnit: larguraCarrinho > 640
+    readonly property bool mostrarSubtotal:  larguraCarrinho > 520
 
     // Linha rótulo/valor (resumo do fechamento).
     component KV: RowLayout {
@@ -490,7 +498,8 @@ Rectangle {
                                 anchors.leftMargin: Theme.spacingMd
                                 anchors.rightMargin: Theme.spacingMd
                                 spacing: Theme.spacingSm
-                                Text { text: qsTr("Produto"); Layout.fillWidth: true; color: Theme.textMuted; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold }
+                                Text { text: qsTr("Produto"); Layout.fillWidth: true; Layout.minimumWidth: 0; elide: Text.ElideRight; color: Theme.textMuted; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold }
+                                Text { text: qsTr("Embalagem"); visible: tela.mostrarEmbalagem; Layout.preferredWidth: tela.colEmbalagem; elide: Text.ElideRight; color: Theme.textMuted; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold }
                                 Text { text: qsTr("Qtd"); Layout.preferredWidth: 110; horizontalAlignment: Text.AlignHCenter; color: Theme.textMuted; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold }
                                 Text { text: qsTr("Preço"); visible: tela.mostrarPrecoUnit; Layout.preferredWidth: 90; horizontalAlignment: Text.AlignRight; color: Theme.textMuted; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold }
                                 Text { text: qsTr("Subtotal"); visible: tela.mostrarSubtotal; Layout.preferredWidth: 96; horizontalAlignment: Text.AlignRight; color: Theme.textMuted; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold }
@@ -501,6 +510,7 @@ Rectangle {
 
                         ListView {
                             id: cartView
+                            objectName: "listaCarrinho"
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             onWidthChanged: tela.larguraCarrinho = width
@@ -547,17 +557,31 @@ Rectangle {
                                         Layout.minimumWidth: 0
                                         spacing: 2
                                         Text { text: linha.nome; Layout.fillWidth: true; elide: Text.ElideRight; color: Theme.text; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold }
-                                        // Composto: mostra os insumos escolhidos.
+                                        // Composto: mostra os insumos escolhidos. Carrinho
+                                        // estreito demais para a coluna de embalagem: ela
+                                        // volta para cá como texto, para a informação não
+                                        // sumir (trocar a embalagem, aí sim, só alargando).
                                         Text {
-                                            visible: linha._composto
-                                            text: linha.insumosLabel
+                                            visible: linha._composto || !tela.mostrarEmbalagem
+                                            text: linha._composto ? linha.insumosLabel : linha.embNome
                                             Layout.fillWidth: true; elide: Text.ElideRight
                                             color: Theme.textMuted; font.pixelSize: Theme.fontXs
                                         }
-                                        // Simples com várias embalagens: seletor unidade/caixa/fardo.
+                                    }
+                                    // Coluna da embalagem, na mesma posição em toda linha:
+                                    // combo quando há escolha, texto quando só existe uma.
+                                    // Assim as linhas não dançam conforme o produto.
+                                    Item {
+                                        objectName: "embalagemCarrinho"
+                                        visible: tela.mostrarEmbalagem
+                                        Layout.preferredWidth: tela.colEmbalagem
+                                        implicitHeight: 36
                                         AppComboBox {
+                                            objectName: "comboEmbalagemCarrinho"
                                             visible: !linha._composto && linha._embs.length > 1
-                                            Layout.preferredWidth: 160
+                                            anchors.left: parent.left
+                                            anchors.right: parent.right
+                                            anchors.verticalCenter: parent.verticalCenter
                                             model: linha._embs
                                             textRole: "nome"
                                             valueRole: "id"
@@ -573,12 +597,15 @@ Rectangle {
                                                 }
                                             }
                                         }
-                                        // Simples com uma embalagem: só o nome.
+                                        // Uma embalagem só, ou composto: nada para escolher.
                                         Text {
-                                            visible: !linha._composto && linha._embs.length <= 1
-                                            text: linha.embNome
-                                            Layout.fillWidth: true; elide: Text.ElideRight
-                                            color: Theme.textMuted; font.pixelSize: Theme.fontXs
+                                            visible: linha._composto || linha._embs.length <= 1
+                                            text: linha._composto ? "" : linha.embNome
+                                            anchors.left: parent.left
+                                            anchors.right: parent.right
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            elide: Text.ElideRight
+                                            color: Theme.textMuted; font.pixelSize: Theme.fontMd
                                         }
                                     }
                                     AppSpinBox {

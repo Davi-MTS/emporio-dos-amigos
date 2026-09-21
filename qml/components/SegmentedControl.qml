@@ -12,8 +12,31 @@ Item {
     readonly property int _n: Math.max(1, options.length)
     readonly property real _seg: width / _n
 
+    // Largura natural = a MAIOR legenda mandando em todos os segmentos (eles
+    // têm o mesmo tamanho). Sem isto o controle nascia com 260 px fixos, e a
+    // tela tinha de adivinhar um número: "Muito boa 91" em 4 segmentos de 65 px
+    // saía por cima do vizinho. Quem chama pode usar
+    // `width: Math.min(implicitWidth, disponível)` e ter o tamanho certo.
+    TextMetrics {
+        id: regua
+        font.family: Theme.fontBase
+        font.pixelSize: Theme.fontSm
+        font.weight: Font.DemiBold
+    }
+    property real _maiorLegenda: 0
+    function _medir() {
+        var maior = 0;
+        for (var i = 0; i < options.length; i++) {
+            regua.text = "" + options[i];
+            maior = Math.max(maior, regua.advanceWidth);
+        }
+        _maiorLegenda = maior;
+    }
+    onOptionsChanged: _medir()
+    Component.onCompleted: _medir()
+
     implicitHeight: 40
-    implicitWidth: 260
+    implicitWidth: Math.max(200, Math.ceil(_maiorLegenda + 28) * _n)
 
     // Trilho
     Rectangle {
@@ -52,7 +75,14 @@ Item {
                 readonly property bool ativo: seg.index === root.currentIndex
 
                 Text {
-                    anchors.centerIn: parent
+                    // Preso ao segmento e com reticências: espremido, o texto
+                    // encurta em vez de invadir o segmento vizinho.
+                    anchors.fill: parent
+                    anchors.leftMargin: 6
+                    anchors.rightMargin: 6
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    elide: Text.ElideRight
                     text: seg.modelData
                     color: seg.ativo ? "#15100A"
                          : (mouse.containsMouse ? Theme.text : Theme.textMuted)

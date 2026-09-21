@@ -88,6 +88,59 @@ TestCase {
         naoTransborda(t, t.width, dados.tag);
     }
 
+    // Entre a tela cheia e a janela restaurada existe um monte de tamanho
+    // intermediário, e é lá que as coisas ficam feias sem ninguém ver: foi numa
+    // janela de ~1400 que o dono achou os filtros do Estoque tortos, e a 760 as
+    // colunas de Estoque escreviam "Produto" por cima de "Localização".
+    //
+    // Item dentro de um pai com `clip` é recortado DE PROPÓSITO (lista rolável),
+    // então não conta.
+    function dentroDeClip(item, raiz) {
+        var at = item.parent;
+        while (at && at !== raiz) {
+            if (at.clip === true)
+                return true;
+            at = at.parent;
+        }
+        return false;
+    }
+
+    function passaDaBorda(raiz, largura, tag) {
+        var fila = [raiz];
+        while (fila.length > 0) {
+            var it = fila.shift();
+            for (var i = 0; i < it.children.length; i++) {
+                var f = it.children[i];
+                if (f.visible === false || f.width <= 0)
+                    continue;
+                var p = raiz.mapFromItem(f, 0, 0);
+                if (!dentroDeClip(f, raiz) && p.x + f.width > largura + 2) {
+                    fail(tag + " @" + largura + "px: " + f + " vai até x="
+                         + Math.round(p.x + f.width) + ", "
+                         + Math.round(p.x + f.width - largura) + "px fora da tela\n  "
+                         + cadeia(f, raiz));
+                }
+                fila.push(f);
+            }
+        }
+    }
+
+    function test_cabe_em_qualquer_largura_data() { return test_abre_data(); }
+    function test_cabe_em_qualquer_largura(dados) {
+        // Sem `waitForRendering`: a geometria já está resolvida no polish, e
+        // esperar o quadro em 14 telas × 4 larguras custava 4 minutos de suíte.
+        var larguras = [1600, 1200, 900, 760];
+        for (var i = 0; i < larguras.length; i++) {
+            var t = createTemporaryObject(dados.comp, palco,
+                                          { width: larguras[i], height: 620 });
+            verify(t !== null, "não instanciou: " + dados.comp.errorString());
+            wait(0);
+            passaDaBorda(t, larguras[i], dados.tag);
+            t.destroy();
+            wait(0);
+        }
+    }
+
     // Descreve o item e seus pais (posição/largura) para dizer ONDE estourou.
     function cadeia(item, raiz) {
         var partes = [];

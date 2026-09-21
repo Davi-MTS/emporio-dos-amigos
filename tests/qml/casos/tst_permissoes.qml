@@ -113,6 +113,51 @@ TestCase {
         wait(0);
         compare(est.podeAjustarEstoque, false, "sem inventário/retirada");
         compare(est.podeReceberMercadoria, true, "mas recebe mercadoria");
+        compare(est.podeVerMargem, false, "margem é lucro da loja, não é do balcão");
+    }
+
+    // Margem no Estoque: some da tela E não chega pelo backend. Só esconder a
+    // coluna deixaria o número a uma linha de QML de distância.
+    function test_funcionario_nao_ve_margem_no_estoque() {
+        // Os casos rodam em sequência e a sessão sobrevive a eles: entra como
+        // administrador antes de criar o produto.
+        App.logout();
+        verify(App.login("teste", "teste1234"), "o administrador não conseguiu entrar");
+
+        // Como administrador, a margem existe: sem isto o caso passaria mesmo
+        // que a margem estivesse quebrada para todo mundo.
+        var p = App.novoProduto();
+        p.nome = "Zzz Margem Permissao";
+        p.categoriaId = App.categorias()[0].id;
+        p.embalagens = [{ id: 0, nome: "Unidade", fator: 1, codigoBarras: "",
+                          preco: 1500, custo: -1 }];
+        verify(App.salvarProduto(p), App.ultimoErro());
+        var id = App.buscarProdutosPorNome(p.nome)[0].produtoId;
+        var emb = App.embalagensDe(id)[0].id;
+        verify(App.registrarEntrada(id, emb, 10, "10,00", "", "", ""), App.ultimoErro());
+        compare(App.itemEstoque(id).margem, 333, "o admin tem que ver 33,3%");
+
+        entrarComoFuncionario();
+        App.recarregarEstoque("Zzz Margem Permissao");
+        wait(0);
+        compare(App.itemEstoque(id).margem, undefined,
+                "o funcionário não pode receber a margem pelo backend");
+        compare(App.estoque.rowCount(), 1);
+        // MargemRole = Qt.UserRole + posição no enum (o último da lista).
+        compare(App.estoque.data(App.estoque.index(0, 0), 257 + 9), undefined,
+                "nem pelo model da lista");
+
+        var est = createTemporaryObject(cEstoque, palco, { width: 1060, height: 660 });
+        verify(est !== null, cEstoque.errorString());
+        wait(0);
+        var lista = findChild(est, "listaEstoque");
+        var celula = findChild(lista.itemAtIndex(0), "margemLinha");
+        verify(celula !== null);
+        verify(!celula.visible, "a coluna Margem tem que sumir para o funcionário");
+        verify(!findChild(est, "margemCabecalho").visible,
+               "o cabeçalho da coluna também — senão fica um buraco sem explicação");
+
+        App.recarregarEstoque("");
     }
 
     // Barra lateral: retaguarda não aparece para o funcionário.

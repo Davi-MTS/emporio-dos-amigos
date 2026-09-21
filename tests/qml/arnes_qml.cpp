@@ -13,6 +13,8 @@
 
 #include <QtQuickTest>
 
+#include <QFontDatabase>
+#include <QGuiApplication>
 #include <QImage>
 #include <QQmlContext>
 #include <QQmlEngine>
@@ -37,6 +39,14 @@ public Q_SLOTS:
         QCoreApplication::setOrganizationName(QStringLiteral("DistribuidoraTeste"));
         QCoreApplication::setApplicationName(QStringLiteral("DistribuidoraTeste"));
         QQuickStyle::setStyle(QStringLiteral("Fusion"));
+
+        // As MESMAS fontes que o main.cpp carrega. Não muda resultado de teste
+        // nenhum, mas sem elas a plataforma offscreen não tem fonte alguma e
+        // toda imagem tirada com grabImage sai com o texto em quadradinhos —
+        // inútil justamente quando se está investigando um problema visual.
+        QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/Archivo-Variable.ttf"));
+        QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/Fraunces-Variable.ttf"));
+        QGuiApplication::setFont(QFont(QStringLiteral("Archivo")));
 
         m_pasta.reset(new QTemporaryDir);
         Q_ASSERT(m_pasta->isValid());

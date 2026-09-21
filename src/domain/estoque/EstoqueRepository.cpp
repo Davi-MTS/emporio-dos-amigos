@@ -1,10 +1,34 @@
 #include "domain/estoque/EstoqueRepository.h"
 
+#include "utils/Money.h"
+
 #include <utility>
 
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QVariant>
+
+std::optional<int> ItemEstoque::margemDecimos() const
+{
+    if (precoBaseMilli <= 0 || custoMedioMilli <= 0)
+        return std::nullopt;
+    const double fracao = double(precoBaseMilli - custoMedioMilli) / double(precoBaseMilli);
+    return int(qRound(fracao * 1000.0));   // 0,3333 -> 333 (= 33,3%)
+}
+
+// Preço de venda por unidade base, em milésimos de centavo: o preço da MENOR
+// embalagem que tem preço, dividido pelo fator dela. Em SQL para sair junto com
+// a listagem — são ~300 produtos e uma consulta por linha seria 300 idas ao
+// banco a cada recarga da tela.
+static QString subconsultaPrecoBase()
+{
+    return QStringLiteral(
+        "COALESCE((SELECT CAST(ROUND(pe.preco_venda * 1000.0 / pe.fator_conversao) AS INTEGER) "
+        "            FROM produto_embalagens pe "
+        "           WHERE pe.produto_id = p.id AND pe.preco_venda > 0 "
+        "             AND pe.fator_conversao > 0 "
+        "           ORDER BY pe.fator_conversao ASC LIMIT 1), 0) ");
+}
 
 EstoqueRepository::EstoqueRepository(QSqlDatabase db)
     : m_db(std::move(db))
@@ -18,7 +42,8 @@ QVector<ItemEstoque> EstoqueRepository::listar(const QString &filtro)
     QString sql = QStringLiteral(
         "SELECT p.id, p.nome, p.localizacao, p.unidade_base, p.estoque_minimo, "
         "       COALESCE(e.quantidade_atual, 0), COALESCE(e.custo_medio_unitario, 0), "
-        "       (p.foto IS NOT NULL) "
+        "       (p.foto IS NOT NULL), ")
+        + subconsultaPrecoBase() + QStringLiteral(
         "FROM produtos p "
         "LEFT JOIN estoque e ON e.produto_id = p.id "
         // Composto e dose não têm estoque próprio (baixam insumo/garrafa):
@@ -51,6 +76,7 @@ QVector<ItemEstoque> EstoqueRepository::listar(const QString &filtro)
         it.custoMedioMilli = q.value(6).toLongLong();
         it.custoMedio = (it.custoMedioMilli + 500) / 1000; // milésimos -> centavos (arredonda)
         it.temFoto = q.value(7).toInt() != 0;
+        it.precoBaseMilli = q.value(8).toLongLong();
         itens.push_back(it);
     }
     return itens;
@@ -62,7 +88,8 @@ ItemEstoque EstoqueRepository::item(int produtoId)
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral(
         "SELECT p.id, p.nome, p.localizacao, p.unidade_base, p.estoque_minimo, "
-        "       COALESCE(e.quantidade_atual, 0), COALESCE(e.custo_medio_unitario, 0) "
+        "       COALESCE(e.quantidade_atual, 0), COALESCE(e.custo_medio_unitario, 0), ")
+        + subconsultaPrecoBase() + QStringLiteral(
         "FROM produtos p LEFT JOIN estoque e ON e.produto_id = p.id "
         "WHERE p.id = :id"));
     q.bindValue(QStringLiteral(":id"), produtoId);
@@ -75,6 +102,7 @@ ItemEstoque EstoqueRepository::item(int produtoId)
         it.quantidade = q.value(5).toLongLong();
         it.custoMedioMilli = q.value(6).toLongLong();
         it.custoMedio = (it.custoMedioMilli + 500) / 1000; // milésimos -> centavos (arredonda)
+        it.precoBaseMilli = q.value(7).toLongLong();
     }
     return it;
 }
@@ -90,6 +118,134 @@ bool EstoqueRepository::garantirLinhaEstoque(int produtoId)
         m_erro = q.lastError().text();
         return false;
     }
+    return true;
+}
+
+// As saídas de venda que a correção de custo alcança. Um lugar só para a
+// CONTAGEM (o que a tela promete) e a ATUALIZAÇÃO (o que é gravado) nunca
+// discordarem. `:desde` vazio pega tudo — produto que nunca teve entrada.
+// A origem é "venda:<id>", daí o SUBSTR a partir do 7º caractere (igual ao
+// relatório de lucro, que é quem lê esse custo).
+static QString filtroVendasDesde()
+{
+    return QStringLiteral(
+        "FROM movimentacoes_estoque m "
+        "JOIN vendas v ON v.id = CAST(SUBSTR(m.origem, 7) AS INTEGER) "
+        "WHERE m.produto_id = :pid AND m.tipo = 'saida_venda' "
+        "  AND m.origem LIKE 'venda:%' AND v.status = 'concluida' "
+        "  AND m.data >= :desde ");
+}
+
+static QString ultimaEntrada(const QSqlDatabase &db, int produtoId)
+{
+    QSqlQuery q(db);
+    q.prepare(QStringLiteral(
+        "SELECT MAX(data) FROM movimentacoes_estoque "
+        "WHERE produto_id = :pid AND tipo = 'entrada'"));
+    q.bindValue(QStringLiteral(":pid"), produtoId);
+    if (q.exec() && q.next() && !q.value(0).isNull())
+        return q.value(0).toString();
+    return QString();
+}
+
+int EstoqueRepository::vendasDesdeUltimaEntrada(int produtoId, QString *dataUltimaEntrada)
+{
+    const QString desde = ultimaEntrada(m_db, produtoId);
+    if (dataUltimaEntrada)
+        *dataUltimaEntrada = desde;
+
+    QSqlQuery q(m_db);
+    // DISTINCT na origem: uma venda pode ter mais de uma linha do mesmo produto
+    // (a parte vendida além do saldo vira linha própria quando a compra chega).
+    q.prepare(QStringLiteral("SELECT COUNT(DISTINCT m.origem) ") + filtroVendasDesde());
+    q.bindValue(QStringLiteral(":pid"), produtoId);
+    q.bindValue(QStringLiteral(":desde"), desde);
+    if (q.exec() && q.next())
+        return q.value(0).toInt();
+    return 0;
+}
+
+bool EstoqueRepository::ajustarCusto(int produtoId, qint64 novoCustoMilli, bool corrigirVendas,
+                                     int usuarioId, const QString &motivo, int *vendasCorrigidas)
+{
+    if (vendasCorrigidas)
+        *vendasCorrigidas = 0;
+    // Custo 0 aqui quer dizer DESCONHECIDO (é assim que aplicarEntrada o trata).
+    // "Corrigir" para desconhecido não corrige nada.
+    if (novoCustoMilli <= 0) {
+        m_erro = QStringLiteral("Custo inválido");
+        return false;
+    }
+
+    QString desde;
+    const int nVendas = corrigirVendas ? vendasDesdeUltimaEntrada(produtoId, &desde) : 0;
+    const ItemEstoque antes = item(produtoId);
+
+    if (!m_db.transaction()) {
+        m_erro = m_db.lastError().text();
+        return false;
+    }
+    const auto falhar = [this](const QSqlQuery &q) {
+        m_erro = q.lastError().text();
+        m_db.rollback();
+        return false;
+    };
+
+    if (!garantirLinhaEstoque(produtoId)) {
+        m_db.rollback();
+        return false;
+    }
+
+    QSqlQuery custo(m_db);
+    custo.prepare(QStringLiteral(
+        "UPDATE estoque SET custo_medio_unitario = :c WHERE produto_id = :pid"));
+    custo.bindValue(QStringLiteral(":c"), novoCustoMilli);
+    custo.bindValue(QStringLiteral(":pid"), produtoId);
+    if (!custo.exec())
+        return falhar(custo);
+
+    if (corrigirVendas) {
+        // SQLite não tem UPDATE com JOIN: o filtro vai numa subconsulta.
+        QSqlQuery vendas(m_db);
+        vendas.prepare(QStringLiteral(
+            "UPDATE movimentacoes_estoque SET custo_unit = :c "
+            "WHERE id IN (SELECT m.id ") + filtroVendasDesde() + QStringLiteral(")"));
+        vendas.bindValue(QStringLiteral(":c"), novoCustoMilli);
+        vendas.bindValue(QStringLiteral(":pid"), produtoId);
+        vendas.bindValue(QStringLiteral(":desde"), desde);
+        if (!vendas.exec())
+            return falhar(vendas);
+    }
+
+    // Rastro. O custo exato fica em custo_unit; a observação é para gente ler,
+    // por isso em centavos arredondados.
+    const auto reais = [](qint64 milli) { return Money::format((milli + 500) / 1000); };
+    QString obs = QStringLiteral("Custo por %1: %2 -> %3")
+                      .arg(antes.unidadeBase, reais(antes.custoMedioMilli), reais(novoCustoMilli));
+    if (corrigirVendas)
+        obs += QStringLiteral("; %1 venda(s) corrigida(s)").arg(nVendas);
+    if (!motivo.trimmed().isEmpty())
+        obs += QStringLiteral(". ") + motivo.trimmed();
+
+    QSqlQuery rastro(m_db);
+    rastro.prepare(QStringLiteral(
+        "INSERT INTO movimentacoes_estoque "
+        "(produto_id, tipo, quantidade, origem, usuario_id, observacao, custo_unit, data) "
+        "VALUES (:pid, 'ajuste', 0, 'ajuste_custo', :uid, :obs, :c, datetime('now','localtime'))"));
+    rastro.bindValue(QStringLiteral(":pid"), produtoId);
+    rastro.bindValue(QStringLiteral(":uid"), usuarioId > 0 ? QVariant(usuarioId) : QVariant());
+    rastro.bindValue(QStringLiteral(":obs"), obs);
+    rastro.bindValue(QStringLiteral(":c"), novoCustoMilli);
+    if (!rastro.exec())
+        return falhar(rastro);
+
+    if (!m_db.commit()) {
+        m_erro = m_db.lastError().text();
+        m_db.rollback();
+        return false;
+    }
+    if (vendasCorrigidas)
+        *vendasCorrigidas = nVendas;
     return true;
 }
 

@@ -16,7 +16,7 @@ na sidebar). Ver `docs/design-ui.md` e `docs/mockup-ui.html`.
 | | |
 | --- | --- |
 | Telas | Dashboard, PDV, **Caixa**, Produtos, Estoque, **Vencimento**, Vendas, Compras, Clientes, Financeiro, Relatórios, Usuários, Backup |
-| Testes | **28 executáveis** no CTest, todos verdes: 312 casos de regra + `tst_qml` (110 casos de interface) |
+| Testes | **28 executáveis** no CTest, todos verdes: 327 casos de regra + `tst_qml` (156 casos de interface) |
 | Migrations | **0001–0018** aplicadas |
 | Entrega | `deploy/empacotar.ps1` → pasta autossuficiente + zip, sem console e sem os extras do Qt |
 | Repositório | `github.com/Davi-MTS/emporio-dos-amigos` (público; pacote pronto versionado em `deploy/pacote/`) |
@@ -573,7 +573,7 @@ seed, com `perfis` ainda vazia, então os dois precisam estar iguais).
 | `pode_dar_desconto` | ❌ | campo F4 + atalho no PDV + `finalizarVenda` (recusa a venda) |
 | `ajusta_estoque` | ❌ | abas Inventário/Retirada + `registrarInventario` / `registrarRetirada` |
 | `ve_relatorios` | ❌ | rota `relatorios` na Sidebar |
-| `ve_financeiro` | ❌ | rotas `compras`/`financeiro` + painel Financeiro do Dashboard |
+| `ve_financeiro` | ❌ | rotas `compras`/`financeiro` + painel Financeiro do Dashboard + **coluna Margem do Estoque** (na tela, no model e no `itemEstoque`) |
 | `pode_cancelar_venda` | ❌ | `VendasScreen` + `cancelarVenda` |
 | `gerencia_usuarios` | ❌ | rotas `usuarios`/`backup` na Sidebar |
 
@@ -1064,3 +1064,320 @@ faz pensar duas vezes antes de desativar o cliente.
 Os testes que conferiam o texto antigo foram ajustados (`tst_custo_aviso.qml`
 procura "pode estar errado"; `tst_mensagens` compara os textos novos) e as
 imagens do relatório foram regeradas — elas mostram as mensagens na tela.
+
+### Margem na tela de Estoque (feito)
+
+Pedido do dono: ver, produto a produto, quanto sobra de cada real vendido.
+Ele foi explícito sobre qual das duas contas é: **margem sobre o preço de
+venda, NÃO markup**. Custo R$ 10,00 e venda R$ 15,00 → lucro R$ 5,00 e
+**margem 33,3%** (o markup, que é sobre o custo, daria 50%). Trocar uma pela
+outra faz o dono achar que ganha metade a mais do que ganha.
+
+- `ItemEstoque::margemDecimos()` é a única fonte da conta, em **décimos de por
+  cento** (333 = 33,3%) para não espalhar `double`. A conta sai dos dois valores
+  em **milésimos de centavo**: em ml o custo é fração de centavo e, pelo custo
+  arredondado, a garrafa de R$ 18,99 mostraria 47,3% em vez de 42,1%.
+- **Preço de referência = a menor embalagem com preço**, levado para a unidade
+  base (`ItemEstoque::precoBaseMilli`, uma subconsulta dentro do `listar` — uma
+  por produto seriam 300 idas ao banco a cada recarga). É a **mesma referência
+  do aviso de custo** (`avaliarCusto`), de propósito: as duas telas não podem
+  discordar sobre "o preço" do mesmo produto. Pela caixa, a margem do exemplo
+  daria 25% em vez de 33,3%.
+- **Não existe margem** (a tela mostra "—", o `MargemRole` devolve `undefined` e
+  a chave `margem` nem entra no mapa do `itemEstoque`) quando o produto não tem
+  preço de venda ou quando o **custo é 0**, que aqui significa DESCONHECIDO
+  (bonificação, produto que nunca entrou). Dizer "100% de margem" nesse caso
+  seria uma mentira com cara de número certo. Margem zero e "não dá para
+  calcular" são coisas diferentes e aparecem diferente.
+- **Margem negativa aparece**, em vermelho e em negrito: é prejuízo, e é
+  justamente a linha que precisa ser olhada hoje.
+- O diálogo do produto mostra **preço de venda ao lado da margem** — sozinha, a
+  porcentagem é um número sem origem. A linha de resumo virou `Flow`: com quatro
+  blocos ela não cabe numa linha na janela restaurada.
+- `AppBackend::formatarPercentual(decimos)` escreve em pt-BR ("33,3%",
+  "-12,5%"), como o `formatarDinheiro` faz com o dinheiro.
+
+**Role novo entra no FIM do enum do `EstoqueListModel`.** O QML acha os roles
+pelo nome, mas os testes chegam neles pelo NÚMERO (`Qt.UserRole + posição`):
+inserir no meio renumera tudo o que vem depois e quebra teste que não tem nada
+a ver com a mudança (o `tst_estoque_filtro` teria quebrado neste mesmo commit).
+
+**Conferido no banco real da loja (17/09, somente leitura):** dos 280 produtos
+com estoque, 237 têm margem, 43 ficam em "—" por custo desconhecido e 5 saem
+negativas. Os extremos são todos **cadastro errado, não conta errada** — as
+maiores (ORIGINAL 350 ML com 94,3%, IMPERIO ULTRA LONG NECK com 95,1%) são
+exatamente os produtos com fator 1 na caixinha já listados na auditoria, e as
+piores (PAÇOCA −1099%, PALHEIRO PIRACANJUBA −775%) são custo de caixa lançado
+na unidade. Ou seja: a coluna acende sozinha os erros de cadastro que hoje só
+apareciam procurando.
+
+**Testes:** 5 casos em `tst_estoque_repository` (o exemplo do dono, referência
+pela menor embalagem, sem preço, sem custo, prejuízo e o caso em ml) e
+`tests/qml/casos/tst_estoque_margem.qml` (6 casos: o model, a coluna com o
+texto formatado, o "—" nos dois casos sem margem, e o diálogo com e sem
+margem), mais um caso em `tst_permissoes`. **28 executáveis, 117 casos de QML.**
+
+**Margem é só de quem vê o financeiro** (pedido do dono, logo depois de a
+coluna ficar pronta). Segue `ve_financeiro`, a mesma chave que já esconde o
+painel de dinheiro do Dashboard — o funcionário recebe mercadoria e consulta
+saldo, mas não vê quanto a loja ganha em cada produto. A coluna some INTEIRA,
+cabeçalho junto: um "—" no lugar do número anunciaria que há algo escondido
+ali. E a trava não é só de tela — `EstoqueListModel::setMostrarMargem` zera o
+role e o `itemEstoque` não devolve a chave, senão o número ficaria a uma linha
+de QML de distância. O flag é reavaliado em toda troca de usuário (login e
+logout), e não só na recarga: a tela não recarrega sozinha ao abrir, então
+entrar como funcionário precisa apagar a margem da lista que o admin deixou
+carregada.
+
+**O que NÃO foi feito, e o dono precisa decidir:** a coluna **Custo médio**
+continua visível para o funcionário — sempre foi. Com o custo e o preço de
+prateleira na mão, a margem é uma conta de cabeça. Esconder a margem e deixar o
+custo é meia trava; se a intenção é que o balcão não saiba o lucro, o custo
+precisa ir junto (e aí a Entrada de mercadoria, que pede o custo da nota,
+precisa ser repensada).
+
+### Filtro por faixa de margem, e a lista que estava em escada (feito)
+
+**Faixas de margem (decisão do dono):** abaixo de 35% **baixa**, de 35% a 45%
+**boa** (as duas bordas INCLUSIVE), acima de 45% **muito boa**. Filtro igual ao
+de situação, na mesma barra: `EstoqueListModel::filtroMargem` +
+`contagemMargem` ({ todos, baixa, boa, muitoboa, **sem** }).
+
+- Quem **não tem margem** (sem preço ou custo desconhecido) não entra em faixa
+  nenhuma: conta em `sem` e só aparece em "Todas". Jogar esses produtos em
+  "baixa" encheria a faixa de gente que ninguém consegue avaliar.
+- **Os dois filtros valem juntos** (situação E margem): "o que está acabando e
+  ainda por cima vende com margem baixa" é a pergunta que resolve a compra da
+  semana.
+- **Cada contagem é sobre o que o OUTRO filtro deixou passar.** Contar sobre a
+  lista inteira mostraria "Baixa 4" e entregaria lista vazia com o filtro de
+  situação ligado.
+- **A coluna Margem NÃO usa as cores do selo de Status** (retorno do dono: *"as
+  cores estão confundindo, dá para separar para ninguém associar sem querer com
+  a coluna ao lado?"*). A primeira versão pintava o número em âmbar/verde — as
+  MESMAS três cores do `StatusBadge`, coladas nele. "34,3%" em âmbar ao lado de
+  "⚠ Baixo" em âmbar lia-se como uma informação só, e são duas: uma é lucro, a
+  outra é quantidade em estoque. Agora:
+  - o número sai em texto normal; **só prejuízo é colorido** (vermelho, e já vem
+    com sinal de menos);
+  - **a faixa vem ESCRITA embaixo do número**, apagada e em minúscula ("baixa",
+    "boa", "muito boa", "prejuízo") — mesma regra do filtro, então filtrar
+    "Baixa" e ler "boa" na linha é impossível;
+  - um **divisor vertical** com folga dos dois lados separa o bloco de números
+    do selo de situação.
+  No diálogo do produto, onde sobra espaço, a faixa vem na mesma linha
+  ("33,3% · baixa") — tira a dúvida de "33,3% é bom?" sem obrigar a decorar os
+  limites.
+- Filtro de margem **some junto com a coluna** para quem não vê o financeiro, e
+  `setMostrarMargem(false)` **desliga o filtro**: senão a lista apareceria
+  encurtada, sem nada na tela explicando por quê.
+- Faixa desconhecida vira "todas", e sair da tela desliga os dois filtros.
+
+**Defeito visual na lista de Clientes (corrigido).** O selo "Em dia"/"Deve R$ x"
+ficava numa posição diferente em cada linha, colado no fim do nome — uma escada
+pela lista. Causa: **uma coluna aninhada não cresce além da largura máxima
+dela, e essa máxima vem dos filhos**. O `Layout.fillWidth` estava na
+`ColumnLayout`, mas os `Text` de dentro não tinham nenhum, então a máxima da
+coluna era a largura do nome e o `fillWidth` não tinha para onde crescer. Com
+`Layout.fillWidth` nos textos (mais `minimumWidth: 0` e `elide`), a coluna ocupa
+o vão e o selo encosta à direita.
+
+Varri as 34 ocorrências do mesmo formato nas telas: a maioria é coluna em pilha
+vertical, onde não crescer não aparece. O único outro caso de verdade era a aba
+**A receber** do Financeiro, onde o valor e o botão "Receber" andavam conforme o
+tamanho do nome do cliente — corrigido igual.
+
+**REGRA:** numa linha de lista, `Layout.fillWidth` na coluna **e** nos textos
+dentro dela.
+
+**Testes:** `tst_estoque_margem` foi de 6 para 13 casos (as duas bordas, 35,0% e
+45,0%, dentro de "boa"; 34,9% fora; sem margem fora de todas as faixas; os dois
+filtros combinados; a cor por faixa) e `tst_clientes_lista.qml` fixa o
+alinhamento (mesmo x em toda linha, encostado à direita) — **verificado falhando
+antes da correção**: 425 e 443 em vez do mesmo x.
+
+**A coluna gulosa (corrigido no mesmo dia).** Pôr a faixa embaixo do número
+transformou a célula da margem numa `ColumnLayout` — e **uma Layout dentro de
+outra tem `Layout.fillWidth` TRUE por padrão**, ao contrário de um item comum.
+Ela passou a comer a folga da linha (293 px em vez de 104) e empurrou Qtd
+atual, Mínimo e Custo médio uns 380 px para longe do próprio cabeçalho. Na
+janela estreita mal dava para ver; na tela cheia da loja ficou evidente.
+`Layout.fillWidth: false` resolve.
+
+Isso virou `test_colunas_batem_com_o_cabecalho`, que abre a lista a 1660 px e
+compara a borda direita de cada célula com a do cabeçalho — **verificado
+falhando com a correção desfeita** ("cabQtd termina em 1123 e a linha em 1035").
+É o teste que faltava: os de tela conferiam que nada começava fora da janela,
+mas nenhum conferia que as colunas batem entre si.
+
+**REGRA:** célula de lista que vira Layout precisa de `Layout.fillWidth: false`
+explícito, senão rouba a folga da linha.
+
+**Fio entre as linhas das listas (pedido do dono: "igual tem em compras").**
+Compras, Financeiro, Vencimento, Vendas, Backup e PDV já desenhavam um fio de
+1 px em `Theme.border` no fim de cada linha; **Estoque, Clientes, Produtos e
+Usuários não**. Eram as quatro fora do padrão — agora as quatro têm o mesmo
+`Rectangle` ancorado no rodapé da linha.
+
+Junto veio o mesmo defeito da escada na lista de **Usuários**: a coluna do nome
+sem `fillWidth` nos textos, e o perfil ("Administrador") mudava de lugar a cada
+linha conforme o tamanho do nome. Corrigido igual ao de Clientes — a varredura
+anterior tinha marcado este arquivo como falso positivo porque olhou a coluna
+de fora, não a da linha.
+
+### Janela pequena: varredura de largura (feito)
+
+Pedido do dono depois de encolher a janela: *"fica esquisito os filtros,
+verifique em todo o sistema problemas visuais ao deixar a tela menor"*. Os
+testes conferiam só DOIS tamanhos (1160 e 760) e só se algo **começava** fora
+da tela. O feio mora no meio do caminho — foi numa janela de ~1400 que os
+filtros do Estoque ficaram tortos.
+
+**`tst_telas::test_cabe_em_qualquer_largura`**: as 14 telas em **1600, 1200,
+900 e 760 px**, reprovando todo item visível cujo lado direito passa da borda.
+Item dentro de pai com `clip` não conta (lista rolável é recortada de
+propósito). Sem `waitForRendering` — a geometria já está resolvida no polish, e
+esperar o quadro custava 4 minutos de suíte em vez de 60 s.
+
+O que a varredura achou e foi corrigido:
+
+- **`Layout.minimumWidth` é letra morta quando `fillWidth` é falso.** O Qt trava
+  o item na largura PREFERIDA, e o mínimo só vale para quem pode ser
+  redimensionado. O editor da tela de Produtos declarava `preferredWidth: 520` +
+  `minimumWidth: 380` e, a 760 px, ficava nos 520 — **60 px fora da tela**.
+  Agora é `fillWidth` + `maximumWidth: 520` + `minimumWidth: 380`: cresce até
+  520 e encolhe até 380. Verificado falhando com a correção desfeita.
+- **Colunas do Estoque somem por ordem de utilidade** (mesmo recurso que a tela
+  de Produtos já tinha): Status > 420, Custo > 560, Margem > 780, Mínimo > 920,
+  Localização > 1080. Sem isso, a 760 px o cabeçalho escrevia "Produto" por
+  cima de "Localização". Nome e quantidade nunca somem. O **filtro de margem
+  anda com a coluna** e é desligado quando ela some, senão a lista ficaria
+  filtrada por algo invisível.
+- **`SegmentedControl` agora se mede.** Tinha `implicitWidth: 260` fixo e cada
+  tela chutava uma largura (400 aqui, 440 ali) — por isso os dois filtros do
+  Estoque saíam de tamanhos diferentes, um em cada linha. Agora a largura
+  natural sai da MAIOR legenda (`TextMetrics`) e o texto do segmento tem
+  `elide`: espremido, encurta em vez de invadir o vizinho.
+- **Os dois filtros do Estoque viraram um `Row` só**, então passam para a linha
+  de baixo juntos e alinhados, em vez de um em cada linha.
+
+**O arnês de QML passou a carregar as fontes embutidas** (as mesmas do
+`main.cpp`). Não muda resultado de teste, mas sem elas a plataforma offscreen
+não tem fonte alguma: toda imagem de `grabImage` saía com o texto em
+quadradinhos — e, pior, as larguras medidas eram as da fonte de emergência.
+Três "transbordamentos" que eu tinha achado no Dashboard, Clientes e Usuários
+eram fantasmas disso.
+
+### Embalagem ao lado do nome, no carrinho (feito)
+
+Pedido do dono. O seletor de embalagem ficava EMBAIXO do nome, dentro da mesma
+coluna: a linha do carrinho parecia um formulário e o nome era empurrado para
+cima. Agora a embalagem tem **coluna própria**, com cabeçalho "Embalagem", na
+mesma posição em toda linha — seletor quando o produto tem mais de uma, texto
+quando só tem uma. O carrinho virou tabela: Produto · Embalagem · Qtd · Preço ·
+Subtotal.
+
+**O ajuste que isso exigiu:** os limites de largura do carrinho foram feitos
+quando não existia essa coluna. Com ela, e sem mexer nos limites, quem sumia
+primeiro era o NOME do produto (a captura mostrou "Pro…" no cabeçalho e linhas
+só com a miniatura). Preço e subtotal passaram a ceder antes: `mostrarPrecoUnit`
+> 640 e `mostrarSubtotal` > 520 (eram 470 e 360), e a coluna de embalagem tem
+120 px e some abaixo de 430 — aí a embalagem volta como texto embaixo do nome,
+para a informação não sumir (trocar, aí sim, só alargando a janela).
+
+**REGRA:** coluna nova numa lista obriga a revisar os limites de "quem some
+primeiro" — senão a coluna nova entra empurrando a mais importante para fora.
+
+Coberto por `tst_pdv::test_embalagem_ao_lado_do_nome` (a coluna existe nas duas
+linhas e começa no MESMO x, o seletor aparece só para quem tem escolha, e o
+seletor está depois do nome, não embaixo). O caso precisa **abrir o caixa**: com
+o caixa fechado a tela mostra o painel "Caixa fechado" e o carrinho inteiro fica
+invisível — foi o que fez a primeira versão do teste falhar.
+
+### Correção de custo — aba "Custo" no Estoque (feito)
+
+Pergunta do dono: *"se eu colocar o custo errado na compra, consigo mudar
+direto pelo estoque?"* Não conseguia: a Entrada exige quantidade > 0, o
+Inventário só mexe em quantidade, e **nem cancelar compra existe**. O custo
+errado ficava no lucro para sempre. No banco da loja (17/09) eram 8 produtos
+com custo implausível — o PALHEIRO PIRACANJUBA com custo de R$ 17,50 vendendo a
+R$ 2,00 e 10 vendas registradas com prejuízo que nunca existiu.
+
+**Aba "Custo"** no diálogo do produto (a última, como as outras restritas):
+escolhe a embalagem, digita o custo certo dela — igual à Entrada, fator do
+cadastro — e a tela mostra ANTES de gravar: custo por unidade antes → depois e
+margem antes → depois. `EstoqueRepository::ajustarCusto` troca
+`estoque.custo_medio_unitario` **sem mexer na quantidade**.
+
+**As vendas que já saíram com o custo errado** (decisão: ligado por padrão, o
+dono pode desligar em cada correção). O botão diz quantas e desde quando
+("Corrigir também as 10 vendas feitas desde 02/09/2026"). Regrava o
+`custo_unit` TRAVADO das saídas de venda **desde a última entrada** do produto
+— o período em que o custo errado valia; antes disso o custo veio de outra
+remessa e não é tocado. Produto que nunca teve entrada: todas as vendas.
+Só vendas `concluida` (cancelada não entra no lucro). A contagem da tela e a
+atualização usam o MESMO filtro (`filtroVendasDesde`), para o número prometido
+ser o número gravado.
+
+**O aviso de custo fora do normal vale aqui também**, e aqui ele tem papel a
+mais: separa custo errado de **fator errado**. Se o custo "certo" ainda dá uma
+margem absurda, o problema está no cadastro da embalagem (é o caso de ORIGINAL
+350 ML e IMPERIO: o custo está certo, a caixinha é que tem fator 1) — e mexer no
+custo pioraria. Primeiro clique avisa, segundo grava, como na Entrada.
+
+**Rastro, sem migration:** uma movimentação de quantidade 0 (tipo `'ajuste'`,
+origem `'ajuste_custo'`) com o custo antigo e o novo na observação e o custo
+exato em `custo_unit`. Conferido antes de escolher: o relatório de lucro só lê
+`saida_venda` com origem `venda:%`, e nada mais lê `'ajuste'` — a linha não
+entra em conta nenhuma, e saldo = soma das movimentações continua valendo. E
+uma linha no `sistema.log`: quem mudou, de quanto para quanto, quantas vendas,
+motivo.
+
+**Trava:** `ajusta_estoque` (a mesma do Inventário/Retirada) na tela e no
+backend; a prévia só entrega margem a quem tem `ve_financeiro`.
+
+**O que NÃO muda:** o registro da compra (`compra_itens`) e a conta a pagar
+dela. Pesa pouco na loja: o banco inteiro tem 1 conta a pagar.
+
+**Conferido nos dados reais** (somente leitura, a mesma consulta): PALHEIRO
+PIRACANJUBA — última entrada 02/09, **10 vendas (25 un.)** a corrigir, o mesmo
+número do diagnóstico. De brinde: há dois produtos de paçoca, "PAÇOCÃO" e
+"Paçocao" (este sem entrada nenhuma) — cara de cadastro duplicado.
+
+**Testes:** 9 casos em `tst_verificacao_geral` (`custo97`–`custo105`: só o
+custo muda; o lucro do dia muda exatamente 3 × (17,50 − 1,46); **sem corrigir,
+o lucro não muda** — controle negativo do anterior; venda de antes da última
+entrada intocada; cancelada fora; prévia não grava; funcionário barrado;
+custo 0/vazio/"1OO"/negativo recusados; log e auditoria) e
+`tests/qml/casos/tst_estoque_custo.qml` (5 casos: caminho feliz com as vendas,
+desligar o botão, custo absurdo pede segundo clique, sem vendas não oferece
+corrigir, custo inválido). **28 executáveis, 326 + 154 casos.**
+
+**Custo por embalagem na aba Custo (retorno do dono).** *"Ao trocar a embalagem,
+mostre o custo da embalagem e não só o da unidade; quero poder trocar o custo
+do fardo."* Trocar pelo fardo JÁ funcionava (escolhe Fardo, digita o custo do
+fardo) — mas a prévia só mostrava "custo por unidade", e parecia que não. Agora:
+- o campo diz de qual embalagem é: **"Novo custo (Fardo)"** (sem artigo — o
+  nome da embalagem é livre e "do Caixinha" erraria o gênero);
+- vazio, o campo mostra o **custo atual daquela embalagem** (placeholder):
+  trocar para o Fardo mostra o do fardo;
+- no lugar da linha por unidade, uma **tabela com todas as embalagens, atual →
+  novo**, a escolhida em destaque. Por unidade, num produto em ml, a linha dizia
+  "R$ 0,02 → R$ 0,02" — por embalagem, diz alguma coisa.
+- `previaAjusteCusto` devolve `embalagens` ({nome, fator, atual, novo,
+  escolhida}, do menor fator ao maior) e `custoAtualEmbalagem`.
+
+**Por que o fardo não tem custo PRÓPRIO, separado da unidade:** é o mesmo
+estoque — a lata do fardo aberto é a lata vendida avulsa, e o estoque guarda um
+número só, em unidade base. Um custo por embalagem faria a mesma lata ter dois
+custos conforme a forma de venda, e o lucro de cada venda dependeria de uma
+escolha arbitrária. Por isso corrigir o fardo corrige a unidade e a caixinha
+junto, e a tabela deixa isso visível. O que de fato difere entre embalagens é o
+PREÇO (fardo mais barato por unidade) — e com ele, a margem.
+`produto_embalagens.custo_compra` existe mas não entra em conta nenhuma (e na
+loja está vazio nas 399 embalagens).
+
+Testes: `tst_verificacao_geral::custo106` (a lista por embalagem, o custo atual
+da escolhida, e gravar pelo fardo define a unidade: R$ 21,00 / 12 = R$ 1,75) e
+dois casos em `tst_estoque_custo.qml` (trocar a embalagem muda rótulo e o custo
+mostrado no campo; corrigir pela caixinha define a unidade).

@@ -164,6 +164,18 @@ private slots:
     // --- Registro ---
     void log96_cancelamentoFicaNoRegistro();
 
+    // --- Correção de custo (aba "Custo" do Estoque) ---
+    void custo97_corrigeOCustoSemMexerNaQuantidade();
+    void custo98_corrigeAsVendasDesdeAUltimaEntrada();
+    void custo99_semCorrigirVendasOHistoricoFica();
+    void custo100_vendaAntesDaUltimaEntradaNaoMuda();
+    void custo101_vendaCanceladaNaoContaNemMuda();
+    void custo102_previaNaoGravaNada();
+    void custo103_funcionarioNaoAjusta();
+    void custo104_custoInvalidoRecusado();
+    void custo105_ficaNoRegistroEAuditoria();
+    void custo106_previaMostraCadaEmbalagem();
+
 private:
     QTemporaryDir m_dir;
     Database m_db;
@@ -1312,6 +1324,220 @@ void TstVerificacaoGeral::log96_cancelamentoFicaNoRegistro()
     const QString log = m_app->ultimasLinhasLog(50).join(QLatin1Char('\n'));
     QVERIFY2(log.contains(QStringLiteral("Venda #%1 CANCELADA").arg(v)), qUtf8Printable(log.left(400)));
     QVERIFY(log.contains(QStringLiteral("motivo do log")));
+}
+
+// ============================================================ correção de custo
+//
+// O caso da loja: PALHEIRO PIRACANJUBA entrou com o custo da caixa (R$ 17,50)
+// lançado na unidade, e vende a R$ 2,00. Cada venda travou esse custo e o
+// relatório mostra um prejuízo que nunca existiu. Não havia volta: nem
+// ajustar custo, nem cancelar compra.
+
+// Troca o custo (digitado por embalagem, com o fator do cadastro) e só ele.
+void TstVerificacaoGeral::custo97_corrigeOCustoSemMexerNaQuantidade()
+{
+    const int pid = produto(nomeUnico("Palheiro"), {{"Unidade", 1, 200, {}}, {"Caixinha", 10, 1800, {}}});
+    QVERIFY(entrar(pid, emb(pid, 1), 20, QStringLiteral("17,50")));   // o engano
+    QCOMPARE(custoMilli(pid), qint64(1750000));
+
+    QVERIFY2(m_app->ajustarCusto(pid, emb(pid, 10), QStringLiteral("14,60"), false, QString()),
+             qUtf8Printable(m_app->ultimoErro()));
+    QCOMPARE(custoMilli(pid), qint64(146000));   // R$ 14,60 / 10 = R$ 1,46 por unidade
+    QCOMPARE(saldo(pid), qint64(20));             // a quantidade não se mexe
+    // Saldo continua igual à soma das movimentações (a linha de rastro é 0).
+    QCOMPARE(escalar(QStringLiteral("SELECT SUM(quantidade) FROM movimentacoes_estoque "
+                                    "WHERE produto_id = %1").arg(pid)), qint64(20));
+}
+
+// As vendas feitas com o custo errado passam a ter o custo certo, e o lucro
+// do dia muda exatamente o que devia.
+void TstVerificacaoGeral::custo98_corrigeAsVendasDesdeAUltimaEntrada()
+{
+    const int pid = produto(nomeUnico("Palheiro"), {{"Unidade", 1, 200, {}}});
+    QVERIFY(entrar(pid, emb(pid, 1), 20, QStringLiteral("17,50")));
+    QVERIFY(venderSimples(pid, 1, 200) > 0);
+    QVERIFY(venderSimples(pid, 2, 200) > 0);
+
+    const QVariantMap previa = m_app->previaAjusteCusto(pid, emb(pid, 1), QStringLiteral("1,46"));
+    QCOMPARE(previa.value(QStringLiteral("vendas")).toInt(), 2);
+
+    const qint64 lucroAntes = m_app->relatorioFaturamento(0).value(QStringLiteral("lucro")).toLongLong();
+    QVERIFY2(m_app->ajustarCusto(pid, emb(pid, 1), QStringLiteral("1,46"), true, QString()),
+             qUtf8Printable(m_app->ultimoErro()));
+    const qint64 lucroDepois = m_app->relatorioFaturamento(0).value(QStringLiteral("lucro")).toLongLong();
+
+    // 3 unidades vendidas: cada uma deixa de "custar" 17,50 e passa a 1,46.
+    QCOMPARE(lucroDepois - lucroAntes, qint64(3 * (1750 - 146)));
+    QCOMPARE(escalar(QStringLiteral("SELECT COUNT(*) FROM movimentacoes_estoque "
+                                    "WHERE produto_id = %1 AND tipo = 'saida_venda' "
+                                    "AND custo_unit <> 146000").arg(pid)), qint64(0));
+}
+
+// Sem marcar a correção, só o custo daqui para frente muda.
+void TstVerificacaoGeral::custo99_semCorrigirVendasOHistoricoFica()
+{
+    const int pid = produto(nomeUnico("Palheiro"), {{"Unidade", 1, 200, {}}});
+    QVERIFY(entrar(pid, emb(pid, 1), 20, QStringLiteral("17,50")));
+    QVERIFY(venderSimples(pid, 1, 200) > 0);
+
+    const qint64 lucroAntes = m_app->relatorioFaturamento(0).value(QStringLiteral("lucro")).toLongLong();
+    QVERIFY(m_app->ajustarCusto(pid, emb(pid, 1), QStringLiteral("1,46"), false, QString()));
+    QCOMPARE(m_app->relatorioFaturamento(0).value(QStringLiteral("lucro")).toLongLong(), lucroAntes);
+    QCOMPARE(custoMilli(pid), qint64(146000));
+}
+
+// Venda de ANTES da última entrada teve o custo de outra remessa: fica como está.
+void TstVerificacaoGeral::custo100_vendaAntesDaUltimaEntradaNaoMuda()
+{
+    const int pid = produto(nomeUnico("Remessas"), {{"Unidade", 1, 500, {}}});
+    QVERIFY(entrar(pid, emb(pid, 1), 10, QStringLiteral("3,00")));   // remessa certa
+    const int antiga = venderSimples(pid, 1, 500);
+    QVERIFY(antiga > 0);
+    // Empurra a remessa certa e a venda dela para o passado: no mesmo segundo
+    // da entrada seguinte, "desde a última entrada" não teria como separar.
+    {
+        QSqlQuery q(m_db.connection());
+        QVERIFY(q.exec(QStringLiteral("UPDATE movimentacoes_estoque SET data = '2020-01-01 10:00:00' "
+                                      "WHERE produto_id = %1").arg(pid)));
+    }
+
+    QVERIFY(entrar(pid, emb(pid, 1), 10, QStringLiteral("30,00")));  // remessa com o engano
+    const int nova = venderSimples(pid, 1, 500);
+    QVERIFY(nova > 0);
+    // Antes da correção a venda nova carrega o engano, a antiga não.
+    const auto custoDaVenda = [&](int vendaId) {
+        return escalar(QStringLiteral("SELECT custo_unit FROM movimentacoes_estoque "
+                                      "WHERE produto_id = %1 AND origem = 'venda:%2'")
+                           .arg(pid).arg(vendaId));
+    };
+    QCOMPARE(m_app->previaAjusteCusto(pid, emb(pid, 1), QString())
+                 .value(QStringLiteral("vendas")).toInt(), 1);   // só a nova
+
+    // Corrige para um valor DIFERENTE dos dois, para ver quem foi tocado.
+    QVERIFY(m_app->ajustarCusto(pid, emb(pid, 1), QStringLiteral("2,50"), true, QString()));
+    QCOMPARE(custoDaVenda(nova), qint64(250000));     // corrigida
+    QCOMPARE(custoDaVenda(antiga), qint64(300000));   // outra remessa: intocada
+}
+
+// Venda cancelada não entra no lucro: não conta na prévia e não é regravada.
+void TstVerificacaoGeral::custo101_vendaCanceladaNaoContaNemMuda()
+{
+    const int pid = produto(nomeUnico("Cancelada"), {{"Unidade", 1, 200, {}}});
+    QVERIFY(entrar(pid, emb(pid, 1), 10, QStringLiteral("17,50")));
+    const int v = venderSimples(pid, 1, 200, "pix");
+    QVERIFY(m_app->cancelarVenda(v, QStringLiteral("teste")).value(QStringLiteral("ok")).toBool());
+
+    QCOMPARE(m_app->previaAjusteCusto(pid, emb(pid, 1), QStringLiteral("1,46"))
+                 .value(QStringLiteral("vendas")).toInt(), 0);
+    QVERIFY(m_app->ajustarCusto(pid, emb(pid, 1), QStringLiteral("1,46"), true, QString()));
+    QCOMPARE(escalar(QStringLiteral("SELECT custo_unit FROM movimentacoes_estoque "
+                                    "WHERE tipo = 'saida_venda' AND origem = 'venda:%1'").arg(v)),
+             qint64(1750000));
+}
+
+// A prévia mostra antes -> depois e NÃO grava nada.
+void TstVerificacaoGeral::custo102_previaNaoGravaNada()
+{
+    const int pid = produto(nomeUnico("Previa"), {{"Unidade", 1, 1500, {}}});
+    QVERIFY(entrar(pid, emb(pid, 1), 5, QStringLiteral("20,00")));   // prejuízo: -33,3%
+
+    const QVariantMap p = m_app->previaAjusteCusto(pid, emb(pid, 1), QStringLiteral("10,00"));
+    QVERIFY(p.value(QStringLiteral("valido")).toBool());
+    QCOMPARE(p.value(QStringLiteral("custoAtual")).toLongLong(), qint64(2000));
+    QCOMPARE(p.value(QStringLiteral("custoNovo")).toLongLong(), qint64(1000));
+    QCOMPARE(p.value(QStringLiteral("margemAtual")).toInt(), -333);
+    QCOMPARE(p.value(QStringLiteral("margemNova")).toInt(), 333);   // o exemplo do dono
+    QVERIFY(!p.value(QStringLiteral("desde")).toString().isEmpty());
+    QCOMPARE(custoMilli(pid), qint64(2000000));                     // nada gravado
+
+    // Campo vazio: mostra o atual, sem "novo".
+    const QVariantMap vazio = m_app->previaAjusteCusto(pid, emb(pid, 1), QString());
+    QVERIFY(!vazio.value(QStringLiteral("valido")).toBool());
+    QVERIFY(!vazio.contains(QStringLiteral("custoNovo")));
+}
+
+// Mexe no lucro: mesma trava do Inventário.
+void TstVerificacaoGeral::custo103_funcionarioNaoAjusta()
+{
+    const int pid = produto(nomeUnico("Trava"), {{"Unidade", 1, 200, {}}});
+    QVERIFY(entrar(pid, emb(pid, 1), 5, QStringLiteral("17,50")));
+    comoFuncionario();
+    QVERIFY(!m_app->ajustarCusto(pid, emb(pid, 1), QStringLiteral("1,46"), true, QString()));
+    QCOMPARE(m_app->ultimoErro(), QStringLiteral("Sem permissão para ajustar o custo"));
+    // E a prévia não entrega margem a quem não vê o financeiro.
+    QVERIFY(!m_app->previaAjusteCusto(pid, emb(pid, 1), QStringLiteral("1,46"))
+                 .contains(QStringLiteral("margemNova")));
+    comoDono();
+    QCOMPARE(custoMilli(pid), qint64(1750000));
+}
+
+// Custo 0 é "desconhecido" no sistema: corrigir para ele não corrige nada.
+void TstVerificacaoGeral::custo104_custoInvalidoRecusado()
+{
+    const int pid = produto(nomeUnico("Invalido"), {{"Unidade", 1, 200, {}}});
+    QVERIFY(entrar(pid, emb(pid, 1), 5, QStringLiteral("1,50")));
+    const QStringList invalidos{QStringLiteral("0"), QString(), QStringLiteral("1OO"),
+                                QStringLiteral("-2,00")};
+    for (const QString &t : invalidos) {
+        QVERIFY2(!m_app->ajustarCusto(pid, emb(pid, 1), t, false, QString()), qUtf8Printable(t));
+        QCOMPARE(m_app->ultimoErro(), QStringLiteral("Custo inválido"));
+    }
+    // Embalagem de outro produto: o fator não é deste.
+    const int outro = produto(nomeUnico("Outro"), {{"Unidade", 1, 200, {}}, {"Fardo", 12, 2000, {}}});
+    QVERIFY(!m_app->ajustarCusto(pid, emb(outro, 12), QStringLiteral("10,00"), false, QString()));
+    QCOMPARE(custoMilli(pid), qint64(150000));
+}
+
+// Quem mudou, de quanto para quanto: no registro do sistema e na auditoria.
+void TstVerificacaoGeral::custo105_ficaNoRegistroEAuditoria()
+{
+    const int pid = produto(nomeUnico("Rastro"), {{"Unidade", 1, 200, {}}});
+    QVERIFY(entrar(pid, emb(pid, 1), 5, QStringLiteral("17,50")));
+    QVERIFY(m_app->ajustarCusto(pid, emb(pid, 1), QStringLiteral("1,46"), false,
+                                QStringLiteral("custo da caixa na unidade")));
+
+    const QString log = m_app->ultimasLinhasLog(50).join(QLatin1Char('\n'));
+    QVERIFY2(log.contains(QStringLiteral("ajustado por 'Dono'")), qUtf8Printable(log.right(400)));
+    QVERIFY2(log.contains(QStringLiteral("R$ 17,50 -> R$ 1,46")), qUtf8Printable(log.right(400)));
+    QVERIFY(log.contains(QStringLiteral("custo da caixa na unidade")));
+
+    QCOMPARE(escalar(QStringLiteral("SELECT COUNT(*) FROM movimentacoes_estoque "
+                                    "WHERE produto_id = %1 AND origem = 'ajuste_custo' "
+                                    "AND quantidade = 0 AND tipo = 'ajuste'").arg(pid)), qint64(1));
+}
+
+// Produto com mais de uma embalagem: a prévia dá o custo de CADA uma, antes e
+// depois, e o custo atual da escolhida (que o campo mostra quando vazio).
+// Digitar o custo do FARDO define o da unidade: é o mesmo estoque.
+void TstVerificacaoGeral::custo106_previaMostraCadaEmbalagem()
+{
+    const int pid = produto(nomeUnico("Fardo"), {{"Unidade", 1, 250, {}}, {"Fardo", 12, 2600, {}}});
+    QVERIFY(entrar(pid, emb(pid, 1), 24, QStringLiteral("1,50")));
+
+    const QVariantMap p = m_app->previaAjusteCusto(pid, emb(pid, 12), QStringLiteral("21,00"));
+    QCOMPARE(p.value(QStringLiteral("custoAtualEmbalagem")).toLongLong(), qint64(1800));  // 1,50 x 12
+
+    const QVariantList l = p.value(QStringLiteral("embalagens")).toList();
+    QCOMPARE(l.size(), 2);
+    const QVariantMap un = l.at(0).toMap();       // menor fator primeiro
+    const QVariantMap fardo = l.at(1).toMap();
+    QCOMPARE(un.value(QStringLiteral("nome")).toString(), QStringLiteral("Unidade"));
+    QCOMPARE(un.value(QStringLiteral("atual")).toLongLong(), qint64(150));
+    QCOMPARE(un.value(QStringLiteral("novo")).toLongLong(), qint64(175));      // 21,00 / 12
+    QCOMPARE(fardo.value(QStringLiteral("atual")).toLongLong(), qint64(1800));
+    QCOMPARE(fardo.value(QStringLiteral("novo")).toLongLong(), qint64(2100));
+    QVERIFY(fardo.value(QStringLiteral("escolhida")).toBool());
+    QVERIFY(!un.value(QStringLiteral("escolhida")).toBool());
+
+    // Campo vazio: a tabela aparece mesmo assim, só com o "atual".
+    const QVariantList vazio = m_app->previaAjusteCusto(pid, emb(pid, 12), QString())
+                                   .value(QStringLiteral("embalagens")).toList();
+    QCOMPARE(vazio.size(), 2);
+    QVERIFY(!vazio.at(1).toMap().contains(QStringLiteral("novo")));
+
+    // Grava pelo fardo; a unidade acompanha.
+    QVERIFY(m_app->ajustarCusto(pid, emb(pid, 12), QStringLiteral("21,00"), false, QString()));
+    QCOMPARE(custoMilli(pid), qint64(175000));
 }
 
 QTEST_MAIN(TstVerificacaoGeral)

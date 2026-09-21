@@ -121,6 +121,7 @@ Rectangle {
                 clip: true
                 ListView {
                     id: lista
+                    objectName: "listaClientes"
                     anchors.fill: parent
                     clip: true
                     model: App.clientes
@@ -138,18 +139,34 @@ Rectangle {
                         highlighted: tela.clienteAtual && tela.clienteAtual.id === idCliente
                         onClicked: tela.abrirCliente(idCliente)
                         contentItem: RowLayout {
+                            // O `fillWidth` de fora não basta: uma coluna
+                            // aninhada não cresce além da largura MÁXIMA dela,
+                            // e essa máxima sai dos filhos. Sem fillWidth nos
+                            // textos, a coluna ficava do tamanho do nome e o
+                            // selo de situação parava colado nele — uma escada
+                            // pela lista, cada linha num lugar.
                             ColumnLayout {
                                 Layout.fillWidth: true
+                                Layout.minimumWidth: 0
                                 spacing: 0
-                                Text { text: linha.nome; color: Theme.text; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold; elide: Text.ElideRight }
-                                Text { text: linha.telefone; color: Theme.textMuted; font.pixelSize: Theme.fontXs }
+                                Text { text: linha.nome; Layout.fillWidth: true; color: Theme.text; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold; elide: Text.ElideRight }
+                                Text { text: linha.telefone; Layout.fillWidth: true; color: Theme.textMuted; font.pixelSize: Theme.fontXs; elide: Text.ElideRight }
                             }
                             Text {
+                                objectName: "situacaoCliente"
                                 text: linha.saldo > 0 ? qsTr("Deve ") + App.formatarDinheiro(linha.saldo) : qsTr("Em dia")
                                 color: linha.saldo > 0 ? Theme.danger : Theme.success
                                 font.pixelSize: Theme.fontSm
                                 font.weight: Font.DemiBold
                             }
+                        }
+
+                        Rectangle {
+                            objectName: "separadorLinha"
+                            anchors.bottom: parent.bottom
+                            width: parent.width
+                            height: 1
+                            color: Theme.border
                         }
                     }
                     Label {
